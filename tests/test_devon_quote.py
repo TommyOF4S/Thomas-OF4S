@@ -95,6 +95,28 @@ def test_cantilevers_become_pairs(catalog):
     assert not res.warnings
 
 
+@pytest.mark.parametrize("lefts,rights,pairs", [(15, 15, 15), (7, 8, 8), (3, 0, 2), (1, 0, 1), (0, 5, 3)])
+def test_cantilever_pairs_are_total_over_two_rounded_up(catalog, lefts, rights, pairs):
+    lines = []
+    if lefts:
+        lines.append(line("WPS-UNCT24L", "Regular Cantilever - Left Hand - 24D", lefts))
+    if rights:
+        lines.append(line("WPS-UNCT24R", "Regular Cantilever - Right Hand - 24D", rights))
+    res = Mapper(catalog).map(lines)
+    assert res.quantities["HMP225.22"] == pairs
+    assert not res.warnings  # unequal lefts and rights are fine: the rule covers them
+
+
+def test_cantilevers_recognized_by_description(catalog):
+    res = Mapper(catalog).map([
+        line("X-CANT-L", "Regular Cantilever - Left Hand - 16D", 2),
+        line("X-CANT-R", "Regular Cantilever - Right Hand - 16D", 3),
+        line("X-CANT-S", "Shared Cantilever - Single - 24D", 4),
+    ])
+    assert res.quantities["HMP165.16"] == 3 and res.quantities["HMP226.22"] == 4
+    assert not res.unmapped
+
+
 def test_odd_worksurface_gets_custom_cut(catalog):
     m = Mapper(catalog).map_line(line("W-WS2454", "Rectangular - 24D x 54W"))
     assert m.targets == [("WS2460", 1), ("MIS-002", 1)] and m.status == "review"

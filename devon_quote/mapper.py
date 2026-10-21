@@ -124,6 +124,8 @@ _PANEL = re.compile(r"^P-DL([A-Z]+?)(\d{2})(\d{2})$")
 _POST = re.compile(r"^P-DLPF([234])(\d{2})$")
 _WS = re.compile(r"^W-WS(\d{2})(\d{2})$")
 _CANT = re.compile(r"^WPS-UNCT(\d{2})([LRS])$")
+_CANT_DEPTH = re.compile(r"(\d{2})\s*(?:D\b|\"|in\b)", re.I)
+CANTILEVER_PAIR_NOTE = "Devon sells cantilevers as L/R pairs: pairs = (AIS lefts + rights) / 2, rounded up"
 _WIDTH = re.compile(r"(\d{2})\s*(?:\"|in\b|W\b)", re.I)
 
 
@@ -266,15 +268,22 @@ class Mapper:
 
     def _rule_support(self, line: BomLine) -> Mapping | None:
         pn = line.part.upper()
+        d = line.description.upper()
         m = _CANT.match(pn)
+        depth = hand = None
         if m:
             depth, hand = int(m.group(1)), m.group(2)
+        elif "CANTILEVER" in d:
+            hand = "S" if "SHARED" in d else "L" if "LEFT" in d else "R" if "RIGHT" in d else None
+            dm = _CANT_DEPTH.search(line.description)
+            depth = int(dm.group(1)) if dm else 24
+        if hand:
             size = "22" if depth >= 22 else "16"
             if hand == "S":
                 return Mapping(line, [(f"HMP226.{size}", 1)], "ok", "", "support")
-            # Devon sells cantilevers as L/R pairs: each AIS left or right counts as half a pair.
+            # Each AIS left or right is half a Devon pair; the total is rounded up after adding them all.
             pair = "HMP225.22" if size == "22" else "HMP165.16"
-            return Mapping(line, [(pair, 0.5)], "ok", "", "support")
+            return Mapping(line, [(pair, 0.5)], "ok", CANTILEVER_PAIR_NOTE, "support")
         if pn == "WPS-FP" or "FLAT PLATE" in line.description.upper():
             return Mapping(line, [("ACC-105", 1)], "ok", "", "support")
         if pn.startswith("WPS-VC"):
@@ -346,11 +355,6 @@ class Mapper:
                 if "2D plan" not in sources[part]:
                     sources[part].append("2D plan")
         quantities = {p: math.ceil(q - 1e-9) for p, q in raw.items() if q > 0}
-
-        lefts = sum(m.source.qty for m in mappings if m.source.part.upper().endswith(("UNCT24L", "UNCT16L")))
-        rights = sum(m.source.qty for m in mappings if m.source.part.upper().endswith(("UNCT24R", "UNCT16R")))
-        if lefts != rights:
-            warnings.append(f"AIS left cantilevers ({lefts:g}) and right cantilevers ({rights:g}) don't match; Devon sells them as pairs")
 
         auto_added = self._auto_add(quantities)
         return MapResult(mappings, quantities, dict(sources), auto_added, warnings, self.plan, plan_parts)

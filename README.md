@@ -115,7 +115,7 @@ BOM has more than one panel height and the plan has no dots, the review says so.
 | Infeeds, duplex outlets, data plates | `BE-SDFD1`/`BE-ENDFD`, `BE-REC1-4`, `BE01439-C` |
 | Electrical jumpers | not quoted (Devon P4 panels connect directly); flagged to add pass-thrus |
 | Worksurfaces `W-WSDDWW` | `WSDDWW`. Sizes Devon doesn't make get the next size up plus `MIS-002` custom cut. |
-| Cantilevers L+R / shared, flat plate, U-channel | `HMP225.22` pairs / `HMP226.22`, `ACC-105`, `WPS-VC48` |
+| Cantilevers left/right, shared, flat plate, U-channel | Pairs = (AIS lefts + rights) ÷ 2, rounded up: `HMP225.22` (22") or `HMP165.16` (16") per depth; shared `HMP226`; `ACC-105`; `WPS-VC48` |
 | Pedestals, laterals | `ECO-BBF-MT` / `ECO-FF-MT` / `ECO-MOB BF`, `G-LF230` |
 
 Devon's no-charge fastener kits (`ACC-106/107/108`) and touch-up paint (`ACC-110`) are added

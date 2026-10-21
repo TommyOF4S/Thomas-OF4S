@@ -276,6 +276,8 @@
   const POST = /^P-DLPF([234])(\d{2})$/;
   const WS = /^W-WS(\d{2})(\d{2})$/;
   const CANT = /^WPS-UNCT(\d{2})([LRS])$/;
+  const CANT_DEPTH = /(\d{2})\s*(?:D\b|"|in\b)/i;
+  const CANTILEVER_PAIR_NOTE = "Devon sells cantilevers as L/R pairs: pairs = (AIS lefts + rights) / 2, rounded up";
   const WIDTH = /(\d{2})\s*(?:"|in\b|W\b)/i;
 
   function powered(desc) {
@@ -420,13 +422,21 @@
 
       function support(line) {
         const pn = line.part.toUpperCase();
-        const m = pn.match(CANT);
-        if (m) {
-          const size = +m[1] >= 22 ? "22" : "16";
-          if (m[2] === "S") return M(line, [[`HMP226.${size}`, 1]], "ok", "", "support");
-          return M(line, [[size === "22" ? "HMP225.22" : "HMP165.16", 0.5]], "ok", "", "support");
-        }
         const d = line.description.toUpperCase();
+        const m = pn.match(CANT);
+        let depth = null, hand = null;
+        if (m) { depth = +m[1]; hand = m[2]; }
+        else if (d.includes("CANTILEVER")) {
+          hand = d.includes("SHARED") ? "S" : d.includes("LEFT") ? "L" : d.includes("RIGHT") ? "R" : null;
+          const dm = line.description.match(CANT_DEPTH);
+          depth = dm ? +dm[1] : 24;
+        }
+        if (hand) {
+          const size = depth >= 22 ? "22" : "16";
+          if (hand === "S") return M(line, [[`HMP226.${size}`, 1]], "ok", "", "support");
+          // Each AIS left or right is half a Devon pair; the total is rounded up after adding them all.
+          return M(line, [[size === "22" ? "HMP225.22" : "HMP165.16", 0.5]], "ok", CANTILEVER_PAIR_NOTE, "support");
+        }
         if (pn === "WPS-FP" || d.includes("FLAT PLATE")) return M(line, [["ACC-105", 1]], "ok", "", "support");
         if (pn.startsWith("WPS-VC")) {
           let part = has(pn.slice(4)) ? pn.slice(4) : null;
@@ -574,10 +584,6 @@
       }
       const quantities = {};
       for (const p of firstSeen) if (raw[p] > 0) quantities[p] = Math.ceil(raw[p] - 1e-9);
-
-      const sumEnds = (ends) => mappings.filter((m) => ends.some((e) => m.source.part.toUpperCase().endsWith(e))).reduce((s, m) => s + m.source.qty, 0);
-      const lefts = sumEnds(["UNCT24L", "UNCT16L"]), rights = sumEnds(["UNCT24R", "UNCT16R"]);
-      if (lefts !== rights) warnings.push(`AIS left cantilevers (${lefts}) and right cantilevers (${rights}) don't match; Devon sells them as pairs`);
 
       const autoAdded = autoAdd(quantities);
       return {

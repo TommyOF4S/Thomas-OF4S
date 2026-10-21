@@ -81,6 +81,8 @@ def test_overrides_and_edge_parts(tmp_path):
         "W-WS2454,Rectangular - 24D x 54W,2\n"
         "P-DLFRPM3024,Divi Linear Panel - NPWR - 30H x 24W,3\n"
         "WPS-UNCT24L,Regular Cantilever - Left Hand - 24D,3\n"
+        "WPS-UNCT24R,Regular Cantilever - Right Hand - 24D,4\n"
+        "X-CANT-L,Regular Cantilever - Left Hand - 16D,1\n"
         "E-MX8W4PTPC21,21 in. Electrical Jumper,2\n"
         "X-MYSTERY,\"Something, odd\",1\n"
     )
