@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Devon quote builder · OF4S</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --navy-900: #0f1d33; --navy-800: #15273f; --navy-700: #1e3554; --navy-600: #2d4a6e;
+  --navy-500: #466489; --navy-300: #8fa9c7; --navy-100: #dde5ee;
+  --paper-50: #faf8f4; --paper-100: #f3efe7; --paper-200: #e8e2d4; --paper-300: #d6cfbe;
+  --stone-500: #7a7468; --stone-600: #555047; --stone-700: #3a362f; --stone-900: #1a1814;
+  --success: #5a7a4f; --warning: #b8895a; --danger: #9c3a30;
+  --display: 'Schibsted Grotesk', 'Geist', sans-serif;
+  --sans: 'Geist', -apple-system, system-ui, sans-serif;
+  --mono: 'Geist Mono', 'SF Mono', Menlo, monospace;
+  --line: rgba(15, 29, 51, 0.1); --line-2: rgba(15, 29, 51, 0.18);
+  --shadow: 0 4px 12px rgba(15, 29, 51, 0.08), 0 2px 4px rgba(15, 29, 51, 0.04);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--paper-50); color: var(--stone-900); font-family: var(--sans); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+
+header.bar { border-bottom: 1px solid var(--line); background: var(--paper-50); position: sticky; top: 0; z-index: 5; }
+header.bar .wrap { display: flex; align-items: center; gap: 16px; height: 60px; }
+.logo { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: -0.01em; color: var(--navy-800); }
+.logo b { color: var(--navy-500); font-weight: 700; }
+.bar .name { font-family: var(--display); font-weight: 500; color: var(--stone-700); }
+.bar .spacer { flex: 1; }
+.chip { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 10px; border-radius: 999px; background: var(--navy-100); color: var(--navy-700); white-space: nowrap; }
+.chip.warn { background: #f4e3d6; color: var(--danger); cursor: pointer; }
+
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--navy-600); margin: 0 0 10px; }
+h1 { font-family: var(--display); font-weight: 600; font-size: 40px; line-height: 1.08; letter-spacing: -0.02em; margin: 0; color: var(--stone-900); }
+h1 .accent { color: var(--navy-600); }
+h2 { font-family: var(--display); font-weight: 600; font-size: 22px; letter-spacing: -0.01em; margin: 0 0 4px; }
+.lede { color: var(--stone-600); max-width: 640px; margin: 12px 0 0; }
+section.hero { padding: 40px 0 28px; }
+
+.grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; align-items: start; }
+.card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 22px; box-shadow: var(--shadow); }
+.card + .card { margin-top: 16px; }
+.step { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--stone-500); margin-bottom: 8px; display: flex; justify-content: space-between; }
+.step .opt { color: var(--stone-500); letter-spacing: 0.12em; }
+
+.drop { border: 1.5px dashed var(--paper-300); border-radius: 10px; background: var(--paper-50); padding: 22px; text-align: center; cursor: pointer; transition: border-color 150ms, background 150ms; }
+.drop:hover, .drop.over { border-color: var(--navy-500); background: var(--navy-100); }
+.drop .big { font-family: var(--display); font-weight: 600; font-size: 17px; }
+.drop .small { color: var(--stone-500); font-size: 13.5px; margin-top: 2px; }
+.drop.has { border-style: solid; border-color: var(--navy-500); background: #fff; text-align: left; }
+.file { display: flex; align-items: center; gap: 10px; }
+.file .fname { font-family: var(--mono); font-size: 13.5px; word-break: break-all; }
+.file .meta { color: var(--stone-500); font-size: 13px; }
+.file .x { margin-left: auto; border: 0; background: none; color: var(--stone-500); cursor: pointer; padding: 4px 6px; font-size: 13px; }
+.file .x:hover { color: var(--danger); }
+.icon { width: 22px; height: 22px; flex: none; stroke: var(--navy-600); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+textarea { width: 100%; min-height: 110px; resize: vertical; border: 1px solid var(--line-2); border-radius: 8px; padding: 10px 12px; background: #fff; }
+.row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.btn { border: 1px solid var(--line-2); background: #fff; border-radius: 8px; padding: 8px 14px; cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--stone-900); }
+.btn:hover { border-color: var(--navy-500); }
+.btn.primary { background: var(--navy-800); border-color: var(--navy-800); color: var(--paper-50); padding: 12px 20px; font-size: 16px; }
+.btn.primary:hover { background: var(--navy-700); }
+.btn.primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.rec { border-color: var(--danger); color: var(--danger); }
+.btn .icon { width: 18px; height: 18px; }
+.btn.primary .icon { stroke: var(--paper-50); }
+.hint { color: var(--stone-500); font-size: 13px; }
+
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.fields .full { grid-column: 1 / -1; }
+label.f span { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--stone-600); margin-bottom: 4px; }
+label.f input, label.f select { width: 100%; border: 1px solid var(--line-2); border-radius: 8px; padding: 9px 11px; background: #fff; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--navy-300); outline-offset: 0; border-color: var(--navy-500); }
+.go { margin-top: 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.error { color: var(--danger); font-size: 14px; }
+
+#results { padding: 36px 0 64px; display: none; }
+.totals { display: grid; grid-template-columns: 1.3fr 1fr; gap: 24px; align-items: stretch; }
+.total-card { background: var(--navy-800); color: var(--paper-50); border-radius: 14px; padding: 26px; }
+.total-card .eyebrow { color: var(--navy-300); }
+.total-card .amount { font-family: var(--display); font-weight: 600; font-size: 48px; letter-spacing: -0.02em; line-height: 1; }
+.total-card .sub { color: var(--navy-100); margin-top: 8px; font-size: 14px; }
+.total-card table { width: 100%; margin-top: 18px; border-collapse: collapse; font-size: 14px; }
+.total-card td { padding: 5px 0; border-top: 1px solid rgba(255,255,255,0.1); }
+.total-card td.n { text-align: right; font-family: var(--mono); }
+.downloads { display: flex; flex-direction: column; gap: 10px; }
+.downloads .btn { justify-content: flex-start; padding: 12px 14px; }
+.downloads .btn small { display: block; color: var(--stone-500); font-weight: 400; font-size: 12.5px; }
+.saved { font-family: var(--mono); font-size: 12px; color: var(--stone-500); word-break: break-all; }
+
+.attn { margin-top: 28px; display: grid; grid-template-columns: 1fr; gap: 24px; }
+.attn.with-plan { grid-template-columns: 1.1fr 1fr; }
+.plan { position: sticky; top: 76px; }
+.plan img, .plan embed, .plan iframe { width: 100%; height: 70vh; object-fit: contain; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.plan .tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.plan .tabs button { border: 1px solid var(--line-2); background: #fff; border-radius: 999px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; }
+.plan .tabs button.on { background: var(--navy-800); color: var(--paper-50); border-color: var(--navy-800); }
+
+.items { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.item { background: #fff; border: 1px solid var(--line); border-left: 3px solid var(--warning); border-radius: 8px; padding: 12px 14px; }
+.item.bad { border-left-color: var(--danger); }
+.item.warnline { border-left-color: var(--danger); background: #fbf3ef; }
+.item .top { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.item .pn { font-family: var(--mono); font-size: 13.5px; font-weight: 500; }
+.item .arrow { color: var(--stone-500); }
+.item .dv { font-family: var(--mono); font-size: 13.5px; color: var(--navy-600); }
+.item .q { margin-left: auto; font-family: var(--mono); font-size: 13px; color: var(--stone-600); }
+.item .desc { color: var(--stone-600); font-size: 13.5px; }
+.item .note { margin-top: 4px; font-size: 14px; }
+.ok { color: var(--success); font-weight: 500; }
+
+table.data { width: 100%; border-collapse: collapse; font-size: 14px; background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+table.data th { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--stone-600); text-align: left; padding: 10px 12px; background: var(--paper-100); font-weight: 500; }
+table.data td { padding: 8px 12px; border-top: 1px solid var(--line); vertical-align: top; }
+table.data td.n, table.data th.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
+table.data td.pn { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+table.data td.src { font-family: var(--mono); font-size: 12px; color: var(--stone-500); }
+table.data tfoot td { font-weight: 600; background: var(--paper-100); }
+.block { margin-top: 36px; }
+.block > p { color: var(--stone-600); margin: 4px 0 12px; }
+
+.spinner { width: 18px; height: 18px; border: 2px solid rgba(250,248,244,0.35); border-top-color: var(--paper-50); border-radius: 50%; animation: spin 0.8s linear infinite; display: none; }
+.busy .spinner { display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.page-drop { position: fixed; inset: 0; background: rgba(21, 39, 63, 0.82); color: var(--paper-50); display: none; align-items: center; justify-content: center; z-index: 50; font-family: var(--display); font-size: 28px; font-weight: 600; }
+.page-drop.on { display: flex; }
+footer { border-top: 1px solid var(--line); padding: 18px 0 30px; color: var(--stone-500); font-size: 13px; }
+
+@media (max-width: 880px) {
+  .grid, .totals, .attn.with-plan { grid-template-columns: 1fr; }
+  .plan { position: static; }
+  h1 { font-size: 32px; }
+  .fields { grid-template-columns: 1fr; }
+  .bar .name { display: none; }
+  .chip { max-width: 62vw; overflow: hidden; text-overflow: ellipsis; }
+  .step { flex-wrap: wrap; gap: 4px 12px; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></symbol>
+  <symbol id="i-plan" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M3 10h8V3M11 10v11M11 15h10"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-sheet" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M4 9h16M4 15h16M10 3v18"/></symbol>
+</svg>
+
+<header class="bar">
+  <div class="wrap">
+    <span class="logo">OF<b>4</b>S</span>
+    <span class="name">Devon quote builder</span>
+    <span class="spacer"></span>
+    <span id="tplChip" class="chip">Loading…</span>
+    <input id="tplInput" type="file" accept=".xlsm" hidden>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <p class="eyebrow">AIS Divi to Devon</p>
+    <h1>Drop the CET file. Get the <span class="accent">Devon quote.</span></h1>
+    <p class="lede">Export the bill of materials from CET, drop it here with the 2D plan, and say anything the drawing doesn't show. You get Devon's own calculator, filled in and ready to send.</p>
+  </section>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <div class="step"><span>1 · CET bill of materials</span><span class="opt">Required</span></div>
+        <div id="bomDrop" class="drop" tabindex="0">
+          <div class="big">Drop the CET export here</div>
+          <div class="small">.sif works best. A .csv or .xlsx with part numbers and quantities also works. Or click to choose.</div>
+        </div>
+        <input id="bomInput" type="file" accept=".sif,.csv,.txt,.xlsx" hidden>
+      </div>
+
+      <div class="card">
+        <div class="step"><span>2 · 2D plan</span><span class="opt">Optional</span></div>
+        <div id="planDrop" class="drop" tabindex="0">
+          <div class="big">Drop the 2D plan here</div>
+          <div class="small">PDF or image. It shows next to the items you need to check.</div>
+        </div>
+        <input id="planInput" type="file" accept=".pdf,image/*" multiple hidden>
+        <div id="planList"></div>
+      </div>
+
+      <div class="card">
+        <div class="step"><span>3 · Notes or dictation</span><span class="opt">Optional</span></div>
+        <textarea id="notes" placeholder="Anything the drawing doesn't show. Example: straight runs along the window wall, power comes from the east wall, all ends finished."></textarea>
+        <div class="row">
+          <button id="micBtn" class="btn" type="button" hidden><svg class="icon"><use href="#i-mic"/></svg><span>Dictate</span></button>
+          <span id="micHint" class="hint"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="step"><span>4 · Quote details</span></div>
+      <div class="fields">
+        <label class="f full"><span>Project name</span><input id="project" placeholder="Acme HQ, 3rd floor"></label>
+        <label class="f"><span>Ship-to zip</span><input id="ship_to" inputmode="numeric" placeholder="33010"></label>
+        <label class="f"><span>Fabric grade</span>
+          <select id="grade"><option value="keystone">Keystone (grade 1)</option><option value="summit">Summit (grade 2)</option><option value="aspen">Aspen (grade 3)</option></select>
+        </label>
+        <label class="f"><span>Workstations</span><input id="stations" inputmode="numeric" placeholder="24"></label>
+        <label class="f"><span>Delivery estimate ($)</span><input id="delivery" inputmode="decimal" placeholder="0"></label>
+        <label class="f"><span>Trim code</span><input id="trim" placeholder="Keep Devon's default"></label>
+        <label class="f"><span>Description</span><input id="description" value="WORKSTATIONS"></label>
+      </div>
+      <div class="go">
+        <button id="buildBtn" class="btn primary" type="button" disabled><span class="spinner"></span><span>Build Devon quote</span></button>
+        <span id="buildMsg" class="hint">Add the CET file to start.</span>
+      </div>
+      <p class="hint" style="margin:16px 0 0">Everything runs on this computer. Results are also saved in the <span style="font-family:var(--mono)">out</span> folder.</p>
+    </div>
+  </div>
+
+  <section id="results">
+    <p class="eyebrow" id="resEyebrow">Estimate</p>
+    <div class="totals">
+      <div class="total-card">
+        <p class="eyebrow">Estimated Devon cost</p>
+        <div class="amount" id="total">$0</div>
+        <div class="sub" id="totalSub"></div>
+        <table id="breakdown"></table>
+      </div>
+      <div class="card downloads">
+        <div class="step"><span>Downloads</span></div>
+        <a id="dlQuote" class="btn" href="#"><svg class="icon"><use href="#i-sheet"/></svg><span>Devon calculator, filled in<small>.xlsm · opens in Excel or Google Sheets and prices itself</small></span></a>
+        <a id="dlReport" class="btn" href="#"><svg class="icon"><use href="#i-doc"/></svg><span>Review report<small>.md · flags, finishes, notes, line items</small></span></a>
+        <a id="dlCross" class="btn" href="#"><svg class="icon"><use href="#i-down"/></svg><span>AIS to Devon crosswalk<small>.csv · every AIS line and what it became</small></span></a>
+        <div class="saved" id="savedTo"></div>
+      </div>
+    </div>
+
+    <div id="attn" class="attn">
+      <div>
+        <div class="block" style="margin-top:0">
+          <h2 id="attnTitle">Needs your attention</h2>
+          <p id="attnLede">Check these against the plan before sending the quote to Devon.</p>
+          <div id="attnItems" class="items"></div>
+        </div>
+      </div>
+      <div id="planView" class="plan" hidden>
+        <div class="tabs" id="planTabs"></div>
+        <div id="planFrame"></div>
+      </div>
+    </div>
+
+    <div class="block" id="finBlock">
+      <h2>AIS finishes in the design</h2>
+      <p>Pick the matching Devon trim, fabric and worksurface colors.</p>
+      <table class="data" id="finTable"></table>
+    </div>
+
+    <div class="block">
+      <h2>Devon line items</h2>
+      <p>What went into the calculator. Net is list × Devon's multiplier.</p>
+      <table class="data" id="lineTable"></table>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap">Office Furniture 4 Sale · Devon quote builder · prices come from the Devon calculator in the templates folder.</div></footer>
+<div class="page-drop" id="pageDrop">Drop to add</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const money = (n) => (n == null ? "" : n.toLocaleString("en-US", { style: "currency", currency: "USD" }));
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const kb = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB");
+
+const state = { bom: null, plans: [], template: null };
+
+function readB64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(",", 2)[1] || "");
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
+
+// ---- Devon calculator status --------------------------------------------------
+async function loadStatus() {
+  try {
+    const s = await (await fetch("/api/status")).json();
+    state.template = s.template && !s.error ? s : null;
+    const chip = $("tplChip");
+    if (state.template) {
+      const when = (s.title || "").replace(/^.*NET PRICER\s*-\s*/i, "");
+      chip.textContent = `Devon calc · ${when || s.template} · ${s.items} items`;
+      chip.className = "chip";
+      chip.title = s.template + " (drop a newer Devon calculator .xlsm anywhere on the page to replace it)";
+      chip.onclick = null;
+    } else {
+      chip.textContent = s.error ? "Devon calc unreadable · click to replace" : "No Devon calc · click to add";
+      chip.className = "chip warn";
+      chip.title = "Add Devon's calculator (.xlsm). It stays on this computer.";
+      chip.onclick = () => $("tplInput").click();
+    }
+  } catch (e) {
+    $("tplChip").textContent = "Server not running";
+    $("tplChip").className = "chip warn";
+  }
+  refresh();
+}
+
+async function uploadTemplate(file) {
+  $("tplChip").textContent = "Loading Devon calc…";
+  try {
+    const res = await fetch("/api/template", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file: { name: file.name, data: await readB64(file) } }) });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error);
+  } catch (e) {
+    alert(e.message);
+  }
+  loadStatus();
+}
+$("tplInput").onchange = (e) => e.target.files[0] && uploadTemplate(e.target.files[0]);
+
+// ---- drop zones ---------------------------------------------------------------
+function wireDrop(zone, input, onFiles) {
+  zone.onclick = (e) => { if (!e.target.closest(".x")) input.click(); };
+  zone.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } };
+  input.onchange = () => { onFiles([...input.files]); input.value = ""; };
+  zone.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); zone.classList.add("over"); });
+  zone.addEventListener("dragleave", () => zone.classList.remove("over"));
+  zone.addEventListener("drop", (e) => {
+    e.preventDefault(); e.stopPropagation(); zone.classList.remove("over"); hidePageDrop();
+    onFiles([...e.dataTransfer.files]);
+  });
+}
+
+function setBom(file) {
+  state.bom = file;
+  const z = $("bomDrop");
+  if (!file) {
+    z.className = "drop";
+    z.innerHTML = '<div class="big">Drop the CET export here</div><div class="small">.sif works best. A .csv or .xlsx with part numbers and quantities also works. Or click to choose.</div>';
+  } else {
+    z.className = "drop has";
+    z.innerHTML = `<div class="file"><svg class="icon"><use href="#i-doc"/></svg><div><div class="fname">${esc(file.name)}</div><div class="meta">${kb(file.size)} · click to replace</div></div><button class="x" type="button" title="Remove">Remove</button></div>`;
+    z.querySelector(".x").onclick = (e) => { e.stopPropagation(); setBom(null); };
+    if (!$("project").value) $("project").value = file.name.replace(/\.[^.]+$/, "").replace(/^CET_/i, "").replace(/[_]+/g, " ");
+  }
+  refresh();
+}
+
+function renderPlans() {
+  $("planList").innerHTML = state.plans.map((p, i) =>
+    `<div class="file" style="margin-top:10px"><svg class="icon"><use href="#i-plan"/></svg><div><div class="fname">${esc(p.file.name)}</div><div class="meta">${kb(p.file.size)}</div></div><button class="x" type="button" data-i="${i}">Remove</button></div>`).join("");
+  $("planList").querySelectorAll(".x").forEach((b) => (b.onclick = () => {
+    URL.revokeObjectURL(state.plans[b.dataset.i].url);
+    state.plans.splice(+b.dataset.i, 1);
+    renderPlans();
+  }));
+}
+function addPlans(files) {
+  for (const f of files) state.plans.push({ file: f, url: URL.createObjectURL(f) });
+  renderPlans();
+}
+
+const isBom = (f) => /\.(sif|csv|txt|xlsx)$/i.test(f.name);
+const isPlan = (f) => /\.pdf$/i.test(f.name) || (f.type || "").startsWith("image/");
+const isTemplate = (f) => /\.xlsm$/i.test(f.name);
+
+function routeFiles(files) {
+  const plans = [];
+  for (const f of files) {
+    if (isTemplate(f)) uploadTemplate(f);
+    else if (isBom(f)) setBom(f);
+    else if (isPlan(f)) plans.push(f);
+    else alert(`Not sure what to do with ${f.name}. Drop a CET .sif/.csv/.xlsx, a plan PDF or image, or a Devon calculator .xlsm.`);
+  }
+  if (plans.length) addPlans(plans);
+}
+
+wireDrop($("bomDrop"), $("bomInput"), routeFiles);
+wireDrop($("planDrop"), $("planInput"), (fs) => addPlans(fs.filter(isPlan)));
+
+// Drop anywhere on the page; files are sorted by type.
+let dragDepth = 0;
+const hidePageDrop = () => { dragDepth = 0; $("pageDrop").classList.remove("on"); };
+window.addEventListener("dragenter", (e) => { if ([...e.dataTransfer.types].includes("Files")) { dragDepth++; $("pageDrop").classList.add("on"); } });
+window.addEventListener("dragleave", () => { if (--dragDepth <= 0) hidePageDrop(); });
+window.addEventListener("dragover", (e) => e.preventDefault());
+window.addEventListener("drop", (e) => { e.preventDefault(); hidePageDrop(); routeFiles([...e.dataTransfer.files]); });
+
+// ---- dictation ----------------------------------------------------------------
+(() => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  const btn = $("micBtn"); btn.hidden = false;
+  const rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
+  let on = false, base = "";
+  rec.onresult = (e) => {
+    let finalText = "", interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      (e.results[i].isFinal ? (finalText += e.results[i][0].transcript) : (interim += e.results[i][0].transcript));
+    }
+    if (finalText) base = (base + " " + finalText.trim()).trim();
+    $("notes").value = (base + (interim ? " " + interim : "")).trim();
+  };
+  rec.onend = () => { if (on) rec.start(); };
+  rec.onerror = (e) => { $("micHint").textContent = e.error === "not-allowed" ? "Microphone blocked. Allow it in the browser to dictate." : ""; };
+  btn.onclick = () => {
+    on = !on;
+    if (on) { base = $("notes").value.trim(); rec.start(); btn.classList.add("rec"); btn.querySelector("span").textContent = "Stop"; $("micHint").textContent = "Listening…"; }
+    else { rec.stop(); btn.classList.remove("rec"); btn.querySelector("span").textContent = "Dictate"; $("micHint").textContent = ""; }
+  };
+})();
+
+// ---- build --------------------------------------------------------------------
+function refresh() {
+  const ready = !!state.bom && !!state.template;
+  $("buildBtn").disabled = !ready;
+  $("buildMsg").className = "hint";
+  $("buildMsg").textContent = !state.template ? "Add Devon's calculator first (top right)." : !state.bom ? "Add the CET file to start." : "Ready.";
+}
+
+$("buildBtn").onclick = async () => {
+  const btn = $("buildBtn");
+  btn.disabled = true; btn.classList.add("busy"); $("buildMsg").textContent = "Building…";
+  try {
+    const body = {
+      bom: { name: state.bom.name, data: await readB64(state.bom) },
+      project: $("project").value, ship_to: $("ship_to").value, grade: $("grade").value,
+      stations: $("stations").value, delivery: $("delivery").value, trim: $("trim").value,
+      description: $("description").value, notes: $("notes").value,
+      drawings: state.plans.map((p) => p.file.name),
+    };
+    const res = await fetch("/api/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error || "Build failed");
+    showResults(j);
+    $("buildMsg").textContent = "Done.";
+  } catch (e) {
+    $("buildMsg").className = "error";
+    $("buildMsg").textContent = e.message;
+  } finally {
+    btn.classList.remove("busy"); refresh();
+    if ($("buildMsg").className !== "error" && state.bom) $("buildMsg").textContent = "Done. Change anything and build again.";
+  }
+};
+
+function showResults(r) {
+  const e = r.estimate;
+  $("results").style.display = "block";
+  $("resEyebrow").textContent = `${r.bom.name} · ${r.bom.lines} lines · ${r.bom.pieces} pieces`;
+  $("total").textContent = money(e.total);
+  $("totalSub").textContent = `${r.template.replace(/^.*NET PRICER\s*-\s*/i, "Devon price list ")} · ${r.grade}` + (e.per_station ? ` · ${money(e.per_station)} per station` : "");
+  $("breakdown").innerHTML = [
+    ["List", e.list], ["Product net", e.product], [`Surcharge (${Math.round(e.surcharge_rate * 100)}%)`, e.surcharge],
+    ["Delivery estimate", e.delivery],
+  ].map(([k, v]) => `<tr><td>${k}</td><td class="n">${money(v)}</td></tr>`).join("") +
+    `<tr><td>Weight (approx.)</td><td class="n">${Math.round(e.weight).toLocaleString()} lbs</td></tr>`;
+  $("dlQuote").href = r.files.quote; $("dlReport").href = r.files.report; $("dlCross").href = r.files.crosswalk;
+  $("savedTo").textContent = "Saved to " + r.saved_to;
+
+  const items = [];
+  for (const w of r.warnings) items.push(`<div class="item warnline"><div class="note">${esc(w)}</div></div>`);
+  for (const m of r.unmapped) items.push(itemHtml(m, true));
+  for (const m of r.review) items.push(itemHtml(m, false));
+  const n = r.unmapped.length + r.review.length + r.warnings.length;
+  $("attnTitle").textContent = n ? `Needs your attention (${r.unmapped.length} unmapped, ${r.review.length} to confirm)` : "Nothing flagged";
+  $("attnLede").innerHTML = n
+    ? "Unmapped parts are <b>not</b> in the Devon quote yet. Add them by hand, or add a row to mappings/overrides.csv so the tool learns them."
+    : '<span class="ok">Every AIS part mapped cleanly.</span>';
+  $("attnItems").innerHTML = items.join("");
+
+  // Plan beside the flags
+  const pv = $("planView");
+  if (state.plans.length) {
+    pv.hidden = false; $("attn").classList.add("with-plan");
+    $("planTabs").innerHTML = state.plans.length > 1 ? state.plans.map((p, i) => `<button data-i="${i}">${esc(p.file.name)}</button>`).join("") : "";
+    const show = (i) => {
+      const p = state.plans[i];
+      $("planFrame").innerHTML = /\.pdf$/i.test(p.file.name) ? `<iframe src="${p.url}" title="2D plan"></iframe>` : `<img src="${p.url}" alt="2D plan">`;
+      $("planTabs").querySelectorAll("button").forEach((b) => b.classList.toggle("on", +b.dataset.i === i));
+    };
+    $("planTabs").querySelectorAll("button").forEach((b) => (b.onclick = () => show(+b.dataset.i)));
+    show(0);
+  } else {
+    pv.hidden = true; $("attn").classList.remove("with-plan");
+  }
+
+  $("finBlock").style.display = r.finishes.length ? "" : "none";
+  $("finTable").innerHTML = "<thead><tr><th>Option</th><th>AIS selection</th><th class=n>Pieces</th></tr></thead><tbody>" +
+    r.finishes.map((f) => `<tr><td>${esc(f.group)}</td><td>${esc(f.selection)}</td><td class="n">${f.pieces}</td></tr>`).join("") + "</tbody>";
+
+  $("lineTable").innerHTML = "<thead><tr><th>Devon part</th><th>Description</th><th class=n>Qty</th><th class=n>Net each</th><th class=n>Net ext</th><th>From AIS</th></tr></thead><tbody>" +
+    r.lines.map((l) => `<tr><td class="pn">${esc(l.part)}</td><td>${esc(l.description)}</td><td class="n">${l.qty}</td><td class="n">${money(l.net_each)}</td><td class="n">${money(l.net_ext)}</td><td class="src">${esc(l.from.join(", "))}</td></tr>`).join("") +
+    `</tbody><tfoot><tr><td colspan="4">Product net</td><td class="n">${money(e.product)}</td><td></td></tr></tfoot>`;
+
+  $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function itemHtml(m, bad) {
+  const dv = m.devon.length ? m.devon.join(" + ") : bad ? "not quoted" : "nothing quoted";
+  return `<div class="item${bad ? " bad" : ""}"><div class="top"><span class="pn">${esc(m.part)}</span><span class="arrow">→</span><span class="dv">${esc(dv)}</span><span class="q">× ${m.qty}</span></div>` +
+    `<div class="desc">${esc(m.description)}</div><div class="note">${esc(m.note)}</div></div>`;
+}
+
+loadStatus();
+</script>
+</body>
+</html>

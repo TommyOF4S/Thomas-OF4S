@@ -196,7 +196,7 @@ class Mapper:
                 part = connector("2way", height)
                 note = (
                     "AIS 2-way post covers both straight runs and L-corners; Devon uses "
-                    f"{connector('inline', height)} for straight panel-to-panel joints — check the plan"
+                    f"{connector('inline', height)} for straight panel-to-panel joints. Check the plan."
                 )
                 return Mapping(line, [(part, 1)], "review", "; ".join(filter(None, [hnote, note])), "post")
             part = connector("3way" if ways == 3 else "4way", height)
@@ -290,7 +290,7 @@ class Mapper:
                 part = "ECO-FF-MT"
             else:
                 part = "ECO-BBF-MT"
-            return Mapping(line, [(part, 1)], "review", "AIS pedestal quoted as Devon ECO-style pedestal — confirm size/finish", "storage")
+            return Mapping(line, [(part, 1)], "review", "AIS pedestal quoted as Devon ECO-style pedestal. Confirm size and finish.", "storage")
         if "LATERAL" in d:
             return Mapping(line, [("G-LF230", 1)], "review", "AIS lateral quoted as Devon 30\" 2-drawer lateral", "storage")
         width = _WIDTH.search(line.description)

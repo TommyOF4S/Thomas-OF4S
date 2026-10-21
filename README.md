@@ -7,6 +7,23 @@ translate the result into Devon's own calculator. This tool does the translation
 
 **CET bill of materials (AIS Divi) → filled-in Devon calculator (.xlsm) + review report**
 
+### The drag-and-drop page
+
+Double-click **`Devon Quote Builder.bat`** (Windows) or **`devon-quote-builder.command`** (Mac),
+or run `python -m devon_quote serve`. A page opens in your browser:
+
+1. Drop the CET export (`.sif`, or a `.csv`/`.xlsx` with part numbers and quantities).
+2. Drop the 2D plan (PDF or image). It's shown next to the flagged items so you can check them.
+3. Type notes, or click **Dictate** and talk (Chrome/Edge).
+4. Fill in project, zip, grade, stations and delivery, then click **Build Devon quote**.
+
+You get the estimated Devon total, everything that needs a look, and downloads for the filled
+Devon calculator, the review report and the crosswalk. Copies are saved in `out/`. To swap in a
+new Devon calculator, drop its `.xlsm` anywhere on the page. The page runs only on your computer
+(127.0.0.1), and no files leave it.
+
+### Command line
+
 ```
 python -m devon_quote BOM.sif --project "Acme HQ" --ship-to 33010 \
     --stations 24 --delivery 4500 --notes dictation.txt --drawing plan.pdf
@@ -28,7 +45,7 @@ It writes three files to `out/`:
    When Devon issues a new calculator, drop it in `templates/`. The newest file is used,
    and the price list is read straight from it.
 
-### Inputs
+### Inputs (command line)
 
 - **BOM**: CET's SIF export (`.sif`) works best, because it carries finishes. A `.csv` or `.xlsx`
   with *Part Number* and *Qty* columns also works.

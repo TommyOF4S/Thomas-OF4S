@@ -57,7 +57,7 @@ def write_report(
 ) -> None:
     out: list[str] = []
     w = out.append
-    w(f"# Devon quote review — {project or 'untitled project'}\n")
+    w(f"# Devon quote review · {project or 'untitled project'}\n")
     w(f"- AIS bill of materials: `{bom_file}` ({len(lines)} lines, {sum(l.qty for l in lines):g} pieces)")
     w(f"- Devon calculator filled in: `{quote_file}`")
     w(f"- Price list: {catalog.title} · fabric grade {GRADES[grade]} · net = list × {catalog.net_multiplier:g}")
@@ -84,14 +84,14 @@ def write_report(
             w(f"- ⚠️ {x}")
         w("")
     if unmapped:
-        w("### Unmapped — not in the Devon quote yet\n")
+        w("### Unmapped: not in the Devon quote yet\n")
         w("Add these by hand, or teach the tool by adding a row to `mappings/overrides.csv`.\n")
         w("| AIS part | Description | Qty | Why |\n|---|---|---:|---|")
         for m in unmapped:
             w(f"| {m.source.part} | {m.source.description} | {m.source.qty:g} | {m.note} |")
         w("")
     if review:
-        w("### Mapped — please confirm\n")
+        w("### Mapped: please confirm\n")
         w("| AIS part | Qty | → Devon | Check |\n|---|---:|---|---|")
         for m in review:
             tgt = ", ".join(p for p, _ in m.targets) or "—"
