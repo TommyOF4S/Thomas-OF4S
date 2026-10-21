@@ -105,10 +105,16 @@ def write_report(
         w(f"Read {result.plan.panels} panels off the plan and measured every joint. These replace the AIS post counts.\n")
         if result.plan.pink_dashes:
             w("Panel-to-panel connectors are counted from the pink dashes drawn on the plan, one per marked joint.\n")
+        tags = Counter(l.text for l in result.plan.labels if l.matched)
+        if tags:
+            w(f"Panel heights come from the CET panel labels ({sum(tags.values())} of {result.plan.panels} panels labeled: "
+              + ", ".join(f"{t} x {n}" for t, n in sorted(tags.items())) + "). Each connector is quoted at the tallest "
+              "panel at its joint; where heights change, a high/low filler strip covers the step.\n")
         w("| Joint on the plan | Qty | Devon part |\n|---|---:|---|")
         labels = {"straight": "Two panels in a straight line (180°)", "pink": "Panel-to-panel joint (pink dash on the plan)", "l": "Corner, two panels at 90°",
                   "tee": "Three panels", "cross": "Four panels", "ends": "Free end of a run",
-                  "filler": "Height change (colored dot): high/low filler strip"}
+                  "filler": "Height change (panel labels): high/low filler strip" if result.height_points
+                  else "Height change (colored dot): high/low filler strip"}
         for kind, part, qty in result.plan_parts:
             w(f"| {labels[kind]} | {qty} | {part} |")
         w("")

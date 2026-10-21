@@ -68,6 +68,7 @@ def read_plans(paths: list[str]) -> PlanResult | None:
             total.pages.extend(res.pages)
             total.height_changes.extend(res.height_changes)
             total.pink_dashes.extend(res.pink_dashes)
+            total.labels.extend(res.labels)
     return total if total is not None and total.panels else None
 
 

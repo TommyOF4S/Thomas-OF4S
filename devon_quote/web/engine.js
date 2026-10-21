@@ -318,6 +318,8 @@
     ovs.forEach((o) => (o.re = globToRegex(o.pattern)));
     let runHeight = null;
     let plan = null; // joints read from the 2D plan, when one was given
+    let widthHeights = new Map(); // Divi heights the BOM has in each panel width
+    let heightPoints = []; // {page, x, y, part, src} where panel labels show a height change
     let marks = null; // pink dashes and colored dots read from 2D images
     const has = (p) => catalog.has(p);
 
@@ -566,25 +568,88 @@
       return fillers;
     }
 
+    /** Devon height of a plan panel: its label, else the BOM's only height in that width. */
+    function panelHeight(width, height) {
+      const known = widthHeights.get(width);
+      if (height === null && known && known.size === 1) height = [...known][0];
+      return height === null ? null : devonHeight(height)[0];
+    }
+    const jointHeights = (panels) => [...new Set(panels.map(([w, h]) => panelHeight(w, h)).filter((h) => h !== null))].sort((a, b) => a - b);
+
+    /** High/low filler strips where panels of different labeled heights meet: one from each lower height up to the tallest. */
+    function labelFillers(warnings) {
+      const fillers = new Map();
+      for (const j of plan.joints) {
+        const hs = jointHeights(j.panels);
+        if (hs.length < 2) continue;
+        const top = hs[hs.length - 1];
+        if (hs.length > 2) warnings.push(`A ${JOINT_WORDS[j.kind] || "joint"} on page ${j.page} joins panels at ${hs.join(", ")}"H; quoted a filler strip from each lower height to ${top}"H. Check it.`);
+        for (const lo of hs.slice(0, -1)) {
+          const part = `HMHL${lo}${top}`;
+          if (has(part)) { fillers.set(part, (fillers.get(part) || 0) + 1); heightPoints.push({ page: j.page, x: j.x, y: j.y, part, src: j.src }); }
+          else warnings.push(`Panels at ${lo}" and ${top}" meet on page ${j.page}, but Devon's calculator has no filler strip for that change; add it by hand.`);
+        }
+      }
+      return new Map([...fillers].sort((a, b) => (a[0] < b[0] ? -1 : 1)));
+    }
+
     function planConnectors(lines, bomHeights) {
-      const height = runHeight || 53;
+      const def = runHeight || 53;
       const c = plan.counts;
       const warnings = [];
-      let fillers = heightChanges(warnings);
+      const labeled = (plan.labels || []).some((l) => l.matched);
+      const heightAt = labeled ? (panels) => { const hs = jointHeights(panels || []); return hs.length ? hs[hs.length - 1] : def; } : () => def;
+      let dotFillers = heightChanges(warnings);
       const markDots = marks && Object.keys(marks.dots || {}).length;
-      if (!(plan.heightChanges || []).length && markDots) fillers = markFillers(warnings);
-      const qty = { ...c };
-      let straightKind = "straight";
-      if ((plan.pinkDashes || []).length) { qty.straight = pinkDashCount(warnings); straightKind = "pink"; } // the designer's marks win
-      else if (marks && marks.pink) {
-        if (marks.pink !== c.straight) warnings.push(`The 2D image has ${marks.pink} pink dashes but the plan measures ${c.straight} straight joints; the pink dashes were quoted.`);
-        qty.straight = marks.pink; straightKind = "pink";
+      if (!(plan.heightChanges || []).length && markDots) dotFillers = markFillers(warnings);
+      const dotted = !!((plan.heightChanges || []).length || markDots);
+      let fillers = dotFillers;
+      if (labeled) {
+        const labelWarnings = [];
+        const lf = labelFillers(labelWarnings);
+        if (!dotted) { fillers = lf; warnings.push(...[...new Set(labelWarnings)].sort()); }
+        else {
+          const fmt = (f) => [...f].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([p, q]) => `${p} x ${q}`).join(", ") || "none";
+          if (fmt(lf) !== fmt(dotFillers)) warnings.push(`The colored dots give filler strips ${fmt(dotFillers)}, but the panel labels on the plan give ${fmt(lf)}. The dots were quoted; check which is right.`);
+          heightPoints = [];
+        }
       }
-      const parts = [["straight", "inline"], ["l", "2way"], ["tee", "3way"], ["cross", "4way"], ["ends", "finished_end"]]
-        .filter(([kind]) => qty[kind]).map(([kind, dk]) => [kind === "straight" ? straightKind : kind, connector(dk, height), qty[kind]]);
+      const entries = new Map(); // "kind|devonKind|height" -> qty
+      const add = (kind, dk, h, q = 1) => { const k = `${kind}|${dk}|${h}`; entries.set(k, (entries.get(k) || 0) + q); };
+      const devonKinds = { straight: "inline", l: "2way", tee: "3way", cross: "4way", ends: "finished_end" };
+      const pinkPlan = (plan.pinkDashes || []).length > 0;
+      const pinkImage = !pinkPlan && marks && marks.pink;
+      for (const j of plan.joints) {
+        if (devonKinds[j.kind] && !(j.kind === "straight" && (pinkPlan || pinkImage))) add(j.kind, devonKinds[j.kind], heightAt(j.panels));
+      }
+      if (pinkPlan) { // the designer marked the panel-to-panel joints: their count wins
+        pinkDashCount(warnings);
+        for (const d of plan.pinkDashes) if (d.joint) add("pink", "inline", heightAt(d.panels));
+      } else if (pinkImage) {
+        if (marks.pink !== c.straight) warnings.push(`The 2D image has ${marks.pink} pink dashes but the plan measures ${c.straight} straight joints; the pink dashes were quoted.`);
+        const straight = new Map();
+        for (const j of plan.joints) if (j.kind === "straight") { const h = heightAt(j.panels); straight.set(h, (straight.get(h) || 0) + 1); }
+        let h = def, best = -1;
+        for (const [k, v] of straight) if (v > best) { h = k; best = v; }
+        add("pink", "inline", h, marks.pink);
+      }
+      const order = { straight: 0, pink: 1, l: 2, tee: 3, cross: 4, ends: 5 };
+      const parts = [...entries].map(([k, q]) => { const [kind, dk, h] = k.split("|"); return [kind, dk, +h, q]; })
+        .sort((a, b) => order[a[0]] - order[b[0]] || a[2] - b[2]).map(([kind, dk, h, q]) => [kind, connector(dk, h), q]);
       for (const [p, q] of fillers) parts.push(["filler", p, q]);
-      if (bomHeights.length > 1 && !(plan.heightChanges || []).length && !markDots) {
-        warnings.push(`The BOM has panels at more than one height; plan connectors are all quoted at ${height}"H. Mark each height change on the CET plan with a colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, purple 53/67) to add its high/low filler strip.`);
+      if (labeled) {
+        const unknown = new Map();
+        for (const j of plan.joints) for (const [w, h] of j.panels || []) if (panelHeight(w, h) === null) unknown.set(w, (unknown.get(w) || 0) + 1);
+        let missing = 0;
+        for (const v of unknown.values()) missing += Math.ceil(v / 2); // each panel shows up at both of its ends
+        if (missing) {
+          const ws = [...unknown.keys()].sort((a, b) => a - b).map((w) => `${w}"W`).join(", ");
+          warnings.push(`${missing} panel(s) on the plan (${ws}) have no height label, and the BOM has more than one height in that width; their joints were quoted at ${def}"H with no filler strips. Check them.`);
+        }
+        const stray = plan.labels.filter((l) => !l.matched);
+        if (stray.length) warnings.push(`${stray.length} panel label(s) on the plan (${stray.map((l) => l.text).join(", ")}) aren't next to a panel of that width, so they were not used. Check the plan.`);
+      } else if (bomHeights.length > 1 && !dotted) {
+        warnings.push(`The BOM has panels at more than one height; plan connectors are all quoted at ${def}"H. Export the CET 2D as a PDF with the panel labels showing (letter, height, width, like A6660) so height changes get their high/low filler strips, or mark each height change with a colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, purple 53/67).`);
       }
       if (c.angled) warnings.push(`The 2D plan has ${c.angled} joint(s) at an angle other than 90 or 180 degrees. Devon has no angled connector; check those runs.`);
       if (c.other) warnings.push(`The 2D plan has ${c.other} joint(s) where more than four panels meet. Check those by hand.`);
@@ -611,6 +676,18 @@
       for (const [key, planN, planText, bomText] of checks) {
         if (bom[key] && bom[key] !== planN) warnings.push(`The 2D plan shows ${planText}, but the AIS BOM has ${fmtQty(bom[key])} ${bomText}. Make sure the plan and the BOM are the same revision.`);
       }
+      const bomSizes = new Map(), labelSizes = new Map();
+      for (const ln of lines) {
+        const pn = ln.part.toUpperCase(), m = pn.match(PANEL);
+        if (m && !pn.startsWith("P-DLPF") && !pn.startsWith("P-DLSEOR")) { const k = `${+m[2]}|${+m[3]}`; bomSizes.set(k, (bomSizes.get(k) || 0) + ln.qty); }
+      }
+      for (const l of plan.labels || []) if (l.matched) { const k = `${l.height}|${l.width}`; labelSizes.set(k, (labelSizes.get(k) || 0) + 1); }
+      const nLabeled = [...labelSizes.values()].reduce((a, b) => a + b, 0);
+      const sameSizes = bomSizes.size === labelSizes.size && [...bomSizes].every(([k, v]) => labelSizes.get(k) === v);
+      if (labeled && bomSizes.size && labelSizes.size && nLabeled === plan.panels && !sameSizes) {
+        const fmt = (z) => [...z].map(([k, v]) => [...k.split("|").map(Number), v]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(([h, w, v]) => `${fmtQty(v)} x ${h}"H ${w}"W`).join(", ");
+        warnings.push(`Panel sizes differ: the plan labels show ${fmt(labelSizes)}; the BOM has ${fmt(bomSizes)}.`);
+      }
       const pw = plan.widths;
       const same = bomWidths.size === Object.keys(pw).length && [...bomWidths].every(([k, v]) => pw[k] === v);
       if (bomWidths.size && Object.keys(pw).length && !same) {
@@ -634,6 +711,12 @@
       let bestCount = -1;
       for (const [h, c] of heights) if (c > bestCount) { runHeight = h; bestCount = c; }
       plan = planResult && planResult.panels ? planResult : null;
+      widthHeights = new Map();
+      for (const ln of lines) {
+        const pn = ln.part.toUpperCase(), m = pn.match(PANEL);
+        if (m && !pn.startsWith("P-DLPF") && !pn.startsWith("P-DLSEOR")) { if (!widthHeights.has(+m[3])) widthHeights.set(+m[3], new Set()); widthHeights.get(+m[3]).add(+m[2]); }
+      }
+      heightPoints = [];
       marks = marksSummary && (marksSummary.pink || Object.keys(marksSummary.dots || {}).length) ? marksSummary : null;
 
       const mappings = lines.map(mapLine);
@@ -669,7 +752,7 @@
 
       const autoAdded = autoAdd(quantities);
       return {
-        mappings, quantities, sources, autoAdded, warnings, plan, planParts, marks,
+        mappings, quantities, sources, autoAdded, warnings, plan, planParts, marks, heightPoints,
         review: mappings.filter((m) => m.status === "review"),
         unmapped: mappings.filter((m) => m.status === "unmapped"),
       };
@@ -684,6 +767,9 @@
   const PLAN_KINDS = ["straight", "l", "tee", "cross", "ends", "angled", "other"];
   const r2 = (v) => Math.round(v * 100) / 100;
   const MARK_JOINT_FACTOR = 6.0, MARK_MAX_FACTOR = 20.0;
+  const MAX_THICKNESS = 20.0; // thickest drawn panel accepted, in PDF points (CET's scale varies with the sheet)
+  const PANEL_LABEL = /^[A-Z](\d{2})(\d{2})$/; // CET panel tag: letter, height, width
+  const LABEL_REACH = 12.0; // a panel label sits within this many panel thicknesses of its panel
   // Dot color -> Devon high/low filler strip
   const DOT_COLORS = { red: "HMHL3953", blue: "HMHL3967", yellow: "HMHL4753", green: "HMHL4767", purple: "HMHL5367" };
 
@@ -726,7 +812,7 @@
     const groups = new Map();
     for (const r of rects) {
       const w = r.x1 - r.x0, h = r.y1 - r.y0, t = Math.min(w, h), len = Math.max(w, h);
-      if (t >= 0.05 && t <= 5 && len >= 3 * t && neutralGray(r.fill)) {
+      if (t >= 0.05 && t <= MAX_THICKNESS && len >= 3 * t && neutralGray(r.fill)) {
         const key = [r2(t), ...r.fill.map(r2)].join("|");
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(r);
@@ -774,9 +860,29 @@
       } else if (g.length === 3) kind = "tee";
       else if (g.length === 4) kind = "cross";
       else kind = "other";
-      out.push({ kind, x, y, page });
+      out.push({ kind, x, y, page, panels: g.map((e) => e[4]).sort((a, b) => a - b) });
     }
     return out;
+  }
+
+  const rectDistance = (x, y, r) => Math.hypot(Math.max(r.x0 - x, 0, x - r.x1), Math.max(r.y0 - y, 0, y - r.y1));
+
+  /** CET panel labels on the page, and the labeled Divi height of each panel they name (Map panel index -> height).
+   *  A label goes to the nearest panel of the width it names; closest pairs are matched first, one label per panel. */
+  function panelLabels(words, panels, t, page) {
+    const found = [];
+    for (const w of words) { const m = w.text.match(PANEL_LABEL); if (m) found.push([w, +m[1], +m[2]]); }
+    const widths = panels.map((r) => nominalWidth(Math.max(r.x1 - r.x0, r.y1 - r.y0), t));
+    const pairs = [];
+    found.forEach(([w, , width], li) => panels.forEach((r, pi) => { if (widths[pi] === width) pairs.push([rectDistance(w.x, w.y, r), li, pi]); }));
+    pairs.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+    const heights = new Map(), used = new Set();
+    for (const [d, li, pi] of pairs) {
+      if (d > LABEL_REACH * t || used.has(li) || heights.has(pi)) continue;
+      used.add(li); heights.set(pi, found[li][1]);
+    }
+    const labels = found.map(([w, h, width], li) => ({ text: w.text, height: h, width, page, x: w.x, y: w.y, matched: used.has(li) }));
+    return [labels, heights];
   }
 
   const isPink = (c) => !!c && c[0] > 0.8 && c[2] > 0.45 && c[1] < 0.8 && c[0] - c[1] > 0.2;
@@ -795,7 +901,7 @@
       let best = null, bd = null;
       joints.forEach((j, i) => { const d = Math.hypot(j.x - x, j.y - y); if (bd === null || d < bd) { best = i; bd = d; } });
       if (best !== null && bd <= MARK_JOINT_FACTOR * t) {
-        if (!marked.has(best)) { marked.add(best); out.push({ x, y, page, joint: joints[best].kind }); }
+        if (!marked.has(best)) { marked.add(best); out.push({ x, y, page, joint: joints[best].kind, panels: joints[best].panels }); }
       } else if (!out.some((m) => m.joint === null && Math.hypot(m.x - x, m.y - y) <= JOIN_FACTOR * t)) {
         out.push({ x, y, page, joint: null });
       }
@@ -805,8 +911,8 @@
 
   /** pages: [[{x0, y0, x1, y1, fill: [r, g, b] | null}]] (0-1 colors); shapes: filled paths per page, same form;
    *  strokes: pink stroked paths per page ({x0, y0, x1, y1, color, line}) */
-  function analyzeRects(pages, shapes = null, strokes = null) {
-    const res = { counts: Object.fromEntries(PLAN_KINDS.map((k) => [k, 0])), widths: {}, joints: [], pages: [], panels: 0, heightChanges: [], pinkDashes: [] };
+  function analyzeRects(pages, shapes = null, strokes = null, words = null) {
+    const res = { counts: Object.fromEntries(PLAN_KINDS.map((k) => [k, 0])), widths: {}, joints: [], pages: [], panels: 0, heightChanges: [], pinkDashes: [], labels: [] };
     pages.forEach((rects, p) => {
       const [panels, t] = findPanels(rects);
       res.pages.push({ page: p + 1, panels: panels.length, thickness: t });
@@ -817,6 +923,10 @@
         res.panels++;
       }
       const js = jointsOnPage(panels, t, p + 1);
+      const [labels, heights] = panelLabels(words ? words[p] || [] : [], panels, t, p + 1);
+      res.labels.push(...labels);
+      const sizes = panels.map((r, i) => [nominalWidth(Math.max(r.x1 - r.x0, r.y1 - r.y0), t), heights.has(i) ? heights.get(i) : null]);
+      for (const j of js) j.panels = j.panels.map((i) => sizes[i]);
       res.joints.push(...js);
       js.forEach((j) => res.counts[j.kind]++);
       if (shapes) res.heightChanges.push(...heightMarks(shapes[p], js, t, p + 1));
@@ -829,7 +939,7 @@
   async function pdfRects(pdfjsLib, bytes, { maxPages = 20 } = {}) {
     const OPS = pdfjsLib.OPS;
     const doc = await pdfjsLib.getDocument({ data: bytes, disableFontFace: true, isEvalSupported: false }).promise;
-    const pages = [], extras = [], strokeLists = [];
+    const pages = [], extras = [], strokeLists = [], wordLists = [];
     const views = [];
     for (let n = 1; n <= Math.min(doc.numPages, maxPages); n++) {
       const page = await doc.getPage(n);
@@ -901,17 +1011,30 @@
           pending = [];
         }
       }
+      // words, for CET's panel labels: the center of each whitespace-separated token in each text item
+      const words = [];
+      for (const it of (await page.getTextContent()).items) {
+        const str = it.str || "", tr = it.transform;
+        if (!str.trim()) continue;
+        const [a, b, c, d, e, f] = tr, al = Math.hypot(a, b) || 1, cl = Math.hypot(c, d) || 1;
+        const per = it.width / str.length;
+        for (const m of str.matchAll(/\S+/g)) {
+          const along = (m.index + m[0].length / 2) * per, up = 0.3 * cl;
+          words.push({ text: m[0], x: e + (a / al) * along + (c / cl) * up, y: f + (b / al) * along + (d / cl) * up, vertical: Math.abs(b) > Math.abs(a) });
+        }
+      }
+      wordLists.push(words);
       pages.push(rects);
       extras.push(shapes);
       strokeLists.push(strokes);
       views.push(page);
     }
-    return { pages, extras, strokes: strokeLists, pdfPages: views };
+    return { pages, extras, strokes: strokeLists, words: wordLists, pdfPages: views };
   }
 
   async function analyzePdf(pdfjsLib, bytes) {
-    const { pages, extras, strokes, pdfPages } = await pdfRects(pdfjsLib, bytes);
-    return { result: analyzeRects(pages, extras, strokes), pdfPages };
+    const { pages, extras, strokes, words, pdfPages } = await pdfRects(pdfjsLib, bytes);
+    return { result: analyzeRects(pages, extras, strokes, words), pdfPages };
   }
 
   // ---------------------------------------------------------------- marks in 2D images (port of marks.py)
@@ -1235,9 +1358,16 @@
       w("## Connectors from the 2D plan\n");
       w(`Read ${result.plan.panels} panels off the plan and measured every joint. These replace the AIS post counts.\n`);
       if ((result.plan.pinkDashes || []).length) w("Panel-to-panel connectors are counted from the pink dashes drawn on the plan, one per marked joint.\n");
+      const tags = new Map();
+      for (const l of result.plan.labels || []) if (l.matched) tags.set(l.text, (tags.get(l.text) || 0) + 1);
+      if (tags.size) {
+        const total = [...tags.values()].reduce((a, b) => a + b, 0);
+        const list = [...tags].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([t, n]) => `${t} x ${n}`).join(", ");
+        w(`Panel heights come from the CET panel labels (${total} of ${result.plan.panels} panels labeled: ${list}). Each connector is quoted at the tallest panel at its joint; where heights change, a high/low filler strip covers the step.\n`);
+      }
       w("| Joint on the plan | Qty | Devon part |\n|---|---:|---|");
       const labels = { straight: "Two panels in a straight line (180°)", pink: "Panel-to-panel joint (pink dash on the plan)", l: "Corner, two panels at 90°", tee: "Three panels", cross: "Four panels", ends: "Free end of a run",
-        filler: "Height change (colored dot): high/low filler strip" };
+        filler: (result.heightPoints || []).length ? "Height change (panel labels): high/low filler strip" : "Height change (colored dot): high/low filler strip" };
       for (const [k, p, q] of result.planParts) w(`| ${labels[k]} | ${q} | ${p} |`);
       w("");
       w("Free ends are quoted as finished ends. Swap any that stop at a wall to a wall start (HMA199).\n");

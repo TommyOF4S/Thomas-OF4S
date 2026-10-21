@@ -87,8 +87,26 @@ into joints, and classifies each joint by how many panels meet and at what angle
 then come from the plan instead of the AIS post counts. Runs that end at a wall are counted as
 finished ends, so swap those to wall starts (`HMA199`).
 
-**Marking height changes.** A 2D can't show panel heights, so mark them in CET before exporting:
-put a filled dot on each joint where the height changes. The color picks the filler strip:
+**Height changes from the panel labels.** Export the 2D with CET's panel labels showing: a
+letter, then the height and width in inches (`A6660` = 66"H × 60"W). The letter only tells the
+heights in one drawing apart (A, B, C...); the digits carry the height. Each label is matched to the
+nearest panel of the width it names, so every joint knows the heights meeting there:
+
+- each connector is quoted at the **tallest** panel height at its joint (a 2-way between a 66" and
+  a 42" panel is a 67" `HMA130.67`);
+- where heights differ, one high/low filler strip from each lower height up to the tallest
+  (42" next to 66" → `HMHL3967`, using the Divi-to-Devon heights: 42→39, 50→53, 66→67, 82→85);
+- a panel with no label takes its height from the BOM when the BOM has only one height in that
+  width; otherwise it's flagged;
+- the review flags labels that aren't next to a panel of their width, joints with three different
+  heights, height changes Devon has no filler strip for (anything to 85"), and plan label sizes
+  that don't match the BOM.
+
+Labels need a PDF (the text is read directly); a PNG or JPG has no text to read.
+
+**Marking height changes with dots.** For a PNG/JPG, or to override the labels, put a filled dot
+on each joint where the height changes. Dots win over labels when both are there (the review says
+if they disagree). The color picks the filler strip:
 
 | Dot | Heights | Devon filler strip |
 |---|---|---|
@@ -99,8 +117,8 @@ put a filled dot on each joint where the height changes. The color picks the fil
 | Purple | 53" to 67" | `HMHL5367` |
 
 The joint keeps its normal connector; each dot adds one filler strip. 39" to 47" (`HMHL3947`)
-has no color yet, so add it by hand. A colored dot that isn't on a joint is flagged. If the
-BOM has more than one panel height and the plan has no dots, the review says so.
+has no color (the labels find it). A colored dot that isn't on a joint is flagged. If the BOM has
+more than one panel height and the plan has neither labels nor dots, the review says so.
 
 **Marking panel-to-panel connectors.** Draw a **pink dash** on each panel-to-panel joint. When
 the plan has pink dashes, each marked joint is quoted as one panel-to-panel connector (`HMP213`),

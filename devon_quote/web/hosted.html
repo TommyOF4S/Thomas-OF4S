@@ -220,11 +220,12 @@ footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
         <div class="step"><span>2D plan</span><span>Optional</span></div>
         <div id="planDrop" class="drop" tabindex="0" role="button" aria-label="Add the 2D plan">
           <div class="big">Drop the 2D plan here</div>
-          <div class="small">PDF, PNG or JPG. The page reads the pink dashes and colored dots drawn on it, and from a vector CET PDF it also measures every panel joint.</div>
+          <div class="small">Best: the CET 2D exported as a PDF with panel labels on. The page measures every panel joint and reads each panel's height from its label. PNG and JPG work too, for pink dashes and colored dots.</div>
         </div>
         <input id="planInput" type="file" accept=".pdf,image/*" multiple hidden>
         <div id="planList"></div>
-        <div class="hint"><b>Height changes:</b> in CET, put a colored dot on each joint where the panel height changes. The color picks the high/low filler strip:
+        <p class="hint"><b>Height changes:</b> nothing to draw when the 2D is a PDF with CET's panel labels (A6660 = 66"H × 60"W). Where panels of different heights meet, the connector is quoted at the taller height and a high/low filler strip covers the step, such as HMHL3967 where a 42" (Devon 39") panel meets a 66" (Devon 67").</p>
+        <div class="hint">For a PNG or JPG, or to override the labels, put a colored dot on each joint where the height changes. The color picks the filler strip:
           <ul class="dotkey">
             <li><span class="dot" style="background:#e00000"></span>Red · 39" to 53" · HMHL3953</li>
             <li><span class="dot" style="background:#0040ff"></span>Blue · 39" to 67" · HMHL3967</li>
@@ -232,7 +233,7 @@ footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
             <li><span class="dot" style="background:#00a000"></span>Green · 47" to 67" · HMHL4767</li>
             <li><span class="dot" style="background:#8000c0"></span>Purple · 53" to 67" · HMHL5367</li>
           </ul>
-          The joint keeps its normal connector. 39" to 47" (HMHL3947) has no color yet, so add it by hand.</div>
+          Dots win over labels. 39" to 47" (HMHL3947) has no color, but the labels find it.</div>
         <p class="hint"><span class="dash" aria-hidden="true"></span><b>Panel-to-panel connectors:</b> draw a pink dash on each panel-to-panel joint. When the plan has pink dashes, each marked joint is quoted as one panel-to-panel connector (HMP213), and any straight joint without a dash is flagged. Without pink dashes, the straight joints the page measures are used.</p>
       </div>
 
@@ -518,7 +519,9 @@ function planSummaryText(r) {
   const hc = (r.heightChanges || []).length;
   const pinkOn = (r.pinkDashes || []).filter((d) => d.joint).length;
   const pinkOff = (r.pinkDashes || []).length - pinkOn;
+  const labeled = (r.labels || []).filter((l) => l.matched).length;
   return `<b>${r.panels} panels read:</b> ${c.straight} straight · ${c.l} corners · ${c.tee} three-way · ${c.cross} four-way · ${c.ends} free ends` +
+    (labeled ? ` · <b>heights from ${labeled} panel label${labeled === 1 ? "" : "s"}</b>` : "") +
     (hc ? ` · <b>${hc} height change${hc === 1 ? "" : "s"} (colored dots)</b>` : "") +
     (pinkOn + pinkOff ? ` · <b>${pinkOn} pink-dash panel-to-panel joint${pinkOn === 1 ? "" : "s"}</b>${pinkOff ? ` (${pinkOff} off a joint)` : ""}` : "") +
     (c.angled + c.other ? ` · <b>${c.angled + c.other} to check</b>` : "");
@@ -597,11 +600,13 @@ async function readPlan(p) {
 }
 
 function combinedPlan() {
-  const read = state.plans.filter((p) => p.status === "done" && p.analysis && p.analysis.panels);
+  const read = state.plans.map((p, src) => [p, src]).filter(([p]) => p.status === "done" && p.analysis && p.analysis.panels);
   if (!read.length) return null;
-  const out = { counts: {}, widths: {}, joints: [], pages: [], panels: 0, heightChanges: [], pinkDashes: [] };
-  for (const p of read) {
+  const out = { counts: {}, widths: {}, joints: [], pages: [], panels: 0, heightChanges: [], pinkDashes: [], labels: [] };
+  for (const [p, src] of read) {
     const r = p.analysis;
+    out.joints.push(...r.joints.map((j) => ({ ...j, src }))); // src: which plan file, for drawing it later
+    out.labels.push(...(r.labels || []));
     out.heightChanges.push(...(r.heightChanges || []));
     out.pinkDashes.push(...(r.pinkDashes || []));
     for (const [k, v] of Object.entries(r.counts)) out.counts[k] = (out.counts[k] || 0) + v;
@@ -790,7 +795,7 @@ function renderResults() {
       `${Object.keys(r.marks.dots).length ? " · dots: " + esc(Object.entries(r.marks.dots).map(([c, n]) => `${n} ${c}`).join(", ")) : ""}. ` +
       `Quoted from the marks: ${esc(parts || "nothing")}. AIS 2-way posts cover straight joints and corners, so the pink dashes are the panel-to-panel connectors and the rest of the 2-way posts are corners.</div></div>`);
   } else if (!r.plan && state.plans.length) {
-    items.unshift(`<div class="item warnline"><div class="note"><b>No marks found on the 2D.</b> Connectors come from the AIS SIF only, so straight panel-to-panel joints are quoted as 2-way corners. Draw a pink dash on each panel-to-panel joint and colored dots at height changes, then export the 2D again.</div></div>`);
+    items.unshift(`<div class="item warnline"><div class="note"><b>No marks found on the 2D.</b> Connectors come from the AIS SIF only, so straight panel-to-panel joints are quoted as 2-way corners. Export the CET 2D as a PDF with panel labels on, or draw a pink dash on each panel-to-panel joint and colored dots at height changes, then export again.</div></div>`);
   }
   if (r.plan) {
     items.unshift(`<div class="item" style="border-left-color:var(--accent-2)"><div class="note">${planSummaryText(r.plan)}. Connectors are quoted from the plan: ${esc(r.planParts.map((x) => x[1] + " × " + x[2]).join(", "))}. Free ends are quoted as finished ends; swap any at a wall to a wall start (HMA199).</div></div>`);
@@ -899,12 +904,13 @@ function renderCorrections() {
 
 function planViews() {
   const views = [];
-  for (const p of state.plans) {
-    if (p.status !== "done") { if (p.image) views.push({ kind: "img", name: p.file.name, url: p.url }); continue; }
+  const fillers = (state.out && state.out.result.heightPoints) || [];
+  state.plans.forEach((p, pi) => {
+    if (p.status !== "done") { if (p.image) views.push({ kind: "img", name: p.file.name, url: p.url }); return; }
     if (p.image) {
       const r = p.rasters[0];
       views.push({ kind: "raster", name: p.file.name, image: r.image, raster: r });
-      continue;
+      return;
     }
     (p.pdfPages || []).forEach((page, i) => {
       const pg = (p.analysis && p.analysis.pages[i]) || { panels: 0 };
@@ -914,9 +920,10 @@ function planViews() {
       views.push({ kind: "pdf", name: p.pdfPages.length > 1 ? `${p.file.name} · p${i + 1}` : p.file.name, page, raster,
         joints: p.analysis.joints.filter((j) => j.page === i + 1),
         marks: (p.analysis.heightChanges || []).filter((m) => m.page === i + 1),
-        dashes: (p.analysis.pinkDashes || []).filter((m) => m.page === i + 1) });
+        dashes: (p.analysis.pinkDashes || []).filter((m) => m.page === i + 1),
+        fillers: fillers.filter((f) => f.src === pi && f.page === i + 1) });
     });
-  }
+  });
   return views;
 }
 
@@ -994,7 +1001,9 @@ async function drawPdfView(v) {
     Object.entries(DOT_STYLE).map(([color, hex]) => {
       const n = v.marks.filter((m) => m.color === color).length;
       return n ? `<span><i style="background:transparent;border:3px solid ${hex}"></i>${E.DOT_COLORS[color]} ${n}</span>` : "";
-    }).join("") + (v.raster ? rasterLegend(v.raster) : "");
+    }).join("") +
+    (v.fillers.length ? `<span><i style="background:transparent;border:3px solid #1a1814;transform:rotate(45deg);border-radius:1px"></i>Height change (labels) ${v.fillers.length}</span>` : "") +
+    (v.raster ? rasterLegend(v.raster) : "");
   frameWith(canvas, legend);
   const ctx = canvas.getContext("2d");
   await v.page.render({ canvasContext: ctx, viewport }).promise;
@@ -1029,6 +1038,21 @@ async function drawPdfView(v) {
     const text = (E.DOT_COLORS[m.color] || "") + (m.joint ? "" : " (not on a joint)");
     ctx.lineWidth = Math.max(3, r / 1.2); ctx.strokeStyle = "#ffffff"; ctx.strokeText(text, x + r * 3, y - r * 2);
     ctx.fillStyle = "#1a1814"; ctx.fillText(text, x + r * 3, y - r * 2);
+  }
+  // height changes found from the panel labels: a diamond on the joint, named by its filler strip
+  const fillerHex = (part) => DOT_STYLE[Object.keys(E.DOT_COLORS).find((c) => E.DOT_COLORS[c] === part)] || "#5f6b7a";
+  const stacked = new Map();
+  for (const f of v.fillers) {
+    const [x, y] = viewport.convertToViewportPoint(f.x, f.y);
+    const key = `${Math.round(x)}|${Math.round(y)}`, k = stacked.get(key) || 0;
+    stacked.set(key, k + 1);
+    const d = r * 4;
+    ctx.beginPath(); ctx.moveTo(x, y - d); ctx.lineTo(x + d, y); ctx.lineTo(x, y + d); ctx.lineTo(x - d, y); ctx.closePath();
+    ctx.lineWidth = Math.max(4, r / 1.1); ctx.strokeStyle = "#1a1814"; ctx.stroke();
+    ctx.lineWidth = Math.max(2.5, r / 1.8); ctx.strokeStyle = fillerHex(f.part); ctx.stroke();
+    const ty = y + d + r * 2.6 * (k + 1);
+    ctx.lineWidth = Math.max(3, r / 1.2); ctx.strokeStyle = "#ffffff"; ctx.strokeText(f.part, x - d, ty);
+    ctx.fillStyle = "#1a1814"; ctx.fillText(f.part, x - d, ty);
   }
   if (v.raster) drawRasterMarks(ctx, v.raster, (mx, my) => [(mx / rs - x0) * scale, (my / rs - y0) * scale], r);
 }

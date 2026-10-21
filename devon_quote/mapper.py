@@ -96,6 +96,7 @@ class MapResult:
     plan: PlanResult | None = None
     plan_parts: list[tuple[str, str, int]] = field(default_factory=list)  # (joint kind, Devon part, qty)
     marks: MarksSummary | None = None  # marks read from 2D images
+    height_points: list[tuple[int, float, float, str]] = field(default_factory=list)  # (page, x, y, filler) from panel labels
 
     @property
     def review(self) -> list[Mapping]:
@@ -348,6 +349,13 @@ class Mapper:
         self.run_height = heights.most_common(1)[0][0] if heights else None
         self.plan = plan if plan is not None and plan.panels else None
         self.marks = marks if marks is not None and marks.any else None
+        # Divi heights the BOM has in each panel width: a plan panel with no label takes the height when there's one
+        self.width_heights: dict[int, set[int]] = defaultdict(set)
+        for ln in lines:
+            m = _PANEL.match(ln.part.upper())
+            if m and not ln.part.upper().startswith(("P-DLPF", "P-DLSEOR")):
+                self.width_heights[int(m.group(3))].add(int(m.group(2)))
+        self.height_points = []
 
         mappings = [self.map_line(ln) for ln in lines]
 
@@ -378,7 +386,8 @@ class Mapper:
         quantities = {p: math.ceil(q - 1e-9) for p, q in raw.items() if q > 0}
 
         auto_added = self._auto_add(quantities)
-        return MapResult(mappings, quantities, dict(sources), auto_added, warnings, self.plan, plan_parts, self.marks)
+        return MapResult(mappings, quantities, dict(sources), auto_added, warnings, self.plan, plan_parts, self.marks,
+                         self.height_points)
 
     def _mark_fillers(self, warnings: list[str]) -> Counter:
         """High/low filler strips from the colored dots found in 2D images."""
@@ -462,37 +471,114 @@ class Mapper:
                             f"{'it was' if one else 'they were'} not quoted. Put each dash right on the joint.")
         return len(on)
 
+    def _panel_height(self, width: int, height: int | None) -> int | None:
+        """Devon height of a plan panel: its label, else the BOM's only height in that width."""
+        if height is None and len(self.width_heights.get(width, ())) == 1:
+            height = next(iter(self.width_heights[width]))
+        return None if height is None else devon_height(height)[0]
+
+    def _joint_heights(self, panels: tuple) -> list[int]:
+        return sorted({h for h in (self._panel_height(w, ht) for w, ht in panels) if h is not None})
+
+    def _label_fillers(self, warnings: list[str]) -> Counter:
+        """High/low filler strips where panels of different labeled heights meet: one from each lower height
+        up to the tallest panel at the joint."""
+        fillers = Counter()
+        for j in self.plan.joints:
+            hs = self._joint_heights(j.panels)
+            if len(hs) < 2:
+                continue
+            if len(hs) > 2:
+                warnings.append(f"A {JOINT_WORDS.get(j.kind, 'joint')} on page {j.page} joins panels at "
+                                f"{', '.join(str(h) for h in hs)}\"H; quoted a filler strip from each lower height to "
+                                f"{hs[-1]}\"H. Check it.")
+            for lo in hs[:-1]:
+                part = f"HMHL{lo}{hs[-1]}"
+                if part in self.catalog:
+                    fillers[part] += 1
+                    self.height_points.append((j.page, j.x, j.y, part))
+                else:
+                    warnings.append(f"Panels at {lo}\" and {hs[-1]}\" meet on page {j.page}, but Devon's calculator has "
+                                    "no filler strip for that change; add it by hand.")
+        return Counter(dict(sorted(fillers.items())))
+
     def _plan_connectors(self, lines: list[BomLine], bom_heights: list[int]) -> tuple[list[tuple[str, str, int]], list[str]]:
-        """Devon connectors from the joints measured on the 2D plan, plus cross-checks against the BOM."""
+        """Devon connectors from the joints measured on the 2D plan, plus cross-checks against the BOM.
+
+        With CET panel labels on the plan, each connector is quoted at the tallest panel height at its joint, and
+        joints where heights differ get high/low filler strips. Colored dots, when drawn, set the filler strips.
+        """
         plan = self.plan
-        height = self.run_height or 53
+        default = self.run_height or 53
         c = plan.counts
         warnings = []
-        fillers = self._height_changes(warnings)
+        labeled = any(l.matched for l in plan.labels)
+        height_at = (lambda panels: (self._joint_heights(panels) or [default])[-1]) if labeled else (lambda panels: default)
+
+        dot_fillers = self._height_changes(warnings)
         if not plan.height_changes and self.marks is not None and self.marks.dots:
-            fillers = self._mark_fillers(warnings)
-        qty = Counter(c)
-        straight_kind = "straight"
-        if plan.pink_dashes:  # the designer marked the panel-to-panel joints: their count wins
-            qty["straight"] = self._pink_dash_count(warnings)
-            straight_kind = "pink"
-        elif self.marks is not None and self.marks.pink:
+            dot_fillers = self._mark_fillers(warnings)
+        dotted = bool(plan.height_changes or (self.marks is not None and self.marks.dots))
+        fillers = dot_fillers
+        if labeled:
+            label_warnings = []
+            label_fillers = self._label_fillers(label_warnings)
+            if not dotted:
+                fillers = label_fillers
+                warnings += sorted(set(label_warnings))
+            elif label_fillers != dot_fillers:
+                fmt = lambda f: ", ".join(f"{p} x {q}" for p, q in sorted(f.items())) or "none"
+                warnings.append(f"The colored dots give filler strips {fmt(dot_fillers)}, but the panel labels on the "
+                                f"plan give {fmt(label_fillers)}. The dots were quoted; check which is right.")
+                self.height_points = []
+            else:
+                self.height_points = []
+
+        entries = Counter()  # (kind on the plan, Devon connector kind, height) -> qty
+        devon_kinds = {"straight": "inline", "l": "2way", "tee": "3way", "cross": "4way", "ends": "finished_end"}
+        pink_plan = bool(plan.pink_dashes)
+        pink_image = not pink_plan and self.marks is not None and self.marks.pink
+        for j in plan.joints:
+            if j.kind in devon_kinds and not (j.kind == "straight" and (pink_plan or pink_image)):
+                entries[(j.kind, devon_kinds[j.kind], height_at(j.panels))] += 1
+        if pink_plan:  # the designer marked the panel-to-panel joints: their count wins
+            self._pink_dash_count(warnings)
+            for d in plan.pink_dashes:
+                if d.joint:
+                    entries[("pink", "inline", height_at(d.panels))] += 1
+        elif pink_image:
             if self.marks.pink != c["straight"]:
                 warnings.append(f"The 2D image has {self.marks.pink} pink dashes but the plan measures {c['straight']} "
                                 "straight joints; the pink dashes were quoted.")
-            qty["straight"] = self.marks.pink
-            straight_kind = "pink"
-        parts = [
-            (straight_kind if kind == "straight" else kind, connector(devon_kind, height), qty[kind])
-            for kind, devon_kind in (("straight", "inline"), ("l", "2way"), ("tee", "3way"),
-                                     ("cross", "4way"), ("ends", "finished_end"))
-            if qty[kind]
-        ]
+            straight = Counter(height_at(j.panels) for j in plan.joints if j.kind == "straight")
+            entries[("pink", "inline", straight.most_common(1)[0][0] if straight else default)] += self.marks.pink
+        order = {k: i for i, k in enumerate(("straight", "pink", "l", "tee", "cross", "ends"))}
+        parts = [(kind, connector(dk, h), q) for (kind, dk, h), q in
+                 sorted(entries.items(), key=lambda e: (order[e[0][0]], e[0][2]))]
         parts += [("filler", p, q) for p, q in fillers.items()]
-        if len(bom_heights) > 1 and not plan.height_changes and not (self.marks and self.marks.dots):
-            warnings.append(f'The BOM has panels at more than one height; plan connectors are all quoted at {height}"H. '
-                            "Mark each height change on the CET plan with a colored dot (red 39/53, blue 39/67, "
-                            "yellow 47/53, green 47/67, purple 53/67) to add its high/low filler strip.")
+
+        if labeled:
+            unknown = Counter()
+            for j in plan.joints:
+                for w, h in j.panels:
+                    if self._panel_height(w, h) is None:
+                        unknown[w] += 1
+            # each panel shows up at both of its ends
+            missing = sum(math.ceil(v / 2) for v in unknown.values())
+            if missing:
+                ws = ", ".join(f'{w}"W' for w in sorted(unknown))
+                warnings.append(f"{missing} panel(s) on the plan ({ws}) have no height label, and the BOM has more than "
+                                f"one height in that width; their joints were quoted at {default}\"H with no filler "
+                                "strips. Check them.")
+            stray = [l for l in plan.labels if not l.matched]
+            if stray:
+                warnings.append(f"{len(stray)} panel label(s) on the plan ({', '.join(l.text for l in stray)}) aren't next "
+                                "to a panel of that width, so they were not used. Check the plan.")
+        elif len(bom_heights) > 1 and not dotted:
+            warnings.append(f'The BOM has panels at more than one height; plan connectors are all quoted at {default}"H. '
+                            "Export the CET 2D as a PDF with the panel labels showing (letter, height, width, like A6660) "
+                            "so height changes get their high/low filler strips, or mark each height change with a "
+                            "colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, purple 53/67).")
         if c["angled"]:
             warnings.append(f"The 2D plan has {c['angled']} joint(s) at an angle other than 90 or 180 degrees. "
                             "Devon has no angled connector; check those runs.")
@@ -526,6 +612,15 @@ class Mapper:
             if bom[key] and abs(bom[key] - plan_n) > 0:
                 warnings.append(f"The 2D plan shows {plan_text}, but the AIS BOM has {bom[key]:g} {bom_text}. "
                                 "Make sure the plan and the BOM are the same revision.")
+        bom_sizes = Counter()
+        for ln in lines:
+            m = _PANEL.match(ln.part.upper())
+            if m and not ln.part.upper().startswith(("P-DLPF", "P-DLSEOR")):
+                bom_sizes[(int(m.group(2)), int(m.group(3)))] += ln.qty
+        label_sizes = Counter((l.height, l.width) for l in plan.labels if l.matched)
+        if labeled and bom_sizes and len(label_sizes) and sum(label_sizes.values()) == plan.panels and label_sizes != bom_sizes:
+            fmt = lambda z: ", ".join(f'{n:g} x {h}"H {w}"W' for (h, w), n in sorted(z.items()))
+            warnings.append(f"Panel sizes differ: the plan labels show {fmt(label_sizes)}; the BOM has {fmt(bom_sizes)}.")
         if bom_widths and plan.widths and bom_widths != plan.widths:
             fmt = lambda w: ", ".join(f'{n:g} x {k}"' for k, n in sorted(w.items()))
             warnings.append(f"Panel widths differ: the plan has {fmt(plan.widths)}; the BOM has {fmt(bom_widths)}.")
