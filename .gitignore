@@ -4,3 +4,4 @@ templates/*.xlsx
 out/
 __pycache__/
 .pytest_cache/
+build/

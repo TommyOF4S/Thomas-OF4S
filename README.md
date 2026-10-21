@@ -7,7 +7,23 @@ translate the result into Devon's own calculator. This tool does the translation
 
 **CET bill of materials (AIS Divi) → filled-in Devon calculator (.xlsm) + review report**
 
-### The drag-and-drop page
+### Hosted page (nothing to install)
+
+**https://claude.ai/artifact/DoCnKnN2pD1asBzVaGtKuF**. It runs entirely in the browser:
+drop the CET export, 2D plan image and notes, build, and download the filled Devon calculator
+(`.xlsx`, Devon's formulas intact, macros removed), the review report and the crosswalk.
+
+- An editor stores Devon's calculator once and everyone with access uses it. To update the
+  prices, drop the new calculator on the page. Don't share the page by public link, because the
+  stored calculator holds dealer pricing.
+- **Fix mapping** on any flagged part saves a correction that's shared with the team and used
+  on every later quote. It works like `mappings/overrides.csv`, but lives in the page.
+- Source: `devon_quote/web/hosted.html` + `devon_quote/web/engine.js` (a JavaScript port of the
+  Python engine). Rebuild with `python -m devon_quote.web.build_hosted` and republish
+  `build/devon_quote_builder.html`. `tests/test_engine_parity.py` checks that the JS port and the
+  Python package produce identical quotes. It needs Node with `jszip` on `NODE_PATH`.
+
+### Local drag-and-drop page
 
 Double-click **`Devon Quote Builder.bat`** (Windows) or **`devon-quote-builder.command`** (Mac),
 or run `python -m devon_quote serve`. A page opens in your browser:
