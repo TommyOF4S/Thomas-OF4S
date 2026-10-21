@@ -122,7 +122,8 @@ label.f input, label.f select, .fixform input { width: 100%; border: 1px solid v
 .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
 .planread { margin-top: 4px; font-size: 13px; color: var(--fg-2); }
 .planread b { color: var(--fg); font-weight: 600; }
-.reddot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #d50000; margin-right: 6px; vertical-align: 0; }
+.dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 7px; vertical-align: -1px; box-shadow: 0 0 0 1px rgba(0,0,0,0.35); }
+.dotkey { list-style: none; padding: 0; margin: 6px 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 3px 14px; color: var(--fg-2); font-family: var(--mono); font-size: 12px; }
 .tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .tabs button { border: 1px solid var(--line-2); background: var(--surface); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tabs button.on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
@@ -216,7 +217,15 @@ footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
         </div>
         <input id="planInput" type="file" accept=".pdf,image/*" multiple hidden>
         <div id="planList"></div>
-        <p class="hint"><span class="reddot" aria-hidden="true"></span><b>Height changes:</b> in CET, put a red dot on each joint where the panel height changes and a label beside it with the two heights, like <span class="kbd">47/53</span>. Each red dot is quoted as a change-of-height connector kit (HMA224) plus the matching high/low filler strip (HMHL4753), in place of that joint's panel-to-panel connector.</p>
+        <div class="hint"><b>Height changes:</b> in CET, put a colored dot on each joint where the panel height changes. The color picks the high/low filler strip:
+          <ul class="dotkey">
+            <li><span class="dot" style="background:#e00000"></span>Red · 39" to 53" · HMHL3953</li>
+            <li><span class="dot" style="background:#0040ff"></span>Blue · 39" to 67" · HMHL3967</li>
+            <li><span class="dot" style="background:#ffe000"></span>Yellow · 47" to 53" · HMHL4753</li>
+            <li><span class="dot" style="background:#00a000"></span>Green · 47" to 67" · HMHL4767</li>
+            <li><span class="dot" style="background:#000000"></span>Black · 53" to 67" · HMHL5367</li>
+          </ul>
+          The joint keeps its normal connector. 39" to 47" (HMHL3947) has no color yet, so add it by hand.</div>
       </div>
 
       <div class="card">
@@ -484,21 +493,23 @@ function loadPdfjs() {
   return pdfjsPromise;
 }
 
+// Joint markers avoid the five dot colors (red, blue, yellow, green, black) used for height changes.
 const JOINT_STYLE = {
-  straight: { color: "#2e7d32", label: "Straight, panel-to-panel" },
-  l: { color: "#e65100", label: "Corner" },
-  tee: { color: "#6a1b9a", label: "3-way" },
-  cross: { color: "#1565c0", label: "4-way" },
-  ends: { color: "#546e7a", label: "Free end" },
-  angled: { color: "#000000", label: "Check: odd angle" },
-  other: { color: "#000000", label: "Check: 5+ panels" },
+  straight: { color: "#00acc1", label: "Straight, panel-to-panel" },
+  l: { color: "#ef6c00", label: "Corner" },
+  tee: { color: "#8e24aa", label: "3-way" },
+  cross: { color: "#d81b60", label: "4-way" },
+  ends: { color: "#78909c", label: "Free end" },
+  angled: { color: "#795548", label: "Check: odd angle" },
+  other: { color: "#795548", label: "Check: 5+ panels" },
 };
+const DOT_STYLE = { red: "#e00000", blue: "#0040ff", yellow: "#ffe000", green: "#00a000", black: "#000000" };
 
 function planSummaryText(r) {
   const c = r.counts;
   const hc = (r.heightChanges || []).length;
   return `<b>${r.panels} panels read:</b> ${c.straight} straight · ${c.l} corners · ${c.tee} three-way · ${c.cross} four-way · ${c.ends} free ends` +
-    (hc ? ` · <b>${hc} height change${hc === 1 ? "" : "s"} (red dots)</b>` : "") +
+    (hc ? ` · <b>${hc} height change${hc === 1 ? "" : "s"} (colored dots)</b>` : "") +
     (c.angled + c.other ? ` · <b>${c.angled + c.other} to check</b>` : "");
 }
 
@@ -821,7 +832,10 @@ async function drawPdfView(v) {
   v.joints.forEach((j) => (counts[j.kind] = (counts[j.kind] || 0) + 1));
   const legend = Object.entries(JOINT_STYLE).filter(([k]) => counts[k])
     .map(([k, st]) => `<span><i style="background:${st.color}"></i>${st.label} ${counts[k]}</span>`).join("") +
-    (v.marks.length ? `<span><i style="background:transparent;border:2px solid #d50000"></i>Height change ${v.marks.length}</span>` : "");
+    Object.entries(DOT_STYLE).map(([color, hex]) => {
+      const n = v.marks.filter((m) => m.color === color).length;
+      return n ? `<span><i style="background:transparent;border:3px solid ${hex}"></i>${E.DOT_COLORS[color]} ${n}</span>` : "";
+    }).join("");
   $("planFrame").innerHTML = "";
   $("planFrame").appendChild(box);
   $("planFrame").insertAdjacentHTML("beforeend", `<div class="legend">${legend}<span class="meta">Click the plan to zoom.</span></div>`);
@@ -838,15 +852,17 @@ async function drawPdfView(v) {
     if (j.kind === "ends") { ctx.strokeStyle = st.color; ctx.stroke(); }
     else { ctx.globalAlpha = 0.8; ctx.fillStyle = st.color; ctx.fill(); ctx.globalAlpha = 1; }
   }
-  // Height-change marks: a red ring with the heights read from the label
+  // Height-change marks: a ring in the dot's color (outlined so yellow shows on white) and its filler strip
   ctx.font = `600 ${Math.round(r * 2.2)}px Geist, system-ui, sans-serif`;
   for (const m of v.marks) {
     const [x, y] = viewport.convertToViewportPoint(m.x, m.y);
+    const hex = DOT_STYLE[m.color] || "#000000";
     ctx.beginPath(); ctx.arc(x, y, r * 2.4, 0, Math.PI * 2);
-    ctx.lineWidth = Math.max(2, r / 1.6); ctx.strokeStyle = "#d50000"; ctx.stroke();
-    const text = m.heights ? `${m.heights[0]}→${m.heights[1]}` : "no label";
+    ctx.lineWidth = Math.max(4, r / 1.1); ctx.strokeStyle = "#1a1814"; ctx.stroke();
+    ctx.lineWidth = Math.max(2.5, r / 1.8); ctx.strokeStyle = hex; ctx.stroke();
+    const text = (E.DOT_COLORS[m.color] || "") + (m.joint ? "" : " (not on a joint)");
     ctx.lineWidth = Math.max(3, r / 1.2); ctx.strokeStyle = "#ffffff"; ctx.strokeText(text, x + r * 3, y - r * 2);
-    ctx.fillStyle = "#d50000"; ctx.fillText(text, x + r * 3, y - r * 2);
+    ctx.fillStyle = "#1a1814"; ctx.fillText(text, x + r * 3, y - r * 2);
   }
 }
 

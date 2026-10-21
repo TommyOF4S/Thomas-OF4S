@@ -23,20 +23,18 @@ from pathlib import Path
 
 from .bom import BomLine
 from .catalog import Catalog
-from .plan import PlanResult
+from .plan import DOT_COLORS, PlanResult
 
 # Devon panel heights, and the size code each connector family uses at that height.
 DEVON_HEIGHTS = (39, 47, 53, 67, 85)
 _CONNECTOR_CODES = {
-    # height: (code A used by HMA130/HMA137/HMA128, code B used by HMP213/HMA224/HMC132/HMA199)
+    # height: (code A used by HMA130/HMA137/HMA128, code B used by HMP213/HMC132/HMA199)
     39: ("39", "34"),
     47: ("47", "42"),
     53: ("53", "48"),
     67: ("67", "62"),
     85: ("85", "80"),
 }
-JOINT_WORDS = {"l": "corner", "tee": "3-way joint", "cross": "4-way joint", "ends": "free end",
-               "angled": "angled joint", "other": "joint of 5+ panels"}
 # A Divi height more than this many inches below the Devon height it rounds up to is flagged.
 HEIGHT_TOLERANCE = 6
 
@@ -48,7 +46,6 @@ def connector(kind: str, height: int) -> str:
         "3way": f"HMA137.{a}",
         "4way": f"HMC132.{b}",
         "inline": f"HMP213.{b}",
-        "change_height": f"HMA224.{b}",
         "finished_end": f"HMA128.{a}",
         "wall_start": f"HMA199.{b}",
     }[kind]
@@ -358,38 +355,20 @@ class Mapper:
         auto_added = self._auto_add(quantities)
         return MapResult(mappings, quantities, dict(sources), auto_added, warnings, self.plan, plan_parts)
 
-    def _height_changes(self, bom_heights: list[int], warnings: list[str]) -> tuple[Counter, Counter, int]:
-        """Change-of-height kits and filler strips from the red dots on the plan."""
-        kits, fillers, on_straight = Counter(), Counter(), 0
+    def _height_changes(self, warnings: list[str]) -> Counter:
+        """High/low filler strips from the colored dots on the plan."""
+        fillers = Counter()
         for ch in self.plan.height_changes:
-            where = f"the red dot on page {ch.page}" + (f' labeled "{ch.label}"' if ch.label else "")
-            Where = where[0].upper() + where[1:]
+            part = DOT_COLORS[ch.color]
             if ch.joint is None:
-                warnings.append(f"{Where} isn't on a panel joint, so it was not quoted. Put the dot right on the joint.")
+                warnings.append(f"A {ch.color} dot on page {ch.page} isn't on a panel joint, so its filler strip "
+                                f"({part}) was not quoted. Put the dot right on the joint.")
                 continue
-            if ch.heights:
-                lo, hi = sorted(devon_height(h)[0] for h in ch.heights)
-            elif len(bom_heights) == 2:
-                lo, hi = sorted(bom_heights)
-                warnings.append(f'{Where} has no height label; used the BOM\'s two heights, {lo}" and {hi}". Add a label like {lo}/{hi}.')
-            else:
-                warnings.append(f"{Where} has no height label like 47/53, so it was not quoted.")
+            if part not in self.catalog:
+                warnings.append(f"{part} ({ch.color} dot) isn't in the Devon calculator; add it by hand.")
                 continue
-            if lo == hi:
-                warnings.append(f'{Where}: both heights are {lo}"H on Devon, so no change-of-height parts are needed.')
-                continue
-            if ch.joint == "straight":
-                on_straight += 1
-            else:
-                warnings.append(f"{Where} sits on a {JOINT_WORDS.get(ch.joint, 'joint')}; Devon's change-of-height kit is "
-                                "for straight runs. The kit and filler strip are quoted there; check it.")
-            kits[connector("change_height", hi)] += 1
-            filler = f"HMHL{lo}{hi}"
-            if filler in self.catalog:
-                fillers[filler] += 1
-            else:
-                warnings.append(f'Devon has no filler strip for {lo}" to {hi}" ({where}); add one by hand.')
-        return kits, fillers, on_straight
+            fillers[part] += 1
+        return fillers
 
     def _plan_connectors(self, lines: list[BomLine], bom_heights: list[int]) -> tuple[list[tuple[str, str, int]], list[str]]:
         """Devon connectors from the joints measured on the 2D plan, plus cross-checks against the BOM."""
@@ -397,22 +376,18 @@ class Mapper:
         height = self.run_height or 53
         c = plan.counts
         warnings = []
-        kits, fillers, on_straight = self._height_changes(bom_heights, warnings)
-        # A change-of-height kit includes the panel-to-panel connector for its joint.
-        joint_qty = Counter(c)
-        joint_qty["straight"] -= on_straight
+        fillers = self._height_changes(warnings)
         parts = [
-            (kind, connector(devon_kind, height), joint_qty[kind])
+            (kind, connector(devon_kind, height), c[kind])
             for kind, devon_kind in (("straight", "inline"), ("l", "2way"), ("tee", "3way"),
                                      ("cross", "4way"), ("ends", "finished_end"))
-            if joint_qty[kind] > 0
+            if c[kind]
         ]
-        parts += [("change_height", p, q) for p, q in kits.items()]
         parts += [("filler", p, q) for p, q in fillers.items()]
         if len(bom_heights) > 1 and not plan.height_changes:
             warnings.append(f'The BOM has panels at more than one height; plan connectors are all quoted at {height}"H. '
-                            "Mark each height change on the CET plan with a red dot and a label like 47/53 "
-                            "to add the change-of-height kit (HMA224) and filler strip.")
+                            "Mark each height change on the CET plan with a colored dot (red 39/53, blue 39/67, "
+                            "yellow 47/53, green 47/67, black 53/67) to add its high/low filler strip.")
         if c["angled"]:
             warnings.append(f"The 2D plan has {c['angled']} joint(s) at an angle other than 90 or 180 degrees. "
                             "Devon has no angled connector; check those runs.")

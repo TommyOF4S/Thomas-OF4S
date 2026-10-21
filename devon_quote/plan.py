@@ -13,9 +13,8 @@ leaves a small gap at each post. So the joints can be measured instead of guesse
       4                                  -> 4-way (HMC132)
       a lone end                         -> finished end (HMA128)
 
-Height changes can't be seen in a 2D, so the designer marks them on the CET plan: a red
-dot on the joint and a label beside it with the two heights ("47/53", "47-53", "47 to 53").
-Each mark becomes a change-of-height connector kit plus the matching high/low filler strip.
+Height changes can't be seen in a 2D, so the designer marks them on the CET plan with a
+colored dot on the joint; the color says which high/low filler strip it needs (DOT_COLORS).
 
 The same algorithm is ported to JavaScript in web/engine.js for the hosted page;
 tests/test_plan.py checks both against tests/fixtures/sample_plan.pdf.
@@ -24,7 +23,6 @@ tests/test_plan.py checks both against tests/fixtures/sample_plan.pdf.
 from __future__ import annotations
 
 import math
-import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -35,10 +33,16 @@ POST_GAP = 1.4  # inches between the drawn ends of two panels at a post
 WIDTH_TOLERANCE = 1.5
 JOIN_FACTOR = 2.0  # ends closer than this many panel thicknesses form one joint
 KINDS = ("straight", "l", "tee", "cross", "ends", "angled", "other")
-MARK_JOINT_FACTOR = 6.0  # a red dot within this many panel thicknesses of a joint marks it
-MARK_LABEL_FACTOR = 60.0  # its label is the nearest height pair within this many thicknesses
+MARK_JOINT_FACTOR = 6.0  # a colored dot within this many panel thicknesses of a joint marks it
 MARK_MAX_FACTOR = 20.0  # dots bigger than this many thicknesses are not marks
-HEIGHT_PAIR = re.compile(r"(\d{2})\s*(?:\"|in\.?|''|”)?\s*(?:/|-|–|to|>|→|x)\s*(\d{2})", re.I)
+# Dot color -> Devon high/low filler strip
+DOT_COLORS = {
+    "red": "HMHL3953",  # 39" to 53"
+    "blue": "HMHL3967",  # 39" to 67"
+    "yellow": "HMHL4753",  # 47" to 53"
+    "green": "HMHL4767",  # 47" to 67"
+    "black": "HMHL5367",  # 53" to 67"
+}
 
 
 @dataclass
@@ -77,20 +81,12 @@ class Shape:
 
 
 @dataclass
-class Word:
-    text: str
-    x: float  # center
-    y: float
-
-
-@dataclass
 class HeightChange:
     x: float
     y: float
     page: int
     joint: str | None  # kind of joint the dot sits on (None: not on a joint)
-    heights: tuple[int, int] | None  # as written on the label, e.g. (47, 53)
-    label: str
+    color: str  # a DOT_COLORS key
 
 
 @dataclass
@@ -188,33 +184,41 @@ def joints_on_page(panels: list[Rect], thickness: float, page: int) -> list[Join
     return out
 
 
-def _is_red(fill) -> bool:
-    return bool(fill) and fill[0] > 0.6 and fill[1] < 0.4 and fill[2] < 0.4
+def dot_color(fill) -> str | None:
+    if not fill:
+        return None
+    r, g, b = fill[:3]
+    if max(r, g, b) < 0.1:
+        return "black"
+    if r > 0.6 and g < 0.4 and b < 0.4:
+        return "red"
+    if r > 0.6 and g > 0.6 and b < 0.4:
+        return "yellow"
+    if g > 0.45 and r < 0.4 and b < 0.4:
+        return "green"
+    if b > 0.5 and r < 0.4 and g < 0.5:
+        return "blue"
+    return None
 
 
-def height_marks(shapes: list[Shape], words: list[Word], joints: list[Joint], t: float, page: int) -> list[HeightChange]:
-    """Red dots the designer put on joints where the panel height changes, with their labels."""
-    labels = []
-    for w in words:
-        m = HEIGHT_PAIR.search(w.text)
-        if m:
-            labels.append((w, (int(m.group(1)), int(m.group(2)))))
+def height_marks(shapes: list[Shape], joints: list[Joint], t: float, page: int) -> list[HeightChange]:
+    """Colored dots the designer put on joints where the panel height changes."""
     out = []
     for s in shapes:
+        color = dot_color(s.fill)
         w, h = s.x1 - s.x0, s.y1 - s.y0
-        if not _is_red(s.fill) or max(w, h) > MARK_MAX_FACTOR * t or min(w, h) <= 0 or not 0.5 <= w / h <= 2:
+        if not color or max(w, h) > MARK_MAX_FACTOR * t or min(w, h) <= 0 or not 0.5 <= w / h <= 2:
             continue
         x, y = (s.x0 + s.x1) / 2, (s.y0 + s.y1) / 2
         near = min(joints, key=lambda j: math.hypot(j.x - x, j.y - y), default=None)
         joint = near.kind if near and math.hypot(near.x - x, near.y - y) <= MARK_JOINT_FACTOR * t else None
-        lab = min(labels, key=lambda l: math.hypot(l[0].x - x, l[0].y - y), default=None)
-        if lab and math.hypot(lab[0].x - x, lab[0].y - y) > MARK_LABEL_FACTOR * t:
-            lab = None
-        out.append(HeightChange(round(x, 2), round(y, 2), page, joint, lab[1] if lab else None, lab[0].text if lab else ""))
+        if joint is None and color == "black":
+            continue  # CET plans are full of small black shapes; only one on a joint is a mark
+        out.append(HeightChange(round(x, 2), round(y, 2), page, joint, color))
     return out
 
 
-def analyze_rects(pages: list[list[Rect]], extras: list[tuple[list[Shape], list[Word]]] | None = None) -> PlanResult:
+def analyze_rects(pages: list[list[Rect]], shapes: list[list[Shape]] | None = None) -> PlanResult:
     res = PlanResult()
     for p, rects in enumerate(pages):
         panels, t = find_panels(rects)
@@ -226,9 +230,8 @@ def analyze_rects(pages: list[list[Rect]], extras: list[tuple[list[Shape], list[
         js = joints_on_page(panels, t, p + 1)
         res.joints.extend(js)
         res.counts.update(j.kind for j in js)
-        if extras:
-            shapes, words = extras[p]
-            res.height_changes.extend(height_marks(shapes, words, js, t, p + 1))
+        if shapes:
+            res.height_changes.extend(height_marks(shapes[p], js, t, p + 1))
     return res
 
 
@@ -245,18 +248,15 @@ def _rgb(obj):
     return None  # CMYK and patterns: not a CET panel fill
 
 
-def read_pdf(path: str | Path) -> tuple[list[list[Rect]], list[tuple[list[Shape], list[Word]]]]:
+def read_pdf(path: str | Path) -> tuple[list[list[Rect]], list[list[Shape]]]:
     import pdfplumber
 
     pages, extras = [], []
     with pdfplumber.open(path) as pdf:
         for page in pdf.pages:
             pages.append([Rect(r["x0"], r["top"], r["x1"], r["bottom"], _rgb(r)) for r in page.rects])
-            shapes = [Shape(o["x0"], o["top"], o["x1"], o["bottom"], _rgb(o))
-                      for o in list(page.rects) + list(page.curves) if o.get("fill")]
-            words = [Word(w["text"], (w["x0"] + w["x1"]) / 2, (w["top"] + w["bottom"]) / 2)
-                     for w in page.extract_words(keep_blank_chars=True)]
-            extras.append((shapes, words))
+            extras.append([Shape(o["x0"], o["top"], o["x1"], o["bottom"], _rgb(o))
+                           for o in list(page.rects) + list(page.curves) if o.get("fill")])
     return pages, extras
 
 

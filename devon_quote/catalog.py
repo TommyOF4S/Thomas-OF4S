@@ -19,6 +19,8 @@ from pathlib import Path
 import openpyxl
 
 GRADES = ("Keystone", "Summit", "Aspen")
+# Rows in Devon's calculator that aren't real SKUs; never offered or quoted.
+NOT_SKUS = ("HMA224.",)
 
 _LREF = re.compile(r"^=\s*L(\d+)\s*(?:\+\s*([\d.]+))?\s*$")
 _RATE = re.compile(r"\*\s*([\d.]+)\s*$")
@@ -116,7 +118,7 @@ def load_catalog(path: str | Path) -> Catalog:
             section = a
             sections.append(a)
             continue
-        if a in items:  # e.g. ACC-110 is listed twice; the first row is the no-charge one
+        if a in items or a.startswith(NOT_SKUS):  # ACC-110 is listed twice; the first row is the no-charge one
             continue
         d = ws.cell(r, 4).value
         l_price = _num(ws.cell(r, 12).value)

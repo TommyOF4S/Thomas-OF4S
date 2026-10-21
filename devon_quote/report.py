@@ -106,8 +106,7 @@ def write_report(
         w("| Joint on the plan | Qty | Devon part |\n|---|---:|---|")
         labels = {"straight": "Two panels in a straight line (180°)", "l": "Corner, two panels at 90°",
                   "tee": "Three panels", "cross": "Four panels", "ends": "Free end of a run",
-                  "change_height": "Height change (red dot): connector kit",
-                  "filler": "Height change (red dot): high/low filler strip"}
+                  "filler": "Height change (colored dot): high/low filler strip"}
         for kind, part, qty in result.plan_parts:
             w(f"| {labels[kind]} | {qty} | {part} |")
         w("")

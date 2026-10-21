@@ -19,8 +19,8 @@ drop the CET export, 2D plan image and notes, build, and download the filled Dev
 - **2D plan from CET as PDF**: the page reads every panel off the drawing and measures every
   joint. Two panels in a straight line (a break between two 180° panels) become a
   panel-to-panel connector (`HMP213`), 90° corners `HMA130`, three panels `HMA137`, four panels
-  `HMC132`, and free ends `HMA128` finished ends. Red dots marked on the plan become
-  change-of-height kits with the right high/low filler strip. These replace the AIS post counts. The plan is
+  `HMC132`, and free ends `HMA128` finished ends. Colored dots marked on the plan become the
+  matching high/low filler strips. These replace the AIS post counts. The plan is
   drawn beside the flags with a colored dot on every joint so you can check it, and the plan is
   cross-checked against the BOM (panel count, widths, posts) to catch mismatched revisions.
 - **Fix mapping** on any flagged part saves a correction that's shared with the team and used
@@ -88,17 +88,22 @@ then come from the plan instead of the AIS post counts. Runs that end at a wall 
 finished ends, so swap those to wall starts (`HMA199`).
 
 **Marking height changes.** A 2D can't show panel heights, so mark them in CET before exporting:
+put a filled dot on each joint where the height changes. The color picks the filler strip:
 
-> **Red dot on a joint = change of height.** Put a red-filled dot on the joint and a label next
-> to it with the two heights, e.g. `47/53` (also `47-53`, `47 to 53`; AIS heights like `42/50`
-> work too and round up to Devon heights).
+| Dot | Heights | Devon filler strip |
+|---|---|---|
+| Red | 39" to 53" | `HMHL3953` |
+| Blue | 39" to 67" | `HMHL3967` |
+| Yellow | 47" to 53" | `HMHL4753` |
+| Green | 47" to 67" | `HMHL4767` |
+| Black | 53" to 67" | `HMHL5367` |
 
-Each red dot is quoted as a change-of-height connector kit at the taller height (`HMA224.48` for
-53") plus the high/low filler strip for that pair (`HMHL4753`), replacing the joint's
-panel-to-panel connector. Devon makes filler strips for 39/47, 39/53, 39/67, 47/53, 47/67 and
-53/67. Any other pair, a dot off a joint, a dot without a label, or a dot on a corner or 3/4-way
-joint is flagged. If the BOM has more than one panel height and the plan has no red dots, the
-review says so.
+The joint keeps its normal connector; each dot adds one filler strip. 39" to 47" (`HMHL3947`)
+has no color yet, so add it by hand. A colored dot that isn't on a joint is flagged, except black:
+CET plans are full of small black shapes, so a black dot only counts when it's on a joint. If the
+BOM has more than one panel height and the plan has no dots, the review says so.
+
+(`HMA224` appears in Devon's calculator but isn't a real SKU; the tool never offers or quotes it.)
 
 ### How AIS parts become Devon parts
 
