@@ -418,7 +418,7 @@ class Mapper:
         if len(bom_heights) > 1 and not self.marks.dots:
             warnings.append("The BOM has panels at more than one height but the 2D has no colored dots. "
                             "Mark each height change with a colored dot (red 39/53, blue 39/67, yellow 47/53, "
-                            "green 47/67, black 53/67) to add its high/low filler strip.")
+                            "green 47/67, purple 53/67) to add its high/low filler strip.")
         return parts, warnings
 
     def _height_changes(self, warnings: list[str]) -> Counter:
@@ -488,7 +488,7 @@ class Mapper:
         if len(bom_heights) > 1 and not plan.height_changes and not (self.marks and self.marks.dots):
             warnings.append(f'The BOM has panels at more than one height; plan connectors are all quoted at {height}"H. '
                             "Mark each height change on the CET plan with a colored dot (red 39/53, blue 39/67, "
-                            "yellow 47/53, green 47/67, black 53/67) to add its high/low filler strip.")
+                            "yellow 47/53, green 47/67, purple 53/67) to add its high/low filler strip.")
         if c["angled"]:
             warnings.append(f"The 2D plan has {c['angled']} joint(s) at an angle other than 90 or 180 degrees. "
                             "Devon has no angled connector; check those runs.")

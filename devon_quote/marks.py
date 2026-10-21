@@ -3,7 +3,7 @@
 Designers mark the CET 2D before exporting it:
   * a pink dash on each panel-to-panel joint (Devon HMP213);
   * a colored dot where the panel height changes; the color picks the high/low filler strip
-    (plan.DOT_COLORS: red 3953, blue 3967, yellow 4753, green 4767, black 5367).
+    (plan.DOT_COLORS: red 3953, blue 3967, yellow 4753, green 4767, purple 5367).
 
 Pixels are sorted into those colors, touching pixels of one color are grouped, and each group
 is judged by shape: a long thin pink group is a dash, a round solid group of dot size is a dot.
@@ -12,8 +12,7 @@ a yellow callout), a chain of equal dots (a dotted dimension line), or the pinki
 something red. A mark must sit on the drawing (panel lines around it) to count.
 
 This is the same algorithm as imageMarks() in web/engine.js; tests/test_marks.py checks they
-agree pixel for pixel. Black dots that touch black panel outlines merge with the lines and can't be
-told apart in an image.
+agree pixel for pixel.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
-MARK_CLASSES = (None, "pink", "red", "blue", "yellow", "green", "black")
+MARK_CLASSES = (None, "pink", "red", "blue", "yellow", "green", "purple")
 MAX_SIDE = 4000  # larger images are scaled down first
 
 
@@ -62,7 +61,7 @@ def classify(rgb: np.ndarray) -> np.ndarray:
         (3, (b > 128) & (r < 102) & (g < 128)),
         (4, (r > 153) & (g > 153) & (b < 102)),
         (5, (g > 115) & (r < 102) & (b < 102)),
-        (6, (r < 64) & (g < 64) & (b < 64)),
+        (6, (r > 101) & (r < 205) & (g < 80) & (b > 115)),
     ]
     for value, mask in reversed(rules):
         cls[mask] = value
@@ -139,8 +138,6 @@ def image_marks(rgba: np.ndarray) -> ImageMarks:
                         stack.append(j)
                     elif c == 1 and flat_cls[j] == 2:
                         red_next += 1
-        if c == 6 and n > d_max * d_max * 2:
-            continue
         bw, bh = maxx - minx + 1, maxy - miny + 1
         if max(bw, bh) < min(d_min, len_min) or max(bw, bh) > max(d_max, len_max) * 1.5:
             continue
@@ -164,10 +161,7 @@ def image_marks(rgba: np.ndarray) -> ImageMarks:
                                    dark_own=k["dark_own"], n=k["n"]))
         else:
             size = max(k["bw"], k["bh"])
-            if k["c"] == 6:
-                round_ = k["elong"] <= 1.35 and k["fill"] >= 0.7
-            else:
-                round_ = k["elong"] <= 1.6 and k["fill"] >= 0.6
+            round_ = k["elong"] <= 1.6 and k["fill"] >= 0.6
             if round_ and d_min <= size <= d_max:
                 dots.append(dict(kind="dot", color=MARK_CLASSES[k["c"]], x=k["mx"], y=k["my"], size=size,
                                  dark_own=k["dark_own"], n=k["n"]))

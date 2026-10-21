@@ -43,7 +43,7 @@ DOT_COLORS = {
     "blue": "HMHL3967",  # 39" to 67"
     "yellow": "HMHL4753",  # 47" to 53"
     "green": "HMHL4767",  # 47" to 67"
-    "black": "HMHL5367",  # 53" to 67"
+    "purple": "HMHL5367",  # 53" to 67"
 }
 
 
@@ -210,8 +210,6 @@ def dot_color(fill) -> str | None:
     if not fill:
         return None
     r, g, b = fill[:3]
-    if max(r, g, b) < 0.1:
-        return "black"
     if r > 0.6 and g < 0.4 and b < 0.4:
         return "red"
     if r > 0.6 and g > 0.6 and b < 0.4:
@@ -220,6 +218,8 @@ def dot_color(fill) -> str | None:
         return "green"
     if b > 0.5 and r < 0.4 and g < 0.5:
         return "blue"
+    if 0.4 <= r <= 0.8 and g < 0.3 and b > 0.45:
+        return "purple"
     return None
 
 
@@ -234,8 +234,6 @@ def height_marks(shapes: list[Shape], joints: list[Joint], t: float, page: int) 
         x, y = (s.x0 + s.x1) / 2, (s.y0 + s.y1) / 2
         near = min(joints, key=lambda j: math.hypot(j.x - x, j.y - y), default=None)
         joint = near.kind if near and math.hypot(near.x - x, near.y - y) <= MARK_JOINT_FACTOR * t else None
-        if joint is None and color == "black":
-            continue  # CET plans are full of small black shapes; only one on a joint is a mark
         out.append(HeightChange(round(x, 2), round(y, 2), page, joint, color))
     return out
 

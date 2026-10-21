@@ -548,7 +548,7 @@
       }
       for (const [p, q] of markFillers(warnings)) parts.push(["filler", p, q]);
       if (bomHeights.length > 1 && !Object.keys(marks.dots || {}).length) {
-        warnings.push("The BOM has panels at more than one height but the 2D has no colored dots. Mark each height change with a colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, black 53/67) to add its high/low filler strip.");
+        warnings.push("The BOM has panels at more than one height but the 2D has no colored dots. Mark each height change with a colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, purple 53/67) to add its high/low filler strip.");
       }
       return [parts, warnings];
     }
@@ -582,7 +582,7 @@
         .filter(([kind]) => qty[kind]).map(([kind, dk]) => [kind === "straight" ? straightKind : kind, connector(dk, height), qty[kind]]);
       for (const [p, q] of fillers) parts.push(["filler", p, q]);
       if (bomHeights.length > 1 && !(plan.heightChanges || []).length && !markDots) {
-        warnings.push(`The BOM has panels at more than one height; plan connectors are all quoted at ${height}"H. Mark each height change on the CET plan with a colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, black 53/67) to add its high/low filler strip.`);
+        warnings.push(`The BOM has panels at more than one height; plan connectors are all quoted at ${height}"H. Mark each height change on the CET plan with a colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, purple 53/67) to add its high/low filler strip.`);
       }
       if (c.angled) warnings.push(`The 2D plan has ${c.angled} joint(s) at an angle other than 90 or 180 degrees. Devon has no angled connector; check those runs.`);
       if (c.other) warnings.push(`The 2D plan has ${c.other} joint(s) where more than four panels meet. Check those by hand.`);
@@ -683,16 +683,16 @@
   const r2 = (v) => Math.round(v * 100) / 100;
   const MARK_JOINT_FACTOR = 6.0, MARK_MAX_FACTOR = 20.0;
   // Dot color -> Devon high/low filler strip
-  const DOT_COLORS = { red: "HMHL3953", blue: "HMHL3967", yellow: "HMHL4753", green: "HMHL4767", black: "HMHL5367" };
+  const DOT_COLORS = { red: "HMHL3953", blue: "HMHL3967", yellow: "HMHL4753", green: "HMHL4767", purple: "HMHL5367" };
 
   function dotColor(f) {
     if (!f) return null;
     const [r, g, b] = f;
-    if (Math.max(r, g, b) < 0.1) return "black";
     if (r > 0.6 && g < 0.4 && b < 0.4) return "red";
     if (r > 0.6 && g > 0.6 && b < 0.4) return "yellow";
     if (g > 0.45 && r < 0.4 && b < 0.4) return "green";
     if (b > 0.5 && r < 0.4 && g < 0.5) return "blue";
+    if (r >= 0.4 && r <= 0.8 && g < 0.3 && b > 0.45) return "purple";
     return null;
   }
 
@@ -707,7 +707,6 @@
       let near = null, nd = Infinity;
       for (const j of joints) { const d = Math.hypot(j.x - x, j.y - y); if (d < nd) { nd = d; near = j; } }
       const joint = near && nd <= MARK_JOINT_FACTOR * t ? near.kind : null;
-      if (joint === null && color === "black") continue; // CET plans are full of small black shapes
       out.push({ x, y, page, joint, color });
     }
     return out;
@@ -917,7 +916,7 @@
   // Designers mark the 2D: a pink dash on each panel-to-panel joint, and a colored dot where the panel
   // height changes (the color picks the filler strip). In an image (PNG/JPG, or a PDF without vector
   // panels) the marks are found by color and shape.
-  const MARK_CLASSES = [null, "pink", "red", "blue", "yellow", "green", "black"];
+  const MARK_CLASSES = [null, "pink", "red", "blue", "yellow", "green", "purple"];
 
   function pixelClass(r, g, b) {
     if (r > 204 && b > 115 && g < 204 && r - g > 51) return 1; // pink
@@ -925,7 +924,7 @@
     if (b > 128 && r < 102 && g < 128) return 3; // blue
     if (r > 153 && g > 153 && b < 102) return 4; // yellow
     if (g > 115 && r < 102 && b < 102) return 5; // green
-    if (r < 64 && g < 64 && b < 64) return 6; // black
+    if (r > 101 && r < 205 && g < 80 && b > 115) return 6; // purple
     return 0;
   }
 
@@ -980,7 +979,6 @@
           }
         }
       }
-      if (c === 6 && n > dMax * dMax * 2) continue; // big black areas: walls, lines
       const bw = maxx - minx + 1, bh = maxy - miny + 1;
       if (Math.max(bw, bh) < Math.min(dMin, lenMin) || Math.max(bw, bh) > Math.max(dMax, lenMax) * 1.5) continue;
       const mx = sx / n, my = sy / n;
@@ -996,7 +994,7 @@
         if (k.elong >= 1.8 && k.length >= lenMin && k.length <= lenMax) dashes.push({ kind: "dash", color: "pink", x: k.mx, y: k.my, size: k.length, darkOwn: k.darkOwn, n: k.n });
       } else {
         const size = Math.max(k.bw, k.bh);
-        const round = k.c === 6 ? k.elong <= 1.35 && k.fill >= 0.7 : k.elong <= 1.6 && k.fill >= 0.6;
+        const round = k.elong <= 1.6 && k.fill >= 0.6;
         if (round && size >= dMin && size <= dMax) dots.push({ kind: "dot", color: MARK_CLASSES[k.c], x: k.mx, y: k.my, size, darkOwn: k.darkOwn, n: k.n });
       }
     }

@@ -96,11 +96,10 @@ put a filled dot on each joint where the height changes. The color picks the fil
 | Blue | 39" to 67" | `HMHL3967` |
 | Yellow | 47" to 53" | `HMHL4753` |
 | Green | 47" to 67" | `HMHL4767` |
-| Black | 53" to 67" | `HMHL5367` |
+| Purple | 53" to 67" | `HMHL5367` |
 
 The joint keeps its normal connector; each dot adds one filler strip. 39" to 47" (`HMHL3947`)
-has no color yet, so add it by hand. A colored dot that isn't on a joint is flagged, except black:
-CET plans are full of small black shapes, so a black dot only counts when it's on a joint. If the
+has no color yet, so add it by hand. A colored dot that isn't on a joint is flagged. If the
 BOM has more than one panel height and the plan has no dots, the review says so.
 
 **Marking panel-to-panel connectors.** Draw a **pink dash** on each panel-to-panel joint. When
@@ -117,9 +116,8 @@ callout boxes, dotted dimension lines, and the pinkish blurred edges of red line
 no vector plan, the pink dashes become panel-to-panel connectors and the remaining AIS 2-way posts
 become 2-way corners (AIS 2-way posts cover both); colored dots add their filler strips; every
 other connector still comes from the SIF. The hosted page lists every mark it found, numbered on the
-plan, with a checkbox to untick anything that isn't a designer mark (such as a CET symbol). A black
-dot touching black panel outlines merges with them in an image, so black is only reliable in a
-vector PDF. `devon_quote/marks.py` and `imageMarks()` in `web/engine.js` are the same algorithm;
+plan, with a checkbox to untick anything that isn't a designer mark (such as a CET symbol).
+`devon_quote/marks.py` and `imageMarks()` in `web/engine.js` are the same algorithm;
 `tests/test_marks.py` checks they agree pixel for pixel.
 
 (`HMA224` appears in Devon's calculator but isn't a real SKU; the tool never offers or quotes it.)

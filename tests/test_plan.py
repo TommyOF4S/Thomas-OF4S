@@ -133,7 +133,8 @@ def test_js_quote_with_plan_matches_python(tmp_path):
 T = 0.57
 GRAY = (0.86, 0.86, 0.86)
 COLORS = {"red": (1.0, 0.0, 0.0), "blue": (0.0, 0.0, 1.0), "yellow": (1.0, 1.0, 0.0),
-          "green": (0.0, 0.6, 0.0), "black": (0.0, 0.0, 0.0), "purple": (0.5, 0.0, 0.5)}
+          "green": (0.0, 0.6, 0.0), "purple": (0.5, 0.0, 0.75), "black": (0.0, 0.0, 0.0),
+          "orange": (1.0, 0.5, 0.0)}
 
 
 def _run(y=0.0):
@@ -155,12 +156,13 @@ CASES = [
     ("blue on straight", _run(), [_dot(6.65, 0.28, "blue")], {"HMHL3967": 1}, []),
     ("yellow on straight", _run(), [_dot(6.65, 0.28, "yellow")], {"HMHL4753": 1}, []),
     ("green on straight", _run(), [_dot(6.65, 0.28, "green")], {"HMHL4767": 1}, []),
-    ("black on straight", _run(), [_dot(6.65, 0.28, "black")], {"HMHL5367": 1}, []),
+    ("purple on straight", _run(), [_dot(6.65, 0.28, "purple")], {"HMHL5367": 1}, []),
     ("two dots", _run(), [_dot(6.65, 0.28, "red"), _dot(6.7, 0.3, "red")], {"HMHL3953": 2}, []),
     ("on a corner", _corner(), [_dot(26.9, 0.28, "yellow")], {"HMHL4753": 1}, []),
     ("blue off a joint", _run(), [_dot(30, 30, "blue")], {}, ["blue dot on page 1 isn't on a panel joint"]),
-    ("black off a joint is ignored", _run(), [_dot(30, 30, "black")], {}, []),
-    ("other colors are ignored", _run(), [_dot(6.65, 0.28, "purple")], {}, []),
+    ("purple off a joint", _run(), [_dot(30, 30, "purple")], {}, ["purple dot on page 1 isn't on a panel joint"]),
+    ("black is not a mark color", _run(), [_dot(6.65, 0.28, "black"), _dot(30, 30, "black")], {}, []),
+    ("other colors are ignored", _run(), [_dot(6.65, 0.28, "orange")], {}, []),
 ]
 
 
@@ -201,7 +203,7 @@ def test_height_marks(case, tmp_path):
 
 def test_dot_colors_match_devon_filler_strips():
     assert DOT_COLORS == {"red": "HMHL3953", "blue": "HMHL3967", "yellow": "HMHL4753",
-                          "green": "HMHL4767", "black": "HMHL5367"}
+                          "green": "HMHL4767", "purple": "HMHL5367"}
 
 
 @needs_template

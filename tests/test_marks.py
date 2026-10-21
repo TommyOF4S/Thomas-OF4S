@@ -90,7 +90,7 @@ def _two_way_lines(n):
 @needs_template
 def test_image_marks_split_two_way_posts():
     cat = load_catalog(TEMPLATE)
-    marks = MarksSummary(pink=5, dots={"red": 2, "black": 1})
+    marks = MarksSummary(pink=5, dots={"red": 2, "purple": 1})
     res = Mapper(cat).map(_two_way_lines(7), None, marks)
     q = res.quantities
     assert q["HMP213.48"] == 5 and q["HMA130.53"] == 2  # 7 AIS 2-way posts = 5 straight + 2 corners

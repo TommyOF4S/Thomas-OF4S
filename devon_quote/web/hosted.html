@@ -230,9 +230,9 @@ footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
             <li><span class="dot" style="background:#0040ff"></span>Blue · 39" to 67" · HMHL3967</li>
             <li><span class="dot" style="background:#ffe000"></span>Yellow · 47" to 53" · HMHL4753</li>
             <li><span class="dot" style="background:#00a000"></span>Green · 47" to 67" · HMHL4767</li>
-            <li><span class="dot" style="background:#000000"></span>Black · 53" to 67" · HMHL5367</li>
+            <li><span class="dot" style="background:#8000c0"></span>Purple · 53" to 67" · HMHL5367</li>
           </ul>
-          The joint keeps its normal connector. 39" to 47" (HMHL3947) has no color yet, so add it by hand. In a PNG or JPG, a black dot that touches the black panel outlines can't be told apart from them, so black dots are only reliable in a vector PDF.</div>
+          The joint keeps its normal connector. 39" to 47" (HMHL3947) has no color yet, so add it by hand.</div>
         <p class="hint"><span class="dash" aria-hidden="true"></span><b>Panel-to-panel connectors:</b> draw a pink dash on each panel-to-panel joint. When the plan has pink dashes, each marked joint is quoted as one panel-to-panel connector (HMP213), and any straight joint without a dash is flagged. Without pink dashes, the straight joints the page measures are used.</p>
       </div>
 
@@ -505,13 +505,13 @@ function loadPdfjs() {
 const JOINT_STYLE = {
   straight: { color: "#00acc1", label: "Straight joint" },
   l: { color: "#ef6c00", label: "Corner" },
-  tee: { color: "#8e24aa", label: "3-way" },
+  tee: { color: "#3949ab", label: "3-way" },
   cross: { color: "#8d6e63", label: "4-way" },
   ends: { color: "#78909c", label: "Free end" },
   angled: { color: "#795548", label: "Check: odd angle" },
   other: { color: "#795548", label: "Check: 5+ panels" },
 };
-const DOT_STYLE = { red: "#e00000", blue: "#0040ff", yellow: "#ffe000", green: "#00a000", black: "#000000" };
+const DOT_STYLE = { red: "#e00000", blue: "#0040ff", yellow: "#ffe000", green: "#00a000", purple: "#8000c0" };
 
 function planSummaryText(r) {
   const c = r.counts;
