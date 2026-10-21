@@ -124,6 +124,12 @@ label.f input, label.f select, .fixform input { width: 100%; border: 1px solid v
 .planread b { color: var(--fg); font-weight: 600; }
 .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 7px; vertical-align: -1px; box-shadow: 0 0 0 1px rgba(0,0,0,0.35); }
 .dash { display: inline-block; width: 16px; height: 4px; border-radius: 2px; background: #ff66b3; margin-right: 7px; vertical-align: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,0.3); }
+.marklist { margin-top: 8px; font-size: 13.5px; }
+.marklist summary { cursor: pointer; color: var(--fg-2); font-size: 13px; }
+.markrow { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.markrow.off { color: var(--fg-3); }
+.markrow i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,0.35); flex: none; }
+.markrow .num { font-family: var(--mono); font-size: 12px; min-width: 1.6em; text-align: right; color: var(--fg-2); }
 .dotkey { list-style: none; padding: 0; margin: 6px 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 3px 14px; color: var(--fg-2); font-family: var(--mono); font-size: 12px; }
 .tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .tabs button { border: 1px solid var(--line-2); background: var(--surface); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -214,7 +220,7 @@ footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
         <div class="step"><span>2D plan</span><span>Optional</span></div>
         <div id="planDrop" class="drop" tabindex="0" role="button" aria-label="Add the 2D plan">
           <div class="big">Drop the 2D plan here</div>
-          <div class="small">Use CET's PDF export: the page reads every panel joint (straight, corner, T, cross, free end) and quotes the connectors from it. A PNG or JPG is shown beside the flags.</div>
+          <div class="small">PDF, PNG or JPG. The page reads the pink dashes and colored dots drawn on it, and from a vector CET PDF it also measures every panel joint.</div>
         </div>
         <input id="planInput" type="file" accept=".pdf,image/*" multiple hidden>
         <div id="planList"></div>
@@ -226,7 +232,7 @@ footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
             <li><span class="dot" style="background:#00a000"></span>Green · 47" to 67" · HMHL4767</li>
             <li><span class="dot" style="background:#000000"></span>Black · 53" to 67" · HMHL5367</li>
           </ul>
-          The joint keeps its normal connector. 39" to 47" (HMHL3947) has no color yet, so add it by hand.</div>
+          The joint keeps its normal connector. 39" to 47" (HMHL3947) has no color yet, so add it by hand. In a PNG or JPG, a black dot that touches the black panel outlines can't be told apart from them, so black dots are only reliable in a vector PDF.</div>
         <p class="hint"><span class="dash" aria-hidden="true"></span><b>Panel-to-panel connectors:</b> draw a pink dash on each panel-to-panel joint. When the plan has pink dashes, each marked joint is quoted as one panel-to-panel connector (HMP213), and any straight joint without a dash is flagged. Without pink dashes, the straight joints the page measures are used.</p>
       </div>
 
@@ -518,14 +524,71 @@ function planSummaryText(r) {
     (c.angled + c.other ? ` · <b>${c.angled + c.other} to check</b>` : "");
 }
 
+const MAX_SIDE = 4000; // images are read at up to this many pixels on the long side
+const markLabel = (m) => (m.kind === "dash" ? "pink dash · panel-to-panel (HMP213)" : `${m.color} dot · ${E.DOT_COLORS[m.color] || ""}`);
+const markHex = (m) => (m.kind === "dash" ? "#ff66b3" : DOT_STYLE[m.color] || "#000000");
+
+function marksSummaryText(list) {
+  const s = E.summarizeMarks(list);
+  const dots = Object.entries(s.dots).map(([c, n]) => `${n} ${c}`).join(" · ");
+  const total = s.pink + Object.values(s.dots).reduce((a, b) => a + b, 0);
+  if (!total && !s.offPanel) return "No pink dashes or colored dots found in this 2D.";
+  return `<b>Marks read:</b> ${s.pink} pink dash${s.pink === 1 ? "" : "es"}` + (dots ? ` · dots: ${dots}` : "") +
+    (s.offPanel ? ` · ${s.offPanel} off the drawing (not counted)` : "");
+}
+
+async function pixelsOf(source, w, h) {
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h);
+  if (source.render) await source.render(ctx);
+  else ctx.drawImage(source, 0, 0, w, h);
+  return ctx.getImageData(0, 0, w, h).data;
+}
+
+function withUse(marks) {
+  for (const m of [...marks.dashes, ...marks.dots]) m.use = m.onPanel;
+  return marks;
+}
+
+async function readImageMarks(p) {
+  const img = new Image();
+  img.src = p.url;
+  await img.decode();
+  const s = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.max(1, Math.round(img.naturalWidth * s)), h = Math.max(1, Math.round(img.naturalHeight * s));
+  const data = await pixelsOf(img, w, h);
+  p.rasters = [{ name: p.file.name, marks: withUse(E.imageMarks(data, w, h)), w, h, image: img }];
+}
+
+async function readPdfMarks(p) {
+  p.rasters = [];
+  for (let i = 0; i < Math.min(p.pdfPages.length, 6); i++) {
+    const page = p.pdfPages[i];
+    const base = page.getViewport({ scale: 1 });
+    const scale = Math.min(4, MAX_SIDE / Math.max(base.width, base.height));
+    const vp = page.getViewport({ scale });
+    const w = Math.round(vp.width), h = Math.round(vp.height);
+    const data = await pixelsOf({ render: (ctx) => page.render({ canvasContext: ctx, viewport: vp }).promise }, w, h);
+    p.rasters.push({ name: p.pdfPages.length > 1 ? `${p.file.name} · p${i + 1}` : p.file.name, page: i + 1, scale, marks: withUse(E.imageMarks(data, w, h)), w, h });
+  }
+}
+
 async function readPlan(p) {
   p.status = "reading";
   renderPlans();
   try {
-    const lib = await loadPdfjs();
-    const { result, pdfPages } = await E.analyzePdf(lib, new Uint8Array(await p.file.arrayBuffer()));
-    p.analysis = result; p.pdfPages = pdfPages;
-    p.status = result.panels ? "done" : "none";
+    if (p.image) {
+      await readImageMarks(p);
+    } else {
+      const lib = await loadPdfjs();
+      const { result, pdfPages } = await E.analyzePdf(lib, new Uint8Array(await p.file.arrayBuffer()));
+      p.analysis = result; p.pdfPages = pdfPages;
+      const vectorMarks = (result.pinkDashes || []).length + (result.heightChanges || []).length;
+      if (!vectorMarks) await readPdfMarks(p); // marks may be drawn as an image, or the PDF may be a picture
+    }
+    p.status = "done";
   } catch (e) {
     p.status = "error"; p.error = e.message || String(e);
   }
@@ -534,7 +597,7 @@ async function readPlan(p) {
 }
 
 function combinedPlan() {
-  const read = state.plans.filter((p) => p.status === "done");
+  const read = state.plans.filter((p) => p.status === "done" && p.analysis && p.analysis.panels);
   if (!read.length) return null;
   const out = { counts: {}, widths: {}, joints: [], pages: [], panels: 0, heightChanges: [], pinkDashes: [] };
   for (const p of read) {
@@ -548,21 +611,49 @@ function combinedPlan() {
   return out;
 }
 
+function combinedMarks() {
+  const list = state.plans.filter((p) => p.status === "done" && p.rasters).flatMap((p) => p.rasters.map((r) => r.marks));
+  return list.length ? E.summarizeMarks(list) : null;
+}
+
+function markRows(p, pi) {
+  const rows = [];
+  (p.rasters || []).forEach((r, ri) => {
+    [...r.marks.dashes, ...r.marks.dots].forEach((m, mi) => {
+      const id = `mk-${pi}-${ri}-${mi}`;
+      rows.push(`<label class="markrow${m.onPanel ? "" : " off"}" for="${id}"><input type="checkbox" id="${id}" data-p="${pi}" data-r="${ri}" data-m="${mi}" ${m.use ? "checked" : ""}>` +
+        `<span class="num">${mi + 1}</span><i style="background:${markHex(m)}"></i>${esc(markLabel(m))}` +
+        `${p.rasters.length > 1 ? ` <span class="meta">· ${esc(r.name)}</span>` : ""}${m.onPanel ? "" : ` <span class="meta">· not on a panel line</span>`}</label>`);
+    });
+  });
+  if (!rows.length) return "";
+  return `<details class="marklist" open><summary>Check the marks (untick anything that isn't a designer mark)</summary>${rows.join("")}</details>`;
+}
+
 function renderPlans() {
   $("planList").innerHTML = state.plans.map((p, i) => {
-    let meta = kb(p.file.size);
     let read = "";
-    if (!p.image) {
-      if (p.status === "reading") read = "Reading panel joints…";
-      else if (p.status === "done") read = planSummaryText(p.analysis);
-      else if (p.status === "none") read = "No CET panels found in this PDF, so connectors come from the AIS BOM. Export the 2D from CET as a PDF (vector, not a scan).";
-      else if (p.status === "error") read = "Couldn't read this PDF: " + esc(p.error);
+    if (p.status === "reading") read = p.image ? "Reading pink dashes and colored dots…" : "Reading panel joints and marks…";
+    else if (p.status === "error") read = "Couldn't read this file: " + esc(p.error);
+    else if (p.status === "done") {
+      const parts = [];
+      if (p.analysis && p.analysis.panels) parts.push(planSummaryText(p.analysis));
+      else if (p.analysis) parts.push("No vector CET panels in this PDF, so the joints can't be measured; marks are read from the picture.");
+      if (p.rasters) parts.push(marksSummaryText(p.rasters.map((r) => r.marks)));
+      read = parts.join("<br>");
     }
-    return `<div class="file" style="margin-top:10px;align-items:flex-start"><svg class="icon"><use href="#i-plan"/></svg><div><div class="fname">${esc(p.file.name)}</div><div class="meta">${meta}</div>${read ? `<div class="planread">${read}</div>` : ""}</div><button class="x" type="button" data-i="${i}">Remove</button></div>`;
+    return `<div class="file" style="margin-top:10px;align-items:flex-start"><svg class="icon"><use href="#i-plan"/></svg><div style="flex:1"><div class="fname">${esc(p.file.name)}</div><div class="meta">${kb(p.file.size)}</div>${read ? `<div class="planread">${read}</div>` : ""}${p.status === "done" ? markRows(p, i) : ""}</div><button class="x" type="button" data-i="${i}">Remove</button></div>`;
   }).join("");
   $("planList").querySelectorAll(".x").forEach((b) => (b.onclick = () => {
     const [p] = state.plans.splice(+b.dataset.i, 1);
     if (p.url) URL.revokeObjectURL(p.url);
+    renderPlans();
+    if (state.out) build();
+  }));
+  $("planList").querySelectorAll(".marklist input").forEach((cb) => (cb.onchange = () => {
+    const r = state.plans[+cb.dataset.p].rasters[+cb.dataset.r];
+    const m = [...r.marks.dashes, ...r.marks.dots][+cb.dataset.m];
+    m.use = cb.checked;
     renderPlans();
     if (state.out) build();
   }));
@@ -572,7 +663,7 @@ function addPlans(files) {
     const image = (f.type || "").startsWith("image/");
     const p = { file: f, image, url: image ? URL.createObjectURL(f) : null };
     state.plans.push(p);
-    if (!image) readPlan(p);
+    readPlan(p);
   }
   renderPlans();
   if (state.out) renderPlanView();
@@ -636,7 +727,7 @@ async function build() {
     const bomBytes = new Uint8Array(await state.bom.arrayBuffer());
     const lines = await E.parseBom(JSZip, state.bom.name, bomBytes);
     if (!lines.length) throw new Error(`No parts found in ${state.bom.name}.`);
-    const result = E.makeMapper(c.catalog, allOverrides()).map(lines, combinedPlan());
+    const result = E.makeMapper(c.catalog, allOverrides()).map(lines, combinedPlan(), combinedMarks());
     const grade = +$("grade").value;
     const num = (v) => { const n = Number(String(v || "").replace(/[$,\s]/g, "")); return v && !Number.isNaN(n) ? n : null; };
     const delivery = num($("delivery").value) || 0;
@@ -693,6 +784,14 @@ function renderResults() {
   r.warnings.forEach((w) => items.push(`<div class="item warnline"><div class="note">${esc(w)}</div></div>`));
   r.unmapped.forEach((m, i) => items.push(itemHtml(m, true, "u" + i)));
   r.review.forEach((m, i) => items.push(itemHtml(m, false, "r" + i)));
+  if (r.marks && !r.plan) {
+    const parts = r.planParts.map((x) => x[1] + " × " + x[2]).join(", ");
+    items.unshift(`<div class="item" style="border-left-color:var(--accent-2)"><div class="note"><b>Read from the 2D:</b> ${r.marks.pink} pink dash${r.marks.pink === 1 ? "" : "es"}` +
+      `${Object.keys(r.marks.dots).length ? " · dots: " + esc(Object.entries(r.marks.dots).map(([c, n]) => `${n} ${c}`).join(", ")) : ""}. ` +
+      `Quoted from the marks: ${esc(parts || "nothing")}. AIS 2-way posts cover straight joints and corners, so the pink dashes are the panel-to-panel connectors and the rest of the 2-way posts are corners.</div></div>`);
+  } else if (!r.plan && state.plans.length) {
+    items.unshift(`<div class="item warnline"><div class="note"><b>No marks found on the 2D.</b> Connectors come from the AIS SIF only, so straight panel-to-panel joints are quoted as 2-way corners. Draw a pink dash on each panel-to-panel joint and colored dots at height changes, then export the 2D again.</div></div>`);
+  }
   if (r.plan) {
     items.unshift(`<div class="item" style="border-left-color:var(--accent-2)"><div class="note">${planSummaryText(r.plan)}. Connectors are quoted from the plan: ${esc(r.planParts.map((x) => x[1] + " × " + x[2]).join(", "))}. Free ends are quoted as finished ends; swap any at a wall to a wall start (HMA199).</div></div>`);
   }
@@ -801,25 +900,81 @@ function renderCorrections() {
 function planViews() {
   const views = [];
   for (const p of state.plans) {
-    if (p.image) views.push({ kind: "img", name: p.file.name, url: p.url });
-    else if (p.status === "done") {
-      p.analysis.pages.forEach((pg, i) => {
-        if (pg.panels) views.push({ kind: "pdf", name: p.pdfPages.length > 1 ? `${p.file.name} · p${pg.page}` : p.file.name,
-          page: p.pdfPages[i], joints: p.analysis.joints.filter((j) => j.page === pg.page),
-          marks: (p.analysis.heightChanges || []).filter((m) => m.page === pg.page),
-          dashes: (p.analysis.pinkDashes || []).filter((m) => m.page === pg.page) });
-      });
+    if (p.status !== "done") { if (p.image) views.push({ kind: "img", name: p.file.name, url: p.url }); continue; }
+    if (p.image) {
+      const r = p.rasters[0];
+      views.push({ kind: "raster", name: p.file.name, image: r.image, raster: r });
+      continue;
     }
+    (p.pdfPages || []).forEach((page, i) => {
+      const pg = (p.analysis && p.analysis.pages[i]) || { panels: 0 };
+      const raster = (p.rasters || []).find((r) => r.page === i + 1) || null;
+      const rasterMarks = raster ? raster.marks.dashes.length + raster.marks.dots.length : 0;
+      if (!pg.panels && !rasterMarks) return;
+      views.push({ kind: "pdf", name: p.pdfPages.length > 1 ? `${p.file.name} · p${i + 1}` : p.file.name, page, raster,
+        joints: p.analysis.joints.filter((j) => j.page === i + 1),
+        marks: (p.analysis.heightChanges || []).filter((m) => m.page === i + 1),
+        dashes: (p.analysis.pinkDashes || []).filter((m) => m.page === i + 1) });
+    });
   }
   return views;
 }
 
+// Numbered markers for the marks read from pixels (matching the numbers in the plan card list).
+function drawRasterMarks(ctx, raster, toScreen, r) {
+  const all = [...raster.marks.dashes, ...raster.marks.dots];
+  ctx.font = `700 ${Math.round(r * 2.4)}px Geist, system-ui, sans-serif`;
+  all.forEach((m, i) => {
+    const [x, y] = toScreen(m.x, m.y);
+    const rad = Math.max(r * 2.2, (m.size * (toScreen(1, 0)[0] - toScreen(0, 0)[0])) * 0.8);
+    ctx.setLineDash(m.use ? [] : [r, r]);
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2);
+    ctx.lineWidth = Math.max(4, r / 1.1); ctx.strokeStyle = m.use ? "#1a1814" : "#9e9e9e"; ctx.stroke();
+    ctx.lineWidth = Math.max(2.5, r / 1.8); ctx.strokeStyle = m.use ? markHex(m) : "#e0e0e0"; ctx.stroke();
+    ctx.setLineDash([]);
+    const label = String(i + 1) + (m.use ? "" : " ✕");
+    ctx.lineWidth = Math.max(3, r / 1.2); ctx.strokeStyle = "#ffffff"; ctx.strokeText(label, x + rad + 2, y - rad);
+    ctx.fillStyle = m.use ? "#1a1814" : "#757575"; ctx.fillText(label, x + rad + 2, y - rad);
+  });
+}
+
+function rasterLegend(raster) {
+  const s = E.summarizeMarks([raster.marks]);
+  const dots = Object.entries(s.dots).map(([c, n]) => `<span><i style="background:transparent;border:3px solid ${DOT_STYLE[c]}"></i>${E.DOT_COLORS[c]} ${n}</span>`).join("");
+  return (s.pink ? `<span><i style="background:#ff66b3;border-radius:2px;height:5px;width:16px"></i>Pink dash ${s.pink}</span>` : "") + dots +
+    (s.offPanel ? `<span class="meta">${s.offPanel} not counted (dashed)</span>` : "");
+}
+
 let renderToken = 0;
+function frameWith(canvas, legend) {
+  const box = document.createElement("div");
+  box.className = "canvasbox"; box.title = "Click to zoom";
+  box.appendChild(canvas);
+  box.onclick = () => box.classList.toggle("zoom");
+  $("planFrame").innerHTML = "";
+  $("planFrame").appendChild(box);
+  $("planFrame").insertAdjacentHTML("beforeend", `<div class="legend">${legend}<span class="meta">Numbers match the list under the plan. Click the plan to zoom.</span></div>`);
+}
+
+async function drawRasterView(v) {
+  ++renderToken;
+  const r = v.raster;
+  const canvas = document.createElement("canvas");
+  canvas.width = r.w; canvas.height = r.h;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, r.w, r.h);
+  ctx.drawImage(v.image, 0, 0, r.w, r.h);
+  frameWith(canvas, rasterLegend(r));
+  drawRasterMarks(ctx, r, (x, y) => [x, y], Math.max(3, r.w / 300));
+}
+
 async function drawPdfView(v) {
   const token = ++renderToken;
-  // Crop to the part of the page that holds panels, with a margin.
+  // Crop to the part of the page that holds panels and marks, with a margin.
   const base = v.page.getViewport({ scale: 1 });
-  const pts = [...v.joints, ...v.marks, ...v.dashes].map((j) => base.convertToViewportPoint(j.x, j.y));
+  const rs = v.raster ? v.raster.scale : 1;
+  const rasterPts = v.raster ? [...v.raster.marks.dashes, ...v.raster.marks.dots].map((m) => [m.x / rs, m.y / rs]) : [];
+  const pts = [...[...v.joints, ...v.marks, ...v.dashes].map((j) => base.convertToViewportPoint(j.x, j.y)), ...rasterPts];
   let [x0, y0, x1, y1] = [0, 0, base.width, base.height];
   if (pts.length) {
     x0 = Math.min(...pts.map((p) => p[0])); x1 = Math.max(...pts.map((p) => p[0]));
@@ -831,10 +986,6 @@ async function drawPdfView(v) {
   const viewport = v.page.getViewport({ scale, offsetX: -x0 * scale, offsetY: -y0 * scale });
   const canvas = document.createElement("canvas");
   canvas.width = Math.round((x1 - x0) * scale); canvas.height = Math.round((y1 - y0) * scale);
-  const box = document.createElement("div");
-  box.className = "canvasbox"; box.title = "Click to zoom";
-  box.appendChild(canvas);
-  box.onclick = () => box.classList.toggle("zoom");
   const counts = {};
   v.joints.forEach((j) => (counts[j.kind] = (counts[j.kind] || 0) + 1));
   const legend = Object.entries(JOINT_STYLE).filter(([k]) => counts[k])
@@ -843,10 +994,8 @@ async function drawPdfView(v) {
     Object.entries(DOT_STYLE).map(([color, hex]) => {
       const n = v.marks.filter((m) => m.color === color).length;
       return n ? `<span><i style="background:transparent;border:3px solid ${hex}"></i>${E.DOT_COLORS[color]} ${n}</span>` : "";
-    }).join("");
-  $("planFrame").innerHTML = "";
-  $("planFrame").appendChild(box);
-  $("planFrame").insertAdjacentHTML("beforeend", `<div class="legend">${legend}<span class="meta">Click the plan to zoom.</span></div>`);
+    }).join("") + (v.raster ? rasterLegend(v.raster) : "");
+  frameWith(canvas, legend);
   const ctx = canvas.getContext("2d");
   await v.page.render({ canvasContext: ctx, viewport }).promise;
   if (token !== renderToken) return;
@@ -860,7 +1009,6 @@ async function drawPdfView(v) {
     if (j.kind === "ends") { ctx.strokeStyle = st.color; ctx.stroke(); }
     else { ctx.globalAlpha = 0.8; ctx.fillStyle = st.color; ctx.fill(); ctx.globalAlpha = 1; }
   }
-  // Pink dashes found on the plan: a dark-outlined box so they stand out; off-joint ones are labeled
   for (const d of v.dashes) {
     const [x, y] = viewport.convertToViewportPoint(d.x, d.y);
     ctx.lineWidth = Math.max(2.5, r / 1.8); ctx.strokeStyle = "#1a1814";
@@ -871,7 +1019,6 @@ async function drawPdfView(v) {
       ctx.fillStyle = "#1a1814"; ctx.fillText("not on a joint", x + r * 3, y + r * 3);
     }
   }
-  // Height-change marks: a ring in the dot's color (outlined so yellow shows on white) and its filler strip
   ctx.font = `600 ${Math.round(r * 2.2)}px Geist, system-ui, sans-serif`;
   for (const m of v.marks) {
     const [x, y] = viewport.convertToViewportPoint(m.x, m.y);
@@ -883,6 +1030,7 @@ async function drawPdfView(v) {
     ctx.lineWidth = Math.max(3, r / 1.2); ctx.strokeStyle = "#ffffff"; ctx.strokeText(text, x + r * 3, y - r * 2);
     ctx.fillStyle = "#1a1814"; ctx.fillText(text, x + r * 3, y - r * 2);
   }
+  if (v.raster) drawRasterMarks(ctx, v.raster, (mx, my) => [(mx / rs - x0) * scale, (my / rs - y0) * scale], r);
 }
 
 function renderPlanView() {
@@ -894,6 +1042,7 @@ function renderPlanView() {
   const show = (i) => {
     const v = views[i];
     if (v.kind === "img") { renderToken++; $("planFrame").innerHTML = `<img src="${v.url}" alt="2D plan: ${esc(v.name)}">`; }
+    else if (v.kind === "raster") drawRasterView(v).catch(() => { $("planFrame").innerHTML = `<p class="meta">Couldn't draw this image.</p>`; });
     else drawPdfView(v).catch(() => { $("planFrame").innerHTML = `<p class="meta">Couldn't draw this page.</p>`; });
     $("planTabs").querySelectorAll("button").forEach((b) => b.classList.toggle("on", +b.dataset.i === i));
   };

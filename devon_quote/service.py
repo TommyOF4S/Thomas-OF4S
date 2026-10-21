@@ -11,6 +11,7 @@ from pathlib import Path
 from .bom import BomLine, load_bom
 from .catalog import GRADES, Catalog, load_catalog
 from .mapper import MapResult, Mapper, load_overrides
+from .marks import MarksSummary, read_marks, summarize
 from .plan import PlanResult, analyze_pdf
 from .pricing import Estimate, estimate
 from .report import write_crosswalk, write_report
@@ -38,6 +39,7 @@ class QuoteOptions:
     notes: str = ""
     drawings: list[str] = field(default_factory=list)
     plan_pdfs: list[str] = field(default_factory=list)  # CET 2D plans as PDF, read for joints
+    plan_images: list[str] = field(default_factory=list)  # 2D plans as PNG/JPG, read for pink dashes and colored dots
 
 
 @dataclass
@@ -69,6 +71,17 @@ def read_plans(paths: list[str]) -> PlanResult | None:
     return total if total is not None and total.panels else None
 
 
+def read_image_marks(images: list[str], pdfs: list[str], plan: PlanResult | None) -> MarksSummary | None:
+    """Pink dashes and colored dots in the 2D images, and in PDF pages whose vector drawing carries no marks."""
+    found = []
+    for path in images:
+        found += read_marks(path)
+    if pdfs and (plan is None or not (plan.pink_dashes or plan.height_changes)):
+        for path in pdfs:
+            found += read_marks(path)
+    return summarize(found) if found else None
+
+
 def safe_stem(name: str) -> str:
     return re.sub(r"[^\w.-]+", "_", name).strip("_") or "quote"
 
@@ -89,7 +102,8 @@ def build_quote(
         raise ValueError(f"No parts found in {Path(bom_path).name}")
 
     plan = read_plans(opts.plan_pdfs)
-    result = Mapper(catalog, load_overrides(overrides)).map(lines, plan)
+    marks = read_image_marks(opts.plan_images, opts.plan_pdfs, plan)
+    result = Mapper(catalog, load_overrides(overrides)).map(lines, plan, marks)
     grade = [g.lower() for g in GRADES].index(opts.grade.lower())
 
     out_dir = Path(out_dir)

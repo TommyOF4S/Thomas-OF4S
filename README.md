@@ -110,6 +110,18 @@ flags straight joints with no dash, dashes on a corner, 3-way or 4-way joint (th
 their own connector too), and dashes that aren't on a joint. Plans without pink dashes use the
 measured straight joints.
 
+**2D images (PNG/JPG) and picture-only PDFs.** The marks are read from the pixels: the page sorts
+pixels into the mark colors, groups touching pixels, and keeps long thin pink shapes (dashes) and
+round solid dot-sized shapes (dots) that sit on panel lines. It ignores letter holes in colored
+callout boxes, dotted dimension lines, and the pinkish blurred edges of red lines. With marks but
+no vector plan, the pink dashes become panel-to-panel connectors and the remaining AIS 2-way posts
+become 2-way corners (AIS 2-way posts cover both); colored dots add their filler strips; every
+other connector still comes from the SIF. The hosted page lists every mark it found, numbered on the
+plan, with a checkbox to untick anything that isn't a designer mark (such as a CET symbol). A black
+dot touching black panel outlines merges with them in an image, so black is only reliable in a
+vector PDF. `devon_quote/marks.py` and `imageMarks()` in `web/engine.js` are the same algorithm;
+`tests/test_marks.py` checks they agree pixel for pixel.
+
 (`HMA224` appears in Devon's calculator but isn't a real SKU; the tool never offers or quotes it.)
 
 ### How AIS parts become Devon parts

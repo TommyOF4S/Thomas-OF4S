@@ -316,6 +316,7 @@
     ovs.forEach((o) => (o.re = globToRegex(o.pattern)));
     let runHeight = null;
     let plan = null; // joints read from the 2D plan, when one was given
+    let marks = null; // pink dashes and colored dots read from 2D images
     const has = (p) => catalog.has(p);
 
     const rules = [
@@ -360,6 +361,7 @@
         const m = pn.match(POST);
         const isEnd = pn === "P-DLSEOR" || line.description.toUpperCase().includes("END OF RUN");
         if (plan && (m || isEnd)) return M(line, [], "ok", "connectors and finished ends are counted from the 2D plan", "plan");
+        if (!plan && marks && m && m[1] === "2" && marks.pink) return M(line, [], "ok", "2-way posts are split into panel-to-panel connectors (pink dashes on the 2D) and 2-way corners", "marks");
         if (m) {
           const ways = +m[1];
           const [height, hnote] = devonHeight(+m[2]);
@@ -513,6 +515,44 @@
       return on.length;
     }
 
+    function markFillers(warnings) {
+      const fillers = new Map();
+      for (const color of Object.keys(DOT_COLORS)) {
+        const n = (marks.dots || {})[color] || 0;
+        if (!n) continue;
+        const part = DOT_COLORS[color];
+        if (has(part)) fillers.set(part, (fillers.get(part) || 0) + n);
+        else warnings.push(`${part} (${color} dot) isn't in the Devon calculator; add it by hand.`);
+      }
+      return fillers;
+    }
+
+    // AIS 2-way posts cover both straight panel-to-panel joints and 90-degree corners: the pink dashes
+    // are the panel-to-panel connectors and the remaining 2-way posts are corners.
+    function imageConnectors(lines, bomHeights) {
+      const warnings = [];
+      const twoWay = new Map();
+      for (const ln of lines) {
+        const m = ln.part.toUpperCase().match(POST);
+        if (m && m[1] === "2") { const h = devonHeight(+m[2])[0]; twoWay.set(h, (twoWay.get(h) || 0) + ln.qty); }
+      }
+      let height = runHeight || 53, best = -1, total = 0;
+      for (const [h, q] of twoWay) { total += q; if (q > best) { best = q; height = h; } }
+      const pink = marks.pink;
+      const parts = [];
+      if (pink) {
+        parts.push(["pink", connector("inline", height), pink]);
+        const corners = total - pink;
+        if (corners > 0) parts.push(["l", connector("2way", height), Math.ceil(corners - 1e-9)]);
+        if (total && pink > total) warnings.push(`The 2D shows ${pink} pink dashes but the AIS BOM has only ${fmtQty(total)} 2-way posts; quoted ${pink} panel-to-panel connectors and no 2-way corners. Check the marks.`);
+      }
+      for (const [p, q] of markFillers(warnings)) parts.push(["filler", p, q]);
+      if (bomHeights.length > 1 && !Object.keys(marks.dots || {}).length) {
+        warnings.push("The BOM has panels at more than one height but the 2D has no colored dots. Mark each height change with a colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, black 53/67) to add its high/low filler strip.");
+      }
+      return [parts, warnings];
+    }
+
     function heightChanges(warnings) {
       const fillers = new Map();
       for (const ch of plan.heightChanges || []) {
@@ -528,14 +568,20 @@
       const height = runHeight || 53;
       const c = plan.counts;
       const warnings = [];
-      const fillers = heightChanges(warnings);
+      let fillers = heightChanges(warnings);
+      const markDots = marks && Object.keys(marks.dots || {}).length;
+      if (!(plan.heightChanges || []).length && markDots) fillers = markFillers(warnings);
       const qty = { ...c };
       let straightKind = "straight";
       if ((plan.pinkDashes || []).length) { qty.straight = pinkDashCount(warnings); straightKind = "pink"; } // the designer's marks win
+      else if (marks && marks.pink) {
+        if (marks.pink !== c.straight) warnings.push(`The 2D image has ${marks.pink} pink dashes but the plan measures ${c.straight} straight joints; the pink dashes were quoted.`);
+        qty.straight = marks.pink; straightKind = "pink";
+      }
       const parts = [["straight", "inline"], ["l", "2way"], ["tee", "3way"], ["cross", "4way"], ["ends", "finished_end"]]
         .filter(([kind]) => qty[kind]).map(([kind, dk]) => [kind === "straight" ? straightKind : kind, connector(dk, height), qty[kind]]);
       for (const [p, q] of fillers) parts.push(["filler", p, q]);
-      if (bomHeights.length > 1 && !(plan.heightChanges || []).length) {
+      if (bomHeights.length > 1 && !(plan.heightChanges || []).length && !markDots) {
         warnings.push(`The BOM has panels at more than one height; plan connectors are all quoted at ${height}"H. Mark each height change on the CET plan with a colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, black 53/67) to add its high/low filler strip.`);
       }
       if (c.angled) warnings.push(`The 2D plan has ${c.angled} joint(s) at an angle other than 90 or 180 degrees. Devon has no angled connector; check those runs.`);
@@ -572,7 +618,7 @@
       return [parts, warnings];
     }
 
-    function map(lines, planResult = null) {
+    function map(lines, planResult = null, marksSummary = null) {
       const heights = new Map(); // insertion order, so ties go to the first height seen (as in Python)
       for (const ln of lines) {
         const pn = ln.part.toUpperCase();
@@ -586,6 +632,7 @@
       let bestCount = -1;
       for (const [h, c] of heights) if (c > bestCount) { runHeight = h; bestCount = c; }
       plan = planResult && planResult.panels ? planResult : null;
+      marks = marksSummary && (marksSummary.pink || Object.keys(marksSummary.dots || {}).length) ? marksSummary : null;
 
       const mappings = lines.map(mapLine);
       const raw = {}, sources = {}, firstSeen = [];
@@ -599,23 +646,28 @@
       }
       const warnings = [];
       let planParts = [];
-      if (plan) {
-        const [parts, planWarnings] = planConnectors(lines, [...heights.keys()]);
+      if (plan || marks) {
+        const [parts, planWarnings] = plan ? planConnectors(lines, [...heights.keys()]) : imageConnectors(lines, [...heights.keys()]);
         planParts = parts;
         warnings.push(...planWarnings);
+        const label = plan ? "2D plan" : "2D marks";
         for (const [, part, qty] of parts) {
           if (!(part in raw)) { raw[part] = 0; firstSeen.push(part); }
           raw[part] += qty;
           (sources[part] ||= []);
-          if (!sources[part].includes("2D plan")) sources[part].push("2D plan");
+          if (!sources[part].includes(label)) sources[part].push(label);
         }
+      }
+      if (marksSummary && marksSummary.offPanel) {
+        const one = marksSummary.offPanel === 1;
+        warnings.push(`${marksSummary.offPanel} colored mark${one ? "" : "s"} on the 2D ${one ? "is" : "are"}n't on the drawing's panel lines, so ${one ? "it was" : "they were"} not quoted.`);
       }
       const quantities = {};
       for (const p of firstSeen) if (raw[p] > 0) quantities[p] = Math.ceil(raw[p] - 1e-9);
 
       const autoAdded = autoAdd(quantities);
       return {
-        mappings, quantities, sources, autoAdded, warnings, plan, planParts,
+        mappings, quantities, sources, autoAdded, warnings, plan, planParts, marks,
         review: mappings.filter((m) => m.status === "review"),
         unmapped: mappings.filter((m) => m.status === "unmapped"),
       };
@@ -861,6 +913,143 @@
     return { result: analyzeRects(pages, extras, strokes), pdfPages };
   }
 
+  // ---------------------------------------------------------------- marks in 2D images (port of marks.py)
+  // Designers mark the 2D: a pink dash on each panel-to-panel joint, and a colored dot where the panel
+  // height changes (the color picks the filler strip). In an image (PNG/JPG, or a PDF without vector
+  // panels) the marks are found by color and shape.
+  const MARK_CLASSES = [null, "pink", "red", "blue", "yellow", "green", "black"];
+
+  function pixelClass(r, g, b) {
+    if (r > 204 && b > 115 && g < 204 && r - g > 51) return 1; // pink
+    if (r > 153 && g < 102 && b < 102) return 2; // red
+    if (b > 128 && r < 102 && g < 128) return 3; // blue
+    if (r > 153 && g > 153 && b < 102) return 4; // yellow
+    if (g > 115 && r < 102 && b < 102) return 5; // green
+    if (r < 64 && g < 64 && b < 64) return 6; // black
+    return 0;
+  }
+
+  /** data: RGBA bytes (row-major), width, height. Returns {dashes, dots, size: {w, h}, limits}. */
+  function imageMarks(data, W, H) {
+    const L = Math.max(W, H);
+    const dMin = Math.max(6, Math.round(0.004 * L)), dMax = Math.max(dMin + 1, Math.round(0.04 * L));
+    const lenMin = dMin, lenMax = Math.max(lenMin + 1, Math.round(0.08 * L));
+    const N = W * H;
+    const cls = new Uint8Array(N), dark = new Uint8Array(N);
+    for (let i = 0; i < N; i++) {
+      const a = data[4 * i + 3], w = 255 * (255 - a);
+      const r = Math.floor((data[4 * i] * a + w) / 255), g = Math.floor((data[4 * i + 1] * a + w) / 255), b = Math.floor((data[4 * i + 2] * a + w) / 255);
+      cls[i] = pixelClass(r, g, b);
+      // drawing ink: black lines and gray panel fills (neutral, not white)
+      dark[i] = Math.max(r, g, b) < 235 && Math.max(r, g, b) - Math.min(r, g, b) < 30 ? 1 : 0;
+    }
+    // integral image of ink pixels, for the "is it on a panel" check
+    const S = new Float64Array((W + 1) * (H + 1));
+    for (let y = 0; y < H; y++) {
+      let row = 0;
+      for (let x = 0; x < W; x++) { row += dark[y * W + x]; S[(y + 1) * (W + 1) + x + 1] = S[y * (W + 1) + x + 1] + row; }
+    }
+    const darkIn = (x0, y0, x1, y1) => {
+      x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(W - 1, x1); y1 = Math.min(H - 1, y1);
+      if (x1 < x0 || y1 < y0) return [0, 0];
+      const A = (x, y) => S[y * (W + 1) + x];
+      return [A(x1 + 1, y1 + 1) - A(x0, y1 + 1) - A(x1 + 1, y0) + A(x0, y0), (x1 - x0 + 1) * (y1 - y0 + 1)];
+    };
+    const seen = new Uint8Array(N);
+    const stack = new Int32Array(N);
+    const comps = [];
+    for (let i0 = 0; i0 < N; i0++) {
+      const c = cls[i0];
+      if (!c || seen[i0]) continue;
+      let top = 0; stack[top++] = i0; seen[i0] = 1;
+      let n = 0, minx = W, maxx = -1, miny = H, maxy = -1, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, darkOwn = 0, redNext = 0;
+      while (top) {
+        const i = stack[--top];
+        const x = i % W, y = (i - x) / W;
+        n++; sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y; darkOwn += dark[i];
+        if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y;
+        for (let dy = -1; dy <= 1; dy++) {
+          const yy = y + dy;
+          if (yy < 0 || yy >= H) continue;
+          for (let dx = -1; dx <= 1; dx++) {
+            const xx = x + dx;
+            if (xx < 0 || xx >= W || (!dx && !dy)) continue;
+            const j = yy * W + xx;
+            if (!seen[j] && cls[j] === c) { seen[j] = 1; stack[top++] = j; }
+            else if (c === 1 && cls[j] === 2) redNext++;
+          }
+        }
+      }
+      if (c === 6 && n > dMax * dMax * 2) continue; // big black areas: walls, lines
+      const bw = maxx - minx + 1, bh = maxy - miny + 1;
+      if (Math.max(bw, bh) < Math.min(dMin, lenMin) || Math.max(bw, bh) > Math.max(dMax, lenMax) * 1.5) continue;
+      const mx = sx / n, my = sy / n;
+      const cxx = sxx / n - mx * mx + 1 / 12, cyy = syy / n - my * my + 1 / 12, cxy = sxy / n - mx * my;
+      const tr = cxx + cyy, det = cxx * cyy - cxy * cxy, disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - det));
+      const l1 = tr / 2 + disc, l2 = Math.max(tr / 2 - disc, 1e-9);
+      if (c === 1 && redNext > 0.2 * n) continue; // the blurred pinkish edge of something red, not a pink mark
+      comps.push({ c, n, bw, bh, mx, my, elong: Math.sqrt(l1 / l2), length: Math.sqrt(12 * l1), fill: n / (bw * bh), darkOwn });
+    }
+    const dashes = [], dots = [];
+    for (const k of comps) {
+      if (k.c === 1) {
+        if (k.elong >= 1.8 && k.length >= lenMin && k.length <= lenMax) dashes.push({ kind: "dash", color: "pink", x: k.mx, y: k.my, size: k.length, darkOwn: k.darkOwn, n: k.n });
+      } else {
+        const size = Math.max(k.bw, k.bh);
+        const round = k.c === 6 ? k.elong <= 1.35 && k.fill >= 0.7 : k.elong <= 1.6 && k.fill >= 0.6;
+        if (round && size >= dMin && size <= dMax) dots.push({ kind: "dot", color: MARK_CLASSES[k.c], x: k.mx, y: k.my, size, darkOwn: k.darkOwn, n: k.n });
+      }
+    }
+    // Dotted lines (dimension leaders) are chains of look-alike dots: group dots of one color and
+    // similar size that sit within three sizes of each other; a group of three or more is a line.
+    const parent = dots.map((_, i) => i);
+    const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+    dots.forEach((a, i) => {
+      for (let j = i + 1; j < dots.length; j++) {
+        const b = dots[j];
+        if (b.color !== a.color) continue;
+        const ratio = b.size / a.size;
+        if (ratio < 0.7 || ratio > 1.43) continue;
+        if (Math.hypot(b.x - a.x, b.y - a.y) <= 3 * Math.max(a.size, b.size)) parent[find(i)] = find(j);
+      }
+    });
+    const groupSize = new Map();
+    dots.forEach((_, i) => groupSize.set(find(i), (groupSize.get(find(i)) || 0) + 1));
+    const chained = new Set(dots.map((_, i) => i).filter((i) => groupSize.get(find(i)) >= 3));
+    // A spot inside a bigger patch of the same color (e.g. the hole of a letter in a yellow callout box)
+    // is part of that patch, not a mark.
+    const embedded = (m, c) => {
+      const R = Math.round(1.5 * m.size), cx = Math.round(m.x), cy = Math.round(m.y);
+      let same = 0, area = 0;
+      for (let y = Math.max(0, cy - R); y <= Math.min(H - 1, cy + R); y++) {
+        for (let x = Math.max(0, cx - R); x <= Math.min(W - 1, cx + R); x++) { area++; if (cls[y * W + x] === c) same++; }
+      }
+      return (same - m.n) / Math.max(1, area - m.n) >= 0.15;
+    };
+    const classOf = (color) => MARK_CLASSES.indexOf(color);
+    const kept = dots.filter((m, i) => !chained.has(i) && !embedded(m, classOf(m.color)));
+    const keptDashes = dashes.filter((m) => !embedded(m, 1));
+    // A mark sits on the drawing: there must be panel lines (ink) right around it.
+    const out = (m) => {
+      const R = Math.round(1.5 * m.size);
+      const [d, area] = darkIn(Math.round(m.x) - R, Math.round(m.y) - R, Math.round(m.x) + R, Math.round(m.y) + R);
+      const onPanel = (d - m.darkOwn) / area >= 0.05;
+      return { kind: m.kind, color: m.color, x: Math.round(m.x * 10) / 10, y: Math.round(m.y * 10) / 10, size: Math.round(m.size * 10) / 10, onPanel };
+    };
+    return { dashes: keptDashes.map(out), dots: kept.map(out), size: { w: W, h: H }, limits: { dMin, dMax, lenMin, lenMax } };
+  }
+
+  /** Sum the marks of several images/pages: {pink, dots: {color: n}, offPanel: n, marks: [...]} */
+  function summarizeMarks(list) {
+    const res = { pink: 0, dots: {}, offPanel: 0, sources: list.length };
+    const use = (d) => (d.use === undefined ? d.onPanel : d.use);
+    for (const m of list) {
+      for (const d of m.dashes) { if (use(d)) res.pink++; else if (!d.onPanel) res.offPanel++; }
+      for (const d of m.dots) { if (use(d)) res.dots[d.color] = (res.dots[d.color] || 0) + 1; else if (!d.onPanel) res.offPanel++; }
+    }
+    return res;
+  }
+
   // ---------------------------------------------------------------- pricing
   function estimate(catalog, quantities, grade, delivery, stations) {
     const lines = Object.entries(quantities).map(([part, qty]) => {
@@ -1053,6 +1242,19 @@
       w("");
       w("Free ends are quoted as finished ends. Swap any that stop at a wall to a wall start (HMA199).\n");
     }
+    if (result.marks) {
+      const mk = result.marks;
+      const dots = Object.entries(mk.dots || {}).map(([color, n]) => `${n} ${color}`).join(", ") || "none";
+      w("## Marks read from the 2D\n");
+      w(`Pink dashes (panel-to-panel): ${mk.pink} · colored dots (filler strips): ${dots}\n`);
+      if (!result.plan) {
+        w("AIS 2-way posts cover straight joints and corners: the pink dashes are the panel-to-panel connectors and the remaining 2-way posts are quoted as corners.\n");
+        w("| From the 2D | Qty | Devon part |\n|---|---:|---|");
+        const labels = { pink: "Pink dash: panel-to-panel connector", l: "Remaining AIS 2-way posts: corner", filler: "Colored dot: high/low filler strip" };
+        for (const [k, p, q] of result.planParts) w(`| ${labels[k]} | ${q} | ${p} |`);
+        w("");
+      }
+    }
     const fin = finishes(lines);
     if (fin.length) {
       w("## AIS finishes in the design\n");
@@ -1079,6 +1281,6 @@
   return {
     GRADES, buildCatalog, loadCalculator, listPrice, parseSif, parseCsv, parseTable, parseBom,
     makeMapper, devonHeight, connector, DOT_COLORS, estimate, setCell, fillSheet, writeQuote,
-    finishes, crosswalkCsv, reportMd, safeStem, analyzeRects, pdfRects, analyzePdf, nominalWidth,
+    finishes, crosswalkCsv, reportMd, safeStem, analyzeRects, pdfRects, analyzePdf, nominalWidth, imageMarks, summarizeMarks,
   };
 });

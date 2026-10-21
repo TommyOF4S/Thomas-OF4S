@@ -84,13 +84,13 @@ def _build(body: dict) -> dict:
     job_dir.mkdir(parents=True, exist_ok=True)
     bom_path = job_dir / name
     bom_path.write_bytes(data)
-    plan_pdfs = []
+    plan_pdfs, plan_images = [], []
     for up in body.get("plans") or []:
         pname, pdata = _decode(up, "2D plan")
-        if pname.lower().endswith(".pdf"):
+        if pname.lower().endswith((".pdf", ".png", ".jpg", ".jpeg")):
             ppath = job_dir / ("plan_" + pname)
             ppath.write_bytes(pdata)
-            plan_pdfs.append(str(ppath))
+            (plan_pdfs if pname.lower().endswith(".pdf") else plan_images).append(str(ppath))
 
     grade = (body.get("grade") or "keystone").lower()
     if grade not in [g.lower() for g in GRADES]:
@@ -106,6 +106,7 @@ def _build(body: dict) -> dict:
         notes=body.get("notes") or "",
         drawings=[Path(d).name for d in body.get("drawings") or []],
         plan_pdfs=plan_pdfs,
+        plan_images=plan_images,
     )
     out = build_quote(bom_path, opts, job_dir)
     est, res = out.estimate, out.result

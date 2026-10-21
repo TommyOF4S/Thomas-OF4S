@@ -34,7 +34,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--stations", type=int, help="number of workstations, for cost per station")
     ap.add_argument("--notes", help="text file with design notes or a dictation transcript")
     ap.add_argument("--drawing", action="append", default=[],
-                    help="2D plan (repeatable). A CET PDF is read for panel joints; images are only referenced")
+                    help="2D plan (repeatable): a CET PDF is measured for panel joints; PNG/JPG/PDF are read for "
+                         "pink dashes and colored dots")
     ap.add_argument("--template", help="Devon calculator .xlsm (default: newest in templates/)")
     ap.add_argument("--overrides", default=str(DEFAULT_OVERRIDES), help="AIS -> Devon override table")
     ap.add_argument("-o", "--out-dir", default="out", help="where to write the results (default: out/)")
@@ -51,6 +52,7 @@ def main(argv: list[str] | None = None) -> int:
         notes=Path(args.notes).read_text(encoding="utf-8") if args.notes else "",
         drawings=[Path(d).name for d in args.drawing],
         plan_pdfs=[d for d in args.drawing if d.lower().endswith(".pdf")],
+        plan_images=[d for d in args.drawing if d.lower().endswith((".png", ".jpg", ".jpeg"))],
     )
     try:
         out = build_quote(args.bom, opts, args.out_dir, args.template, args.overrides)
@@ -68,6 +70,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"2D plan: {result.plan.panels} panels, {c['straight']} straight joints, {c['l']} corners, "
               f"{c['tee']} three-way, {c['cross']} four-way, {c['ends']} free ends.")
     elif opts.plan_pdfs:
-        print("2D plan: no CET panels found in the PDF; connectors come from the AIS BOM.")
+        print("2D plan: no vector CET panels in the PDF.")
+    if result.marks is not None:
+        mk = result.marks
+        print(f"2D marks: {mk.pink} pink dashes, dots: " + (", ".join(f"{n} {c}" for c, n in mk.dots.items()) or "none")
+              + (f", {mk.off_panel} off the drawing (not quoted)" if mk.off_panel else ""))
+    elif opts.plan_images or opts.plan_pdfs:
+        print("2D marks: no pink dashes or colored dots found.")
     print(f"{len(result.unmapped)} unmapped, {len(result.review)} to confirm — see the review file.")
     return 0

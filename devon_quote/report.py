@@ -114,6 +114,21 @@ def write_report(
         w("")
         w("Free ends are quoted as finished ends. Swap any that stop at a wall to a wall start (HMA199).\n")
 
+    if result.marks is not None:
+        mk = result.marks
+        dots = ", ".join(f"{n} {color}" for color, n in mk.dots.items()) or "none"
+        w("## Marks read from the 2D\n")
+        w(f"Pink dashes (panel-to-panel): {mk.pink} · colored dots (filler strips): {dots}\n")
+        if result.plan is None:
+            w("AIS 2-way posts cover straight joints and corners: the pink dashes are the panel-to-panel "
+              "connectors and the remaining 2-way posts are quoted as corners.\n")
+            w("| From the 2D | Qty | Devon part |\n|---|---:|---|")
+            labels = {"pink": "Pink dash: panel-to-panel connector", "l": "Remaining AIS 2-way posts: corner",
+                      "filler": "Colored dot: high/low filler strip"}
+            for kind, part, qty in result.plan_parts:
+                w(f"| {labels[kind]} | {qty} | {part} |")
+            w("")
+
     fin = finishes(lines)
     if fin:
         w("## AIS finishes in the design\n")

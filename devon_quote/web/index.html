@@ -434,7 +434,7 @@ $("buildBtn").onclick = async () => {
       stations: $("stations").value, delivery: $("delivery").value, trim: $("trim").value,
       description: $("description").value, notes: $("notes").value,
       drawings: state.plans.map((p) => p.file.name),
-      plans: await Promise.all(state.plans.filter((p) => /\.pdf$/i.test(p.file.name))
+      plans: await Promise.all(state.plans.filter((p) => /\.(pdf|png|jpe?g)$/i.test(p.file.name))
         .map(async (p) => ({ name: p.file.name, data: await readB64(p.file) }))),
     };
     const res = await fetch("/api/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });

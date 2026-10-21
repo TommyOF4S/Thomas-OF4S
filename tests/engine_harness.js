@@ -16,7 +16,7 @@ const E = require(path.join(__dirname, "..", "devon_quote", "web", "engine.js"))
     const pdfjs = require("pdfjs-dist/legacy/build/pdf.js");
     plan = (await E.analyzePdf(pdfjs, new Uint8Array(fs.readFileSync(opts.plan)))).result;
   }
-  const result = E.makeMapper(catalog, opts.overrides || []).map(lines, plan);
+  const result = E.makeMapper(catalog, opts.overrides || []).map(lines, plan, opts.marks || null);
   const grade = opts.grade || 0;
   const est = E.estimate(catalog, result.quantities, grade, opts.delivery || 0, opts.stations || null);
   const header = { project: opts.project || "", description: "WORKSTATIONS", date: "1.2.26", shipTo: "33010", grade, delivery: opts.delivery || 0, stations: opts.stations || null };

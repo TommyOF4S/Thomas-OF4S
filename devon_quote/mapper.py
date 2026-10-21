@@ -23,6 +23,7 @@ from pathlib import Path
 
 from .bom import BomLine
 from .catalog import Catalog
+from .marks import MarksSummary
 from .plan import DOT_COLORS, PlanResult
 
 # Devon panel heights, and the size code each connector family uses at that height.
@@ -90,6 +91,7 @@ class MapResult:
     warnings: list[str] = field(default_factory=list)
     plan: PlanResult | None = None
     plan_parts: list[tuple[str, str, int]] = field(default_factory=list)  # (joint kind, Devon part, qty)
+    marks: MarksSummary | None = None  # marks read from 2D images
 
     @property
     def review(self) -> list[Mapping]:
@@ -146,6 +148,7 @@ class Mapper:
         self.overrides = overrides or []
         self.run_height: int | None = None  # dominant Devon panel height, for height-less parts
         self.plan: PlanResult | None = None  # joints read from the 2D plan, when one was given
+        self.marks: MarksSummary | None = None  # pink dashes and colored dots read from 2D images
 
     # Each rule returns a Mapping or None.
     def _rule_override(self, line: BomLine) -> Mapping | None:
@@ -199,6 +202,9 @@ class Mapper:
         is_end = pn == "P-DLSEOR" or "END OF RUN" in line.description.upper()
         if self.plan is not None and (m or is_end):
             return Mapping(line, [], "ok", "connectors and finished ends are counted from the 2D plan", "plan")
+        if self.marks is not None and m and m.group(1) == "2" and self.marks.pink:
+            return Mapping(line, [], "ok", "2-way posts are split into panel-to-panel connectors (pink dashes on the 2D) "
+                                            "and 2-way corners", "marks")
         if m:
             ways, h = int(m.group(1)), int(m.group(2))
             height, hnote = devon_height(h)
@@ -328,7 +334,7 @@ class Mapper:
                 return m
         return Mapping(line, [], "unmapped", "no rule or override for this AIS part", "")
 
-    def map(self, lines: list[BomLine], plan: PlanResult | None = None) -> MapResult:
+    def map(self, lines: list[BomLine], plan: PlanResult | None = None, marks: MarksSummary | None = None) -> MapResult:
         # Main panel height, used for parts that don't carry a height (end-of-run, wall start).
         heights = Counter()
         for ln in lines:
@@ -337,6 +343,7 @@ class Mapper:
                 heights[devon_height(int(m.group(2)))[0]] += ln.qty
         self.run_height = heights.most_common(1)[0][0] if heights else None
         self.plan = plan if plan is not None and plan.panels else None
+        self.marks = marks if marks is not None and marks.any else None
 
         mappings = [self.map_line(ln) for ln in lines]
 
@@ -349,17 +356,70 @@ class Mapper:
                     sources[part].append(m.source.part)
         warnings = []
         plan_parts = []
-        if self.plan is not None:
-            plan_parts, plan_warnings = self._plan_connectors(lines, list(heights))
+        if self.plan is not None or self.marks is not None:
+            if self.plan is not None:
+                plan_parts, plan_warnings = self._plan_connectors(lines, list(heights))
+            else:
+                plan_parts, plan_warnings = self._image_connectors(lines, list(heights))
             warnings += plan_warnings
+            label = "2D plan" if self.plan is not None else "2D marks"
             for _, part, qty in plan_parts:
                 raw[part] += qty
-                if "2D plan" not in sources[part]:
-                    sources[part].append("2D plan")
+                if label not in sources[part]:
+                    sources[part].append(label)
+        if marks is not None and marks.off_panel:
+            one = marks.off_panel == 1
+            warnings.append(f"{marks.off_panel} colored mark{'' if one else 's'} on the 2D {'is' if one else 'are'}n't on "
+                            f"the drawing's panel lines, so {'it was' if one else 'they were'} not quoted.")
         quantities = {p: math.ceil(q - 1e-9) for p, q in raw.items() if q > 0}
 
         auto_added = self._auto_add(quantities)
-        return MapResult(mappings, quantities, dict(sources), auto_added, warnings, self.plan, plan_parts)
+        return MapResult(mappings, quantities, dict(sources), auto_added, warnings, self.plan, plan_parts, self.marks)
+
+    def _mark_fillers(self, warnings: list[str]) -> Counter:
+        """High/low filler strips from the colored dots found in 2D images."""
+        fillers = Counter()
+        for color in DOT_COLORS:
+            n = self.marks.dots.get(color, 0)
+            if not n:
+                continue
+            part = DOT_COLORS[color]
+            if part in self.catalog:
+                fillers[part] += n
+            else:
+                warnings.append(f"{part} ({color} dot) isn't in the Devon calculator; add it by hand.")
+        return fillers
+
+    def _image_connectors(self, lines: list[BomLine], bom_heights: list[int]) -> tuple[list[tuple[str, str, int]], list[str]]:
+        """Pink dashes and colored dots read from 2D images, when there's no vector plan to measure.
+
+        AIS 2-way posts cover both straight panel-to-panel joints and 90-degree corners, so the
+        pink dashes are the panel-to-panel connectors and the remaining 2-way posts are corners.
+        """
+        warnings = []
+        two_way = Counter()
+        for ln in lines:
+            m = _POST.match(ln.part.upper())
+            if m and m.group(1) == "2":
+                two_way[devon_height(int(m.group(2)))[0]] += ln.qty
+        height = two_way.most_common(1)[0][0] if two_way else (self.run_height or 53)
+        total = sum(two_way.values())
+        pink = self.marks.pink
+        parts = []
+        if pink:
+            parts.append(("pink", connector("inline", height), pink))
+            corners = total - pink
+            if corners > 0:
+                parts.append(("l", connector("2way", height), int(math.ceil(corners - 1e-9))))
+            if total and pink > total:
+                warnings.append(f"The 2D shows {pink} pink dashes but the AIS BOM has only {total:g} 2-way posts; "
+                                f"quoted {pink} panel-to-panel connectors and no 2-way corners. Check the marks.")
+        parts += [("filler", p, q) for p, q in self._mark_fillers(warnings).items()]
+        if len(bom_heights) > 1 and not self.marks.dots:
+            warnings.append("The BOM has panels at more than one height but the 2D has no colored dots. "
+                            "Mark each height change with a colored dot (red 39/53, blue 39/67, yellow 47/53, "
+                            "green 47/67, black 53/67) to add its high/low filler strip.")
+        return parts, warnings
 
     def _height_changes(self, warnings: list[str]) -> Counter:
         """High/low filler strips from the colored dots on the plan."""
@@ -405,10 +465,18 @@ class Mapper:
         c = plan.counts
         warnings = []
         fillers = self._height_changes(warnings)
+        if not plan.height_changes and self.marks is not None and self.marks.dots:
+            fillers = self._mark_fillers(warnings)
         qty = Counter(c)
         straight_kind = "straight"
         if plan.pink_dashes:  # the designer marked the panel-to-panel joints: their count wins
             qty["straight"] = self._pink_dash_count(warnings)
+            straight_kind = "pink"
+        elif self.marks is not None and self.marks.pink:
+            if self.marks.pink != c["straight"]:
+                warnings.append(f"The 2D image has {self.marks.pink} pink dashes but the plan measures {c['straight']} "
+                                "straight joints; the pink dashes were quoted.")
+            qty["straight"] = self.marks.pink
             straight_kind = "pink"
         parts = [
             (straight_kind if kind == "straight" else kind, connector(devon_kind, height), qty[kind])
@@ -417,7 +485,7 @@ class Mapper:
             if qty[kind]
         ]
         parts += [("filler", p, q) for p, q in fillers.items()]
-        if len(bom_heights) > 1 and not plan.height_changes:
+        if len(bom_heights) > 1 and not plan.height_changes and not (self.marks and self.marks.dots):
             warnings.append(f'The BOM has panels at more than one height; plan connectors are all quoted at {height}"H. '
                             "Mark each height change on the CET plan with a colored dot (red 39/53, blue 39/67, "
                             "yellow 47/53, green 47/67, black 53/67) to add its high/low filler strip.")
