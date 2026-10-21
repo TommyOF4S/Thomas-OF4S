@@ -54,7 +54,9 @@ def test_parse_table():
 
 def test_heights():
     assert devon_height(50) == (53, "")
-    assert devon_height(42) == (47, "")
+    assert devon_height(42) == (39, "")
+    assert devon_height(82) == (85, "")
+    assert devon_height(66) == (67, "")
     assert devon_height(30)[0] == 39 and devon_height(30)[1]
     assert devon_height(90)[0] == 85
 

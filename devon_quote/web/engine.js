@@ -255,6 +255,7 @@
   // ---------------------------------------------------------------- mapper
   const DEVON_HEIGHTS = [39, 47, 53, 67, 85];
   const CONNECTOR_CODES = { 39: ["39", "34"], 47: ["47", "42"], 53: ["53", "48"], 67: ["67", "62"], 85: ["85", "80"] };
+  const DIVI_TO_DEVON_HEIGHT = { 42: 39, 50: 53, 82: 85 }; // set equivalents; other heights round up
   const HEIGHT_TOLERANCE = 6;
 
   function connector(kind, height) {
@@ -266,6 +267,7 @@
   }
 
   function devonHeight(h) {
+    if (DIVI_TO_DEVON_HEIGHT[h]) return [DIVI_TO_DEVON_HEIGHT[h], ""];
     for (const d of DEVON_HEIGHTS) {
       if (h <= d) return [d, d - h > HEIGHT_TOLERANCE ? `AIS ${h}"H rounds up to Devon ${d}"H` : ""];
     }

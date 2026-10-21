@@ -126,7 +126,7 @@ plan, with a checkbox to untick anything that isn't a designer mark (such as a C
 
 | AIS Divi | Devon |
 |---|---|
-| Panels `P-DL…HHWW` | `HM01.HHWW` with the height rounded **up** to Devon's 39/47/53/67/85 (50H → 53H). Powered panels become `.P4`. Glass panels become `HM51` (panel + 14" glass stacker). |
+| Panels `P-DL…HHWW` | `HM01.HHWW` at the Devon equivalent height: Divi 42H → 39H, 50H → 53H, 82H → 85H; any other height rounds **up** to Devon's 39/47/53/67/85. Powered panels become `.P4`. Glass panels become `HM51` (panel + 14" glass stacker). |
 | Posts 2/3/4-way `P-DLPF*` | `HMA130` / `HMA137` / `HMC132` at that height. 2-way is flagged, because straight runs use `HMP213`. |
 | End-of-run shroud | `HMA128` finished end kit |
 | Infeeds, duplex outlets, data plates | `BE-SDFD1`/`BE-ENDFD`, `BE-REC1-4`, `BE01439-C` |

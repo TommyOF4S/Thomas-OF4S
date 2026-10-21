@@ -38,6 +38,8 @@ _CONNECTOR_CODES = {
 }
 JOINT_WORDS = {"l": "corner", "tee": "3-way joint", "cross": "4-way joint", "ends": "free end",
                "angled": "angled joint", "other": "joint of 5+ panels"}
+# Divi heights with a set Devon equivalent (from OF4S); any other height rounds up.
+DIVI_TO_DEVON_HEIGHT = {42: 39, 50: 53, 82: 85}
 # A Divi height more than this many inches below the Devon height it rounds up to is flagged.
 HEIGHT_TOLERANCE = 6
 
@@ -55,7 +57,9 @@ def connector(kind: str, height: int) -> str:
 
 
 def devon_height(divi_height: int) -> tuple[int, str]:
-    """Round a Divi panel height up to the next Devon height (never lose privacy)."""
+    """The Devon equivalent of a Divi panel height; unknown heights round up (never lose privacy)."""
+    if divi_height in DIVI_TO_DEVON_HEIGHT:
+        return DIVI_TO_DEVON_HEIGHT[divi_height], ""
     for h in DEVON_HEIGHTS:
         if divi_height <= h:
             note = ""
