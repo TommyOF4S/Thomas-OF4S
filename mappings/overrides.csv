@@ -1,0 +1,4 @@
+ais_part,devon_part,ratio,note
+# One row per AIS part (wildcards like P-DLXYZ* allowed). Leave devon_part blank when the AIS part needs nothing on the Devon side.
+# Several rows for the same AIS part add several Devon parts. ratio = Devon quantity per AIS piece (0.5 = one Devon item per two AIS).
+# Rows here always win over the built-in rules.

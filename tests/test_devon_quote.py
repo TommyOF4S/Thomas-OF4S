@@ -1,0 +1,136 @@
+import zipfile
+from pathlib import Path
+
+import openpyxl
+import pytest
+
+from devon_quote.bom import BomLine, load_bom, parse_table
+from devon_quote.catalog import load_catalog
+from devon_quote.mapper import Mapper, Override, devon_height
+from devon_quote.pricing import estimate
+from devon_quote.writer import QuoteHeader, write_quote
+
+ROOT = Path(__file__).resolve().parent.parent
+TEMPLATES = sorted((ROOT / "templates").glob("DEVON*.xlsm"))
+TEMPLATE = TEMPLATES[-1] if TEMPLATES else None
+SAMPLE = ROOT / "tests" / "fixtures" / "sample_ais_divi.sif"
+
+
+@pytest.fixture(scope="module")
+def catalog():
+    if TEMPLATE is None:
+        pytest.skip("put the Devon calculator .xlsm in templates/")
+    return load_catalog(TEMPLATE)
+
+
+def line(part, desc="", qty=1):
+    return BomLine(part=part, description=desc, qty=qty)
+
+
+def test_catalog_prices_by_grade(catalog):
+    item = catalog.get("HM01.5348")
+    assert item.list_price(0) == pytest.approx(425.04)  # Keystone
+    assert item.list_price(1) == pytest.approx(491.04)  # Summit = L + 66
+    assert item.list_price(2) == pytest.approx(591.04)  # Aspen = L + 166
+    assert catalog.net_multiplier == pytest.approx(0.3)
+    assert catalog.surcharge_rate == pytest.approx(0.09)
+    # 85" glass-stacker panels carry a fixed price regardless of grade
+    assert catalog.get("HM51.8548").list_price(2) == catalog.get("HM51.8548").list_price(0)
+
+
+def test_parse_sif():
+    lines = load_bom(SAMPLE)
+    assert len(lines) == 24
+    first = lines[0]
+    assert first.part == "E-UN8W4BIFS" and first.qty == 5
+    panel = next(l for l in lines if l.part == "P-DLFRPM5024")
+    assert ("Fabric Side A", "New England Night") in [(o.group, o.description) for o in panel.options]
+
+
+def test_parse_table():
+    rows = [["Project X"], ["Part Number", "Description", "Qty"], ["W-WS2460", "Worksurface", "4"], ["", "", ""]]
+    assert [(l.part, l.qty) for l in parse_table(rows)] == [("W-WS2460", 4)]
+
+
+def test_heights():
+    assert devon_height(50) == (53, "")
+    assert devon_height(42) == (47, "")
+    assert devon_height(30)[0] == 39 and devon_height(30)[1]
+    assert devon_height(90)[0] == 85
+
+
+@pytest.mark.parametrize(
+    "part,desc,expected",
+    [
+        ("P-DLFRPM5024", "Divi Linear Panel - Hard Surf Perm/Mono - NPWR - 50H x 24W", "HM01.5324"),
+        ("P-DLFPPM5060", "Divi Linear Panel - Hard Surf Perm/Mono - PWR - 50H x 60W", "HM01.5360.P4"),
+        ("P-DLQGWRMM5042", "Divi Linear Qtr Glass Panel - AMono/BMono - NPWR - 50H x 42W", "HM51.5342"),
+        ("P-DLQGWPMM5060", "Divi Linear Qrt Glass Panel - AMono/BMono - PWR - 50H x 60W", "HM51.5360.P4"),
+        ("P-DLPF350", "Divi Linear Post Filler - 3 Way - 50H", "HMA137.53"),
+        ("P-DLPF450", "Divi Linear Post Filler - 4 Way - 50H", "HMC132.48"),
+        ("W-WS2442", "Rectangular - 24D x 42W", "WS2442"),
+        ("WPS-UNCT24S", "Shared Cantilever - Single - 24D", "HMP226.22"),
+        ("WPS-VC48", "U-Channel - 48W Black", "WPS-VC48"),
+        ("E-MW8W4DO2", "Duplex Outlet - Line 2 - Black", "BE-REC2"),
+    ],
+)
+def test_rules(catalog, part, desc, expected):
+    m = Mapper(catalog).map_line(line(part, desc))
+    assert m.targets[0][0] == expected
+    assert m.status in ("ok", "review")
+
+
+def test_two_way_post_is_flagged(catalog):
+    m = Mapper(catalog).map_line(line("P-DLPF250", "Divi Linear Post Filler - 2 -Way 50H"))
+    assert m.targets == [("HMA130.53", 1)] and m.status == "review"
+
+
+def test_cantilevers_become_pairs(catalog):
+    res = Mapper(catalog).map([
+        line("WPS-UNCT24L", "Regular Cantilever - Left Hand - 24D", 3),
+        line("WPS-UNCT24R", "Regular Cantilever - Right Hand - 24D", 3),
+    ])
+    assert res.quantities["HMP225.22"] == 3
+    assert res.quantities["ACC-107"] == 3
+    assert not res.warnings
+
+
+def test_odd_worksurface_gets_custom_cut(catalog):
+    m = Mapper(catalog).map_line(line("W-WS2454", "Rectangular - 24D x 54W"))
+    assert m.targets == [("WS2460", 1), ("MIS-002", 1)] and m.status == "review"
+
+
+def test_unknown_part_is_reported(catalog):
+    res = Mapper(catalog).map([line("X-MYSTERY", "Something", 2)])
+    assert res.unmapped and not res.quantities
+
+
+def test_override_wins(catalog):
+    mapper = Mapper(catalog, [Override("P-DLPF250", "HMP213.48", 1, "straight runs only")])
+    m = mapper.map_line(line("P-DLPF250", "Divi Linear Post Filler - 2 -Way 50H"))
+    assert m.targets == [("HMP213.48", 1)] and m.status == "ok"
+    skip = Mapper(catalog, [Override("E-MX*", "", 1, "")]).map_line(line("E-MX8W4PTPC21", "Jumper"))
+    assert skip.targets == [] and skip.status == "ok"
+
+
+def test_sample_maps_cleanly(catalog):
+    res = Mapper(catalog).map(load_bom(SAMPLE))
+    assert not res.unmapped
+    assert res.quantities["HMA128.53"] == 23  # end-of-run shrouds -> finished ends at 53"H
+    assert all(p in catalog for p in res.quantities)
+
+
+def test_writer_fills_calculator(tmp_path, catalog):
+    res = Mapper(catalog).map(load_bom(SAMPLE))
+    out = write_quote(TEMPLATE, tmp_path / "q.xlsm", catalog, res.quantities,
+                      QuoteHeader(project="Test & Co", ship_to="33010", grade=1, delivery=1000, stations=10))
+    assert "xl/vbaProject.bin" in zipfile.ZipFile(out).namelist()
+    ws = openpyxl.load_workbook(out, keep_vba=True)["Master"]
+    filled = {ws.cell(r, 1).value: ws.cell(r, 3).value for r in range(catalog.first_row, catalog.last_row + 1) if ws.cell(r, 3).value}
+    assert filled == res.quantities
+    assert ws["B6"].value == "Test & Co" and ws["J10"].value == 2 and ws["G444"].value == 1000
+    assert ws["B4"].value is None  # Devon's quote number is cleared
+    assert str(ws["G442"].value).startswith("=")  # formulas untouched
+
+    est = estimate(catalog, res.quantities, 1, 1000, 10)
+    assert est.total == pytest.approx(est.product_net * 1.09 + 1000)
