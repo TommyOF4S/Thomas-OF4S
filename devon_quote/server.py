@@ -84,6 +84,13 @@ def _build(body: dict) -> dict:
     job_dir.mkdir(parents=True, exist_ok=True)
     bom_path = job_dir / name
     bom_path.write_bytes(data)
+    plan_pdfs = []
+    for up in body.get("plans") or []:
+        pname, pdata = _decode(up, "2D plan")
+        if pname.lower().endswith(".pdf"):
+            ppath = job_dir / ("plan_" + pname)
+            ppath.write_bytes(pdata)
+            plan_pdfs.append(str(ppath))
 
     grade = (body.get("grade") or "keystone").lower()
     if grade not in [g.lower() for g in GRADES]:
@@ -98,6 +105,7 @@ def _build(body: dict) -> dict:
         stations=_num(body.get("stations"), int),
         notes=body.get("notes") or "",
         drawings=[Path(d).name for d in body.get("drawings") or []],
+        plan_pdfs=plan_pdfs,
     )
     out = build_quote(bom_path, opts, job_dir)
     est, res = out.estimate, out.result
@@ -132,6 +140,11 @@ def _build(body: dict) -> dict:
             "weight": est.weight,
         },
         "warnings": res.warnings,
+        "plan": None if res.plan is None else {
+            "panels": res.plan.panels,
+            "counts": {k: res.plan.counts[k] for k in ("straight", "l", "tee", "cross", "ends", "angled", "other")},
+            "parts": [{"kind": k, "part": p, "qty": q} for k, p, q in res.plan_parts],
+        },
         "unmapped": [row(m) for m in res.unmapped],
         "review": [row(m) for m in res.review],
         "lines": [

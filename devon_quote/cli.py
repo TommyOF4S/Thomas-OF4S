@@ -33,7 +33,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--delivery", type=float, default=0.0, help="delivery estimate in dollars (default 0; Devon confirms)")
     ap.add_argument("--stations", type=int, help="number of workstations, for cost per station")
     ap.add_argument("--notes", help="text file with design notes or a dictation transcript")
-    ap.add_argument("--drawing", action="append", default=[], help="2D plan file to reference in the review (repeatable)")
+    ap.add_argument("--drawing", action="append", default=[],
+                    help="2D plan (repeatable). A CET PDF is read for panel joints; images are only referenced")
     ap.add_argument("--template", help="Devon calculator .xlsm (default: newest in templates/)")
     ap.add_argument("--overrides", default=str(DEFAULT_OVERRIDES), help="AIS -> Devon override table")
     ap.add_argument("-o", "--out-dir", default="out", help="where to write the results (default: out/)")
@@ -49,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
         stations=args.stations,
         notes=Path(args.notes).read_text(encoding="utf-8") if args.notes else "",
         drawings=[Path(d).name for d in args.drawing],
+        plan_pdfs=[d for d in args.drawing if d.lower().endswith(".pdf")],
     )
     try:
         out = build_quote(args.bom, opts, args.out_dir, args.template, args.overrides)
@@ -61,5 +63,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Crosswalk:    {out.crosswalk_path}")
     print(f"Estimated Devon total ${est.total:,.2f} "
           f"(product ${est.product_net:,.2f} + surcharge ${est.surcharge:,.2f} + delivery ${est.delivery:,.2f})")
+    if result.plan is not None:
+        c = result.plan.counts
+        print(f"2D plan: {result.plan.panels} panels, {c['straight']} straight joints, {c['l']} corners, "
+              f"{c['tee']} three-way, {c['cross']} four-way, {c['ends']} free ends.")
+    elif opts.plan_pdfs:
+        print("2D plan: no CET panels found in the PDF; connectors come from the AIS BOM.")
     print(f"{len(result.unmapped)} unmapped, {len(result.review)} to confirm — see the review file.")
     return 0

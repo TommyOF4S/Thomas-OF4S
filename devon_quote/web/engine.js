@@ -312,6 +312,7 @@
       }));
     ovs.forEach((o) => (o.re = globToRegex(o.pattern)));
     let runHeight = null;
+    let plan = null; // joints read from the 2D plan, when one was given
     const has = (p) => catalog.has(p);
 
     const rules = [
@@ -354,6 +355,8 @@
       function post(line) {
         const pn = line.part.toUpperCase();
         const m = pn.match(POST);
+        const isEnd = pn === "P-DLSEOR" || line.description.toUpperCase().includes("END OF RUN");
+        if (plan && (m || isEnd)) return M(line, [], "ok", "connectors and finished ends are counted from the 2D plan", "plan");
         if (m) {
           const ways = +m[1];
           const [height, hnote] = devonHeight(+m[2]);
@@ -364,7 +367,7 @@
           return M(line, [[connector(ways === 3 ? "3way" : "4way", height), 1]], hnote ? "review" : "ok", hnote, "post");
         }
         const d = line.description.toUpperCase();
-        if (pn === "P-DLSEOR" || d.includes("END OF RUN")) {
+        if (isEnd) {
           const height = runHeight || 53;
           return M(line, [[connector("finished_end", height), 1]], "review", `finished end quoted at ${height}"H (the main panel height in this BOM)`, "post");
         }
@@ -474,7 +477,48 @@
       return added;
     }
 
-    function map(lines) {
+    function planConnectors(lines, nHeights) {
+      const height = runHeight || 53;
+      const c = plan.counts;
+      const parts = [["straight", "inline"], ["l", "2way"], ["tee", "3way"], ["cross", "4way"], ["ends", "finished_end"]]
+        .filter(([kind]) => c[kind]).map(([kind, dk]) => [kind, connector(dk, height), c[kind]]);
+      const warnings = [];
+      if (nHeights > 1) warnings.push(`The BOM has panels at more than one height; plan connectors are all quoted at ${height}"H. Add change-of-height kits (HMA224) where heights meet.`);
+      if (c.angled) warnings.push(`The 2D plan has ${c.angled} joint(s) at an angle other than 90 or 180 degrees. Devon has no angled connector; check those runs.`);
+      if (c.other) warnings.push(`The 2D plan has ${c.other} joint(s) where more than four panels meet. Check those by hand.`);
+      const bom = { panels: 0, pf2: 0, pf3: 0, pf4: 0, seor: 0 };
+      const bomWidths = new Map();
+      for (const ln of lines) {
+        const pn = ln.part.toUpperCase();
+        const pm = pn.match(POST);
+        if (pm) bom["pf" + pm[1]] += ln.qty;
+        else if (pn === "P-DLSEOR" || ln.description.toUpperCase().includes("END OF RUN")) bom.seor += ln.qty;
+        else {
+          const m = pn.match(PANEL);
+          if (m) { bom.panels += ln.qty; bomWidths.set(+m[3], (bomWidths.get(+m[3]) || 0) + ln.qty); }
+        }
+      }
+      const n = (k, word) => `${k} ${word}` + (k === 1 ? "" : "s");
+      const checks = [
+        ["panels", plan.panels, n(plan.panels, "panel"), "panels"],
+        ["pf2", c.straight + c.l, `${n(c.straight, "straight joint")} + ${n(c.l, "corner")}`, "2-way posts"],
+        ["pf3", c.tee, n(c.tee, "three-way joint"), "3-way posts"],
+        ["pf4", c.cross, n(c.cross, "four-way joint"), "4-way posts"],
+        ["seor", c.ends, n(c.ends, "free end"), "end-of-run shrouds"],
+      ];
+      for (const [key, planN, planText, bomText] of checks) {
+        if (bom[key] && bom[key] !== planN) warnings.push(`The 2D plan shows ${planText}, but the AIS BOM has ${fmtQty(bom[key])} ${bomText}. Make sure the plan and the BOM are the same revision.`);
+      }
+      const pw = plan.widths;
+      const same = bomWidths.size === Object.keys(pw).length && [...bomWidths].every(([k, v]) => pw[k] === v);
+      if (bomWidths.size && Object.keys(pw).length && !same) {
+        const fmt = (entries) => entries.sort((a, b) => a[0] - b[0]).map(([k, v]) => `${fmtQty(v)} x ${k}"`).join(", ");
+        warnings.push(`Panel widths differ: the plan has ${fmt(Object.entries(pw).map(([k, v]) => [+k, v]))}; the BOM has ${fmt([...bomWidths])}.`);
+      }
+      return [parts, warnings];
+    }
+
+    function map(lines, planResult = null) {
       const heights = new Map(); // insertion order, so ties go to the first height seen (as in Python)
       for (const ln of lines) {
         const pn = ln.part.toUpperCase();
@@ -487,6 +531,7 @@
       runHeight = null;
       let bestCount = -1;
       for (const [h, c] of heights) if (c > bestCount) { runHeight = h; bestCount = c; }
+      plan = planResult && planResult.panels ? planResult : null;
 
       const mappings = lines.map(mapLine);
       const raw = {}, sources = {}, firstSeen = [];
@@ -498,23 +543,193 @@
           if (!sources[part].includes(m.source.part)) sources[part].push(m.source.part);
         }
       }
+      const warnings = [];
+      let planParts = [];
+      if (plan) {
+        const [parts, planWarnings] = planConnectors(lines, heights.size);
+        planParts = parts;
+        warnings.push(...planWarnings);
+        for (const [, part, qty] of parts) {
+          if (!(part in raw)) { raw[part] = 0; firstSeen.push(part); }
+          raw[part] += qty;
+          (sources[part] ||= []);
+          if (!sources[part].includes("2D plan")) sources[part].push("2D plan");
+        }
+      }
       const quantities = {};
       for (const p of firstSeen) if (raw[p] > 0) quantities[p] = Math.ceil(raw[p] - 1e-9);
 
-      const warnings = [];
       const sumEnds = (ends) => mappings.filter((m) => ends.some((e) => m.source.part.toUpperCase().endsWith(e))).reduce((s, m) => s + m.source.qty, 0);
       const lefts = sumEnds(["UNCT24L", "UNCT16L"]), rights = sumEnds(["UNCT24R", "UNCT16R"]);
       if (lefts !== rights) warnings.push(`AIS left cantilevers (${lefts}) and right cantilevers (${rights}) don't match; Devon sells them as pairs`);
 
       const autoAdded = autoAdd(quantities);
       return {
-        mappings, quantities, sources, autoAdded, warnings,
+        mappings, quantities, sources, autoAdded, warnings, plan, planParts,
         review: mappings.filter((m) => m.status === "review"),
         unmapped: mappings.filter((m) => m.status === "unmapped"),
       };
     }
 
     return { map, mapLine };
+  }
+
+  // ---------------------------------------------------------------- 2D plan (port of plan.py)
+  const STD_WIDTHS = [12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72];
+  const PANEL_INCHES = 2.0, POST_GAP = 1.4, WIDTH_TOLERANCE = 1.5, JOIN_FACTOR = 2.0;
+  const PLAN_KINDS = ["straight", "l", "tee", "cross", "ends", "angled", "other"];
+  const r2 = (v) => Math.round(v * 100) / 100;
+
+  function nominalWidth(length, t) {
+    const implied = (length / t) * PANEL_INCHES + POST_GAP;
+    let best = STD_WIDTHS[0];
+    for (const s of STD_WIDTHS) if (Math.abs(implied - s) < Math.abs(implied - best)) best = s;
+    return Math.abs(implied - best) <= WIDTH_TOLERANCE ? best : null;
+  }
+  const neutralGray = (f) => !!f && Math.max(...f) - Math.min(...f) < 0.02 && f[0] > 0.5 && f[0] < 0.97;
+
+  function findPanels(rects) {
+    const groups = new Map();
+    for (const r of rects) {
+      const w = r.x1 - r.x0, h = r.y1 - r.y0, t = Math.min(w, h), len = Math.max(w, h);
+      if (t >= 0.05 && t <= 5 && len >= 3 * t && neutralGray(r.fill)) {
+        const key = [r2(t), ...r.fill.map(r2)].join("|");
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(r);
+      }
+    }
+    let best = null, bestFit = 0;
+    for (const [key, rs] of groups) {
+      const t = +key.split("|")[0];
+      const fit = rs.filter((r) => nominalWidth(Math.max(r.x1 - r.x0, r.y1 - r.y0), t)).length;
+      if (fit >= 2 && fit / rs.length >= 0.9 && fit > bestFit) { best = key; bestFit = fit; }
+    }
+    if (best === null) return [[], null];
+    const t = +best.split("|")[0];
+    return [groups.get(best).filter((r) => nominalWidth(Math.max(r.x1 - r.x0, r.y1 - r.y0), t)), t];
+  }
+
+  function jointsOnPage(panels, t, page) {
+    const ends = [];
+    panels.forEach((r, i) => {
+      const w = r.x1 - r.x0, h = r.y1 - r.y0, cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2;
+      const [a, b] = w >= h ? [[r.x0, cy], [r.x1, cy]] : [[cx, r.y0], [cx, r.y1]];
+      for (const [e, o] of [[a, b], [b, a]]) {
+        const dx = e[0] - o[0], dy = e[1] - o[1], n = Math.hypot(dx, dy) || 1;
+        ends.push([e[0], e[1], dx / n, dy / n, i]);
+      }
+    });
+    const parent = ends.map((_, i) => i);
+    const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+    const tol = JOIN_FACTOR * t;
+    for (let i = 0; i < ends.length; i++) {
+      for (let j = i + 1; j < ends.length; j++) {
+        if (ends[i][4] !== ends[j][4] && Math.hypot(ends[i][0] - ends[j][0], ends[i][1] - ends[j][1]) <= tol) parent[find(i)] = find(j);
+      }
+    }
+    const groups = new Map();
+    ends.forEach((e, i) => { const k = find(i); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(e); });
+    const out = [];
+    for (const g of groups.values()) {
+      const x = g.reduce((s, e) => s + e[0], 0) / g.length, y = g.reduce((s, e) => s + e[1], 0) / g.length;
+      let kind;
+      if (g.length === 1) kind = "ends";
+      else if (g.length === 2) {
+        const dot = g[0][2] * g[1][2] + g[0][3] * g[1][3];
+        kind = dot < -0.95 ? "straight" : Math.abs(dot) < 0.15 ? "l" : "angled";
+      } else if (g.length === 3) kind = "tee";
+      else if (g.length === 4) kind = "cross";
+      else kind = "other";
+      out.push({ kind, x, y, page });
+    }
+    return out;
+  }
+
+  /** pages: [[{x0, y0, x1, y1, fill: [r, g, b] | null}]] (0-1 colors) */
+  function analyzeRects(pages) {
+    const res = { counts: Object.fromEntries(PLAN_KINDS.map((k) => [k, 0])), widths: {}, joints: [], pages: [], panels: 0 };
+    pages.forEach((rects, p) => {
+      const [panels, t] = findPanels(rects);
+      res.pages.push({ page: p + 1, panels: panels.length, thickness: t });
+      if (!panels.length) return;
+      for (const r of panels) {
+        const w = nominalWidth(Math.max(r.x1 - r.x0, r.y1 - r.y0), t);
+        res.widths[w] = (res.widths[w] || 0) + 1;
+        res.panels++;
+      }
+      const js = jointsOnPage(panels, t, p + 1);
+      res.joints.push(...js);
+      js.forEach((j) => res.counts[j.kind]++);
+    });
+    return res;
+  }
+
+  /** Axis-aligned filled/stroked rectangles on every page, read with PDF.js (v3 operator lists). */
+  async function pdfRects(pdfjsLib, bytes, { maxPages = 20 } = {}) {
+    const OPS = pdfjsLib.OPS;
+    const doc = await pdfjsLib.getDocument({ data: bytes, disableFontFace: true, isEvalSupported: false }).promise;
+    const pages = [];
+    const views = [];
+    for (let n = 1; n <= Math.min(doc.numPages, maxPages); n++) {
+      const page = await doc.getPage(n);
+      const ops = await page.getOperatorList();
+      const rects = [];
+      let ctm = [1, 0, 0, 1, 0, 0], fill = [0, 0, 0];
+      const stack = [];
+      let pending = [];
+      const mul = (m, c) => [m[0] * c[0] + m[1] * c[2], m[0] * c[1] + m[1] * c[3], m[2] * c[0] + m[3] * c[2], m[2] * c[1] + m[3] * c[3],
+        m[4] * c[0] + m[5] * c[2] + c[4], m[4] * c[1] + m[5] * c[3] + c[5]];
+      const tp = (x, y) => [ctm[0] * x + ctm[2] * y + ctm[4], ctm[1] * x + ctm[3] * y + ctm[5]];
+      const toRect = (pts) => {
+        if (pts.length >= 2) { const a = pts[0], b = pts[pts.length - 1]; if (Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6) pts = pts.slice(0, -1); }
+        if (pts.length !== 4) return null;
+        const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+        const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+        const eps = 1e-3;
+        const onCorner = pts.every((p) => (Math.abs(p[0] - x0) < eps || Math.abs(p[0] - x1) < eps) && (Math.abs(p[1] - y0) < eps || Math.abs(p[1] - y1) < eps));
+        const corners = new Set(pts.map((p) => `${Math.abs(p[0] - x0) < eps}${Math.abs(p[1] - y0) < eps}`));
+        return onCorner && corners.size === 4 ? { x0, y0, x1, y1 } : null;
+      };
+      for (let i = 0; i < ops.fnArray.length; i++) {
+        const fn = ops.fnArray[i], args = ops.argsArray[i];
+        if (fn === OPS.save) stack.push([ctm, fill]);
+        else if (fn === OPS.restore) { const s = stack.pop(); if (s) [ctm, fill] = s; }
+        else if (fn === OPS.transform) ctm = mul(args, ctm);
+        else if (fn === OPS.paintFormXObjectBegin) { stack.push([ctm, fill]); if (args && args[0]) ctm = mul(args[0], ctm); }
+        else if (fn === OPS.paintFormXObjectEnd) { const s = stack.pop(); if (s) [ctm, fill] = s; }
+        else if (fn === OPS.setFillRGBColor) fill = [args[0] / 255, args[1] / 255, args[2] / 255];
+        else if (fn === OPS.constructPath) {
+          const [sub, coords] = args;
+          let k = 0, cur = null;
+          for (const op of sub) {
+            if (op === OPS.moveTo) { if (cur) pending.push(cur); cur = [tp(coords[k], coords[k + 1])]; k += 2; }
+            else if (op === OPS.lineTo) { (cur ||= []).push(tp(coords[k], coords[k + 1])); k += 2; }
+            else if (op === OPS.curveTo) { k += 6; cur = null; }
+            else if (op === OPS.curveTo2 || op === OPS.curveTo3) { k += 4; cur = null; }
+            else if (op === OPS.closePath) { if (cur) { pending.push(cur); cur = null; } }
+            else if (op === OPS.rectangle) {
+              const [x, y, w, h] = coords.slice(k, k + 4); k += 4;
+              if (cur) { pending.push(cur); cur = null; }
+              pending.push([tp(x, y), tp(x + w, y), tp(x + w, y + h), tp(x, y + h)]);
+            }
+          }
+          if (cur) pending.push(cur);
+        } else if ([OPS.fill, OPS.eoFill, OPS.fillStroke, OPS.eoFillStroke, OPS.closeFillStroke, OPS.closeEOFillStroke,
+          OPS.stroke, OPS.closeStroke, OPS.endPath].includes(fn)) {
+          const filled = [OPS.fill, OPS.eoFill, OPS.fillStroke, OPS.eoFillStroke, OPS.closeFillStroke, OPS.closeEOFillStroke].includes(fn);
+          if (fn !== OPS.endPath) for (const pts of pending) { const r = toRect(pts); if (r) rects.push({ ...r, fill: filled ? fill.slice() : null }); }
+          pending = [];
+        }
+      }
+      pages.push(rects);
+      views.push(page);
+    }
+    return { pages, pdfPages: views };
+  }
+
+  async function analyzePdf(pdfjsLib, bytes) {
+    const { pages, pdfPages } = await pdfRects(pdfjsLib, bytes);
+    return { result: analyzeRects(pages), pdfPages };
   }
 
   // ---------------------------------------------------------------- pricing
@@ -698,6 +913,17 @@
       w("");
     }
     if (!unmapped.length && !review.length && !result.warnings.length) w("Nothing flagged.\n");
+    if (result.plan) {
+      const c = result.plan.counts;
+      w("## Connectors from the 2D plan\n");
+      w(`Read ${result.plan.panels} panels off the plan and measured every joint. These replace the AIS post counts.\n`);
+      w("| Joint on the plan | Count | Devon part |\n|---|---:|---|");
+      const labels = { straight: "Two panels in a straight line (180°)", l: "Corner, two panels at 90°", tee: "Three panels", cross: "Four panels", ends: "Free end of a run" };
+      const parts = Object.fromEntries(result.planParts.map(([k, p]) => [k, p]));
+      for (const k of ["straight", "l", "tee", "cross", "ends"]) if (c[k]) w(`| ${labels[k]} | ${c[k]} | ${parts[k] || ""} |`);
+      w("");
+      w("Free ends are quoted as finished ends. Swap any that stop at a wall to a wall start (HMA199).\n");
+    }
     const fin = finishes(lines);
     if (fin.length) {
       w("## AIS finishes in the design\n");
@@ -724,6 +950,6 @@
   return {
     GRADES, buildCatalog, loadCalculator, listPrice, parseSif, parseCsv, parseTable, parseBom,
     makeMapper, devonHeight, connector, estimate, setCell, fillSheet, writeQuote,
-    finishes, crosswalkCsv, reportMd, safeStem,
+    finishes, crosswalkCsv, reportMd, safeStem, analyzeRects, pdfRects, analyzePdf, nominalWidth,
   };
 });

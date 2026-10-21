@@ -11,6 +11,7 @@ from pathlib import Path
 from .bom import BomLine, load_bom
 from .catalog import GRADES, Catalog, load_catalog
 from .mapper import MapResult, Mapper, load_overrides
+from .plan import PlanResult, analyze_pdf
 from .pricing import Estimate, estimate
 from .report import write_crosswalk, write_report
 from .writer import QuoteHeader, write_quote
@@ -36,6 +37,7 @@ class QuoteOptions:
     stations: int | None = None
     notes: str = ""
     drawings: list[str] = field(default_factory=list)
+    plan_pdfs: list[str] = field(default_factory=list)  # CET 2D plans as PDF, read for joints
 
 
 @dataclass
@@ -48,6 +50,21 @@ class QuoteOutput:
     result: MapResult
     estimate: Estimate
     grade: int
+
+
+def read_plans(paths: list[str]) -> PlanResult | None:
+    """Joints from every PDF plan given (pages add up). None when no panels were found."""
+    total = None
+    for path in paths:
+        res = analyze_pdf(path)
+        if total is None:
+            total = res
+        else:
+            total.counts.update(res.counts)
+            total.widths.update(res.widths)
+            total.joints.extend(res.joints)
+            total.pages.extend(res.pages)
+    return total if total is not None and total.panels else None
 
 
 def safe_stem(name: str) -> str:
@@ -69,7 +86,8 @@ def build_quote(
     if not lines:
         raise ValueError(f"No parts found in {Path(bom_path).name}")
 
-    result = Mapper(catalog, load_overrides(overrides)).map(lines)
+    plan = read_plans(opts.plan_pdfs)
+    result = Mapper(catalog, load_overrides(overrides)).map(lines, plan)
     grade = [g.lower() for g in GRADES].index(opts.grade.lower())
 
     out_dir = Path(out_dir)

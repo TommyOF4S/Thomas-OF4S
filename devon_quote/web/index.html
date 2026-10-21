@@ -434,6 +434,8 @@ $("buildBtn").onclick = async () => {
       stations: $("stations").value, delivery: $("delivery").value, trim: $("trim").value,
       description: $("description").value, notes: $("notes").value,
       drawings: state.plans.map((p) => p.file.name),
+      plans: await Promise.all(state.plans.filter((p) => /\.pdf$/i.test(p.file.name))
+        .map(async (p) => ({ name: p.file.name, data: await readB64(p.file) }))),
     };
     const res = await fetch("/api/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const j = await res.json();
@@ -472,6 +474,10 @@ function showResults(r) {
   $("attnLede").innerHTML = n
     ? "Unmapped parts are <b>not</b> in the Devon quote yet. Add them by hand, or add a row to mappings/overrides.csv so the tool learns them."
     : '<span class="ok">Every AIS part mapped cleanly.</span>';
+  if (r.plan) {
+    const c = r.plan.counts;
+    items.unshift(`<div class="item" style="border-left-color:var(--navy-500)"><div class="note"><b>Read from the 2D plan:</b> ${r.plan.panels} panels, ${c.straight} straight joints, ${c.l} corners, ${c.tee} three-way, ${c.cross} four-way, ${c.ends} free ends. Connectors are quoted from these counts: ${esc(r.plan.parts.map((x) => x.part + " × " + x.qty).join(", "))}.</div></div>`);
+  }
   $("attnItems").innerHTML = items.join("");
 
   // Plan beside the flags

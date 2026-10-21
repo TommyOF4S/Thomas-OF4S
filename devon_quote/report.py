@@ -100,6 +100,20 @@ def write_report(
     if not unmapped and not review and not result.warnings:
         w("Nothing flagged.\n")
 
+    if result.plan is not None:
+        c = result.plan.counts
+        w("## Connectors from the 2D plan\n")
+        w(f"Read {result.plan.panels} panels off the plan and measured every joint. These replace the AIS post counts.\n")
+        w("| Joint on the plan | Count | Devon part |\n|---|---:|---|")
+        labels = {"straight": "Two panels in a straight line (180°)", "l": "Corner, two panels at 90°",
+                  "tee": "Three panels", "cross": "Four panels", "ends": "Free end of a run"}
+        parts = {kind: part for kind, part, _ in result.plan_parts}
+        for kind in ("straight", "l", "tee", "cross", "ends"):
+            if c[kind]:
+                w(f"| {labels[kind]} | {c[kind]} | {parts.get(kind, '')} |")
+        w("")
+        w("Free ends are quoted as finished ends. Swap any that stop at a wall to a wall start (HMA199).\n")
+
     fin = finishes(lines)
     if fin:
         w("## AIS finishes in the design\n")

@@ -23,6 +23,7 @@ from pathlib import Path
 
 from .bom import BomLine
 from .catalog import Catalog
+from .plan import PlanResult
 
 # Devon panel heights, and the size code each connector family uses at that height.
 DEVON_HEIGHTS = (39, 47, 53, 67, 85)
@@ -86,6 +87,8 @@ class MapResult:
     sources: dict[str, list[str]]  # Devon part -> AIS parts that produced it
     auto_added: list[tuple[str, int, str]]
     warnings: list[str] = field(default_factory=list)
+    plan: PlanResult | None = None
+    plan_parts: list[tuple[str, str, int]] = field(default_factory=list)  # (joint kind, Devon part, qty)
 
     @property
     def review(self) -> list[Mapping]:
@@ -139,6 +142,7 @@ class Mapper:
         self.catalog = catalog
         self.overrides = overrides or []
         self.run_height: int | None = None  # dominant Devon panel height, for height-less parts
+        self.plan: PlanResult | None = None  # joints read from the 2D plan, when one was given
 
     # Each rule returns a Mapping or None.
     def _rule_override(self, line: BomLine) -> Mapping | None:
@@ -189,6 +193,9 @@ class Mapper:
     def _rule_post(self, line: BomLine) -> Mapping | None:
         pn = line.part.upper()
         m = _POST.match(pn)
+        is_end = pn == "P-DLSEOR" or "END OF RUN" in line.description.upper()
+        if self.plan is not None and (m or is_end):
+            return Mapping(line, [], "ok", "connectors and finished ends are counted from the 2D plan", "plan")
         if m:
             ways, h = int(m.group(1)), int(m.group(2))
             height, hnote = devon_height(h)
@@ -201,7 +208,7 @@ class Mapper:
                 return Mapping(line, [(part, 1)], "review", "; ".join(filter(None, [hnote, note])), "post")
             part = connector("3way" if ways == 3 else "4way", height)
             return Mapping(line, [(part, 1)], "review" if hnote else "ok", hnote, "post")
-        if pn == "P-DLSEOR" or "END OF RUN" in line.description.upper():
+        if is_end:
             height = self.run_height or 53
             note = f'finished end quoted at {height}"H (the main panel height in this BOM)'
             return Mapping(line, [(connector("finished_end", height), 1)], "review", note, "post")
@@ -311,7 +318,7 @@ class Mapper:
                 return m
         return Mapping(line, [], "unmapped", "no rule or override for this AIS part", "")
 
-    def map(self, lines: list[BomLine]) -> MapResult:
+    def map(self, lines: list[BomLine], plan: PlanResult | None = None) -> MapResult:
         # Main panel height, used for parts that don't carry a height (end-of-run, wall start).
         heights = Counter()
         for ln in lines:
@@ -319,6 +326,7 @@ class Mapper:
             if m and not ln.part.upper().startswith(("P-DLPF", "P-DLSEOR")):
                 heights[devon_height(int(m.group(2)))[0]] += ln.qty
         self.run_height = heights.most_common(1)[0][0] if heights else None
+        self.plan = plan if plan is not None and plan.panels else None
 
         mappings = [self.map_line(ln) for ln in lines]
 
@@ -329,16 +337,77 @@ class Mapper:
                 raw[part] += m.source.qty * ratio
                 if m.source.part not in sources[part]:
                     sources[part].append(m.source.part)
+        warnings = []
+        plan_parts = []
+        if self.plan is not None:
+            plan_parts, plan_warnings = self._plan_connectors(lines, len(heights))
+            warnings += plan_warnings
+            for _, part, qty in plan_parts:
+                raw[part] += qty
+                if "2D plan" not in sources[part]:
+                    sources[part].append("2D plan")
         quantities = {p: math.ceil(q - 1e-9) for p, q in raw.items() if q > 0}
 
-        warnings = []
         lefts = sum(m.source.qty for m in mappings if m.source.part.upper().endswith(("UNCT24L", "UNCT16L")))
         rights = sum(m.source.qty for m in mappings if m.source.part.upper().endswith(("UNCT24R", "UNCT16R")))
         if lefts != rights:
             warnings.append(f"AIS left cantilevers ({lefts:g}) and right cantilevers ({rights:g}) don't match; Devon sells them as pairs")
 
         auto_added = self._auto_add(quantities)
-        return MapResult(mappings, quantities, dict(sources), auto_added, warnings)
+        return MapResult(mappings, quantities, dict(sources), auto_added, warnings, self.plan, plan_parts)
+
+    def _plan_connectors(self, lines: list[BomLine], n_heights: int) -> tuple[list[tuple[str, str, int]], list[str]]:
+        """Devon connectors from the joints measured on the 2D plan, plus cross-checks against the BOM."""
+        plan = self.plan
+        height = self.run_height or 53
+        c = plan.counts
+        parts = [
+            (kind, connector(devon_kind, height), c[kind])
+            for kind, devon_kind in (("straight", "inline"), ("l", "2way"), ("tee", "3way"),
+                                     ("cross", "4way"), ("ends", "finished_end"))
+            if c[kind]
+        ]
+        warnings = []
+        if n_heights > 1:
+            warnings.append(f'The BOM has panels at more than one height; plan connectors are all quoted at {height}"H. '
+                            "Add change-of-height kits (HMA224) where heights meet.")
+        if c["angled"]:
+            warnings.append(f"The 2D plan has {c['angled']} joint(s) at an angle other than 90 or 180 degrees. "
+                            "Devon has no angled connector; check those runs.")
+        if c["other"]:
+            warnings.append(f"The 2D plan has {c['other']} joint(s) where more than four panels meet. Check those by hand.")
+
+        # Cross-check the plan against the AIS BOM: they should be the same revision.
+        bom = Counter()
+        bom_widths = Counter()
+        for ln in lines:
+            pn = ln.part.upper()
+            pm = _POST.match(pn)
+            if pm:
+                bom[f"pf{pm.group(1)}"] += ln.qty
+            elif pn == "P-DLSEOR" or "END OF RUN" in ln.description.upper():
+                bom["seor"] += ln.qty
+            else:
+                m = _PANEL.match(pn)
+                if m:
+                    bom["panels"] += ln.qty
+                    bom_widths[int(m.group(3))] += ln.qty
+        n = lambda k, word: f"{k} {word}" + ("" if k == 1 else "s")
+        checks = [
+            ("panels", plan.panels, n(plan.panels, "panel"), "panels"),
+            ("pf2", c["straight"] + c["l"], f"{n(c['straight'], 'straight joint')} + {n(c['l'], 'corner')}", "2-way posts"),
+            ("pf3", c["tee"], n(c["tee"], "three-way joint"), "3-way posts"),
+            ("pf4", c["cross"], n(c["cross"], "four-way joint"), "4-way posts"),
+            ("seor", c["ends"], n(c["ends"], "free end"), "end-of-run shrouds"),
+        ]
+        for key, plan_n, plan_text, bom_text in checks:
+            if bom[key] and abs(bom[key] - plan_n) > 0:
+                warnings.append(f"The 2D plan shows {plan_text}, but the AIS BOM has {bom[key]:g} {bom_text}. "
+                                "Make sure the plan and the BOM are the same revision.")
+        if bom_widths and plan.widths and bom_widths != plan.widths:
+            fmt = lambda w: ", ".join(f'{n:g} x {k}"' for k, n in sorted(w.items()))
+            warnings.append(f"Panel widths differ: the plan has {fmt(plan.widths)}; the BOM has {fmt(bom_widths)}.")
+        return parts, warnings
 
     def _auto_add(self, q: dict[str, int]) -> list[tuple[str, int, str]]:
         """No-charge hardware Devon asks to be listed on every order."""

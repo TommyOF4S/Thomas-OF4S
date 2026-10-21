@@ -115,6 +115,13 @@ label.f input, label.f select, .fixform input { width: 100%; border: 1px solid v
 .attn.with-plan { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
 .plan { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 74px); min-width: 0; }
 .plan img { width: 100%; max-height: 72vh; object-fit: contain; border: 1px solid var(--line); border-radius: 10px; background: #fff; display: block; }
+.canvasbox { overflow: auto; max-height: 72vh; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.canvasbox canvas { display: block; width: 100%; height: auto; }
+.canvasbox.zoom canvas { width: 260%; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 13px; color: var(--fg-2); align-items: center; }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.planread { margin-top: 4px; font-size: 13px; color: var(--fg-2); }
+.planread b { color: var(--fg); font-weight: 600; }
 .tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .tabs button { border: 1px solid var(--line-2); background: var(--surface); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tabs button.on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
@@ -204,7 +211,7 @@ footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
         <div class="step"><span>2D plan</span><span>Optional</span></div>
         <div id="planDrop" class="drop" tabindex="0" role="button" aria-label="Add the 2D plan">
           <div class="big">Drop the 2D plan here</div>
-          <div class="small">PNG or JPG shows next to the items you need to check. PDFs are listed by name.</div>
+          <div class="small">Use CET's PDF export: the page reads every panel joint (straight, corner, T, cross, free end) and quotes the connectors from it. A PNG or JPG is shown beside the flags.</div>
         </div>
         <input id="planInput" type="file" accept=".pdf,image/*" multiple hidden>
         <div id="planList"></div>
@@ -454,20 +461,96 @@ function setBom(file) {
   refresh();
 }
 
+// ---- reading CET PDF plans (PDF.js runs on the page's main thread; no worker file needed)
+const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+let pdfjsPromise = null;
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const el = document.createElement("script");
+    el.src = src; el.onload = resolve; el.onerror = () => reject(new Error("Couldn't load the PDF reader."));
+    document.head.appendChild(el);
+  });
+}
+function loadPdfjs() {
+  pdfjsPromise ||= loadScript(PDFJS + "pdf.worker.min.js").then(() => loadScript(PDFJS + "pdf.min.js")).then(() => {
+    const lib = window.pdfjsLib;
+    if (!lib) throw new Error("Couldn't load the PDF reader.");
+    lib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js";
+    return lib;
+  });
+  pdfjsPromise.catch(() => { pdfjsPromise = null; });
+  return pdfjsPromise;
+}
+
+const JOINT_STYLE = {
+  straight: { color: "#2e7d32", label: "Straight, panel-to-panel" },
+  l: { color: "#e65100", label: "Corner" },
+  tee: { color: "#6a1b9a", label: "3-way" },
+  cross: { color: "#c62828", label: "4-way" },
+  ends: { color: "#546e7a", label: "Free end" },
+  angled: { color: "#000000", label: "Check: odd angle" },
+  other: { color: "#000000", label: "Check: 5+ panels" },
+};
+
+function planSummaryText(r) {
+  const c = r.counts;
+  return `<b>${r.panels} panels read:</b> ${c.straight} straight · ${c.l} corners · ${c.tee} three-way · ${c.cross} four-way · ${c.ends} free ends` +
+    (c.angled + c.other ? ` · <b>${c.angled + c.other} to check</b>` : "");
+}
+
+async function readPlan(p) {
+  p.status = "reading";
+  renderPlans();
+  try {
+    const lib = await loadPdfjs();
+    const { result, pdfPages } = await E.analyzePdf(lib, new Uint8Array(await p.file.arrayBuffer()));
+    p.analysis = result; p.pdfPages = pdfPages;
+    p.status = result.panels ? "done" : "none";
+  } catch (e) {
+    p.status = "error"; p.error = e.message || String(e);
+  }
+  renderPlans();
+  if (state.out) build();
+}
+
+function combinedPlan() {
+  const read = state.plans.filter((p) => p.status === "done");
+  if (!read.length) return null;
+  const out = { counts: {}, widths: {}, joints: [], pages: [], panels: 0 };
+  for (const p of read) {
+    const r = p.analysis;
+    for (const [k, v] of Object.entries(r.counts)) out.counts[k] = (out.counts[k] || 0) + v;
+    for (const [k, v] of Object.entries(r.widths)) out.widths[k] = (out.widths[k] || 0) + v;
+    out.panels += r.panels;
+  }
+  return out;
+}
+
 function renderPlans() {
-  $("planList").innerHTML = state.plans.map((p, i) =>
-    `<div class="file" style="margin-top:10px"><svg class="icon"><use href="#i-plan"/></svg><div><div class="fname">${esc(p.file.name)}</div><div class="meta">${kb(p.file.size)}${p.image ? "" : " · PDF: export a PNG or JPG from CET to see it beside the flags"}</div></div><button class="x" type="button" data-i="${i}">Remove</button></div>`).join("");
+  $("planList").innerHTML = state.plans.map((p, i) => {
+    let meta = kb(p.file.size);
+    let read = "";
+    if (!p.image) {
+      if (p.status === "reading") read = "Reading panel joints…";
+      else if (p.status === "done") read = planSummaryText(p.analysis);
+      else if (p.status === "none") read = "No CET panels found in this PDF, so connectors come from the AIS BOM. Export the 2D from CET as a PDF (vector, not a scan).";
+      else if (p.status === "error") read = "Couldn't read this PDF: " + esc(p.error);
+    }
+    return `<div class="file" style="margin-top:10px;align-items:flex-start"><svg class="icon"><use href="#i-plan"/></svg><div><div class="fname">${esc(p.file.name)}</div><div class="meta">${meta}</div>${read ? `<div class="planread">${read}</div>` : ""}</div><button class="x" type="button" data-i="${i}">Remove</button></div>`;
+  }).join("");
   $("planList").querySelectorAll(".x").forEach((b) => (b.onclick = () => {
     const [p] = state.plans.splice(+b.dataset.i, 1);
     if (p.url) URL.revokeObjectURL(p.url);
     renderPlans();
-    if (state.out) renderPlanView();
+    if (state.out) build();
   }));
 }
 function addPlans(files) {
   for (const f of files) {
     const image = (f.type || "").startsWith("image/");
-    state.plans.push({ file: f, image, url: image ? URL.createObjectURL(f) : null });
+    const p = { file: f, image, url: image ? URL.createObjectURL(f) : null };
+    state.plans.push(p);
+    if (!image) readPlan(p);
   }
   renderPlans();
   if (state.out) renderPlanView();
@@ -531,7 +614,7 @@ async function build() {
     const bomBytes = new Uint8Array(await state.bom.arrayBuffer());
     const lines = await E.parseBom(JSZip, state.bom.name, bomBytes);
     if (!lines.length) throw new Error(`No parts found in ${state.bom.name}.`);
-    const result = E.makeMapper(c.catalog, allOverrides()).map(lines);
+    const result = E.makeMapper(c.catalog, allOverrides()).map(lines, combinedPlan());
     const grade = +$("grade").value;
     const num = (v) => { const n = Number(String(v || "").replace(/[$,\s]/g, "")); return v && !Number.isNaN(n) ? n : null; };
     const delivery = num($("delivery").value) || 0;
@@ -588,6 +671,9 @@ function renderResults() {
   r.warnings.forEach((w) => items.push(`<div class="item warnline"><div class="note">${esc(w)}</div></div>`));
   r.unmapped.forEach((m, i) => items.push(itemHtml(m, true, "u" + i)));
   r.review.forEach((m, i) => items.push(itemHtml(m, false, "r" + i)));
+  if (r.plan) {
+    items.unshift(`<div class="item" style="border-left-color:var(--accent-2)"><div class="note">${planSummaryText(r.plan)}. Connectors are quoted from the plan: ${esc(r.planParts.map((x) => x[1] + " × " + x[2]).join(", "))}. Free ends are quoted as finished ends; swap any at a wall to a wall start (HMA199).</div></div>`);
+  }
   const n = r.unmapped.length + r.review.length + r.warnings.length;
   $("attnTitle").textContent = n ? `Needs your attention (${r.unmapped.length} unmapped, ${r.review.length} to confirm)` : "Nothing flagged";
   $("attnLede").innerHTML = n
@@ -690,14 +776,63 @@ function renderCorrections() {
   }));
 }
 
+function planViews() {
+  const views = [];
+  for (const p of state.plans) {
+    if (p.image) views.push({ kind: "img", name: p.file.name, url: p.url });
+    else if (p.status === "done") {
+      p.analysis.pages.forEach((pg, i) => {
+        if (pg.panels) views.push({ kind: "pdf", name: p.pdfPages.length > 1 ? `${p.file.name} · p${pg.page}` : p.file.name,
+          page: p.pdfPages[i], joints: p.analysis.joints.filter((j) => j.page === pg.page) });
+      });
+    }
+  }
+  return views;
+}
+
+let renderToken = 0;
+async function drawPdfView(v) {
+  const token = ++renderToken;
+  const base = v.page.getViewport({ scale: 1 });
+  const viewport = v.page.getViewport({ scale: Math.min(4, 2400 / base.width) });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(viewport.width); canvas.height = Math.round(viewport.height);
+  const box = document.createElement("div");
+  box.className = "canvasbox"; box.title = "Click to zoom";
+  box.appendChild(canvas);
+  box.onclick = () => box.classList.toggle("zoom");
+  const counts = {};
+  v.joints.forEach((j) => (counts[j.kind] = (counts[j.kind] || 0) + 1));
+  const legend = Object.entries(JOINT_STYLE).filter(([k]) => counts[k])
+    .map(([k, st]) => `<span><i style="background:${st.color}"></i>${st.label} ${counts[k]}</span>`).join("");
+  $("planFrame").innerHTML = "";
+  $("planFrame").appendChild(box);
+  $("planFrame").insertAdjacentHTML("beforeend", `<div class="legend">${legend}<span class="meta">Click the plan to zoom.</span></div>`);
+  const ctx = canvas.getContext("2d");
+  await v.page.render({ canvasContext: ctx, viewport }).promise;
+  if (token !== renderToken) return;
+  const r = Math.max(4, canvas.width / 260);
+  ctx.lineWidth = Math.max(1.5, r / 3);
+  for (const j of v.joints) {
+    const [x, y] = viewport.convertToViewportPoint(j.x, j.y);
+    const st = JOINT_STYLE[j.kind] || JOINT_STYLE.other;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    if (j.kind === "ends") { ctx.strokeStyle = st.color; ctx.stroke(); }
+    else { ctx.globalAlpha = 0.8; ctx.fillStyle = st.color; ctx.fill(); ctx.globalAlpha = 1; }
+  }
+}
+
 function renderPlanView() {
-  const imgs = state.plans.filter((p) => p.image);
+  const views = planViews();
   const pv = $("planView");
-  if (!imgs.length) { pv.hidden = true; $("attn").classList.remove("with-plan"); return; }
+  if (!views.length) { pv.hidden = true; $("attn").classList.remove("with-plan"); return; }
   pv.hidden = false; $("attn").classList.add("with-plan");
-  $("planTabs").innerHTML = imgs.length > 1 ? imgs.map((p, i) => `<button type="button" data-i="${i}">${esc(p.file.name)}</button>`).join("") : "";
+  $("planTabs").innerHTML = views.length > 1 ? views.map((v, i) => `<button type="button" data-i="${i}">${esc(v.name)}</button>`).join("") : "";
   const show = (i) => {
-    $("planFrame").innerHTML = `<img src="${imgs[i].url}" alt="2D plan: ${esc(imgs[i].file.name)}">`;
+    const v = views[i];
+    if (v.kind === "img") { renderToken++; $("planFrame").innerHTML = `<img src="${v.url}" alt="2D plan: ${esc(v.name)}">`; }
+    else drawPdfView(v).catch(() => { $("planFrame").innerHTML = `<p class="meta">Couldn't draw this page.</p>`; });
     $("planTabs").querySelectorAll("button").forEach((b) => b.classList.toggle("on", +b.dataset.i === i));
   };
   $("planTabs").querySelectorAll("button").forEach((b) => (b.onclick = () => show(+b.dataset.i)));

@@ -1,5 +1,6 @@
 // Runs the hosted page's JS engine under Node for tests/test_engine_parity.py.
 // usage: node engine_harness.js <calculator.xlsm> <bom> <out.xlsx|.xlsm> <options-json>
+console.log = console.warn = (...a) => console.error(...a); // keep stdout for the JSON result
 const fs = require("fs");
 const path = require("path");
 const JSZip = require("jszip");
@@ -10,7 +11,12 @@ const E = require(path.join(__dirname, "..", "devon_quote", "web", "engine.js"))
   const opts = JSON.parse(optsJson || "{}");
   const { catalog } = await E.loadCalculator(JSZip, fs.readFileSync(calcPath));
   const lines = await E.parseBom(JSZip, path.basename(bomPath), fs.readFileSync(bomPath));
-  const result = E.makeMapper(catalog, opts.overrides || []).map(lines);
+  let plan = null;
+  if (opts.plan) {
+    const pdfjs = require("pdfjs-dist/legacy/build/pdf.js");
+    plan = (await E.analyzePdf(pdfjs, new Uint8Array(fs.readFileSync(opts.plan)))).result;
+  }
+  const result = E.makeMapper(catalog, opts.overrides || []).map(lines, plan);
   const grade = opts.grade || 0;
   const est = E.estimate(catalog, result.quantities, grade, opts.delivery || 0, opts.stations || null);
   const header = { project: opts.project || "", description: "WORKSTATIONS", date: "1.2.26", shipTo: "33010", grade, delivery: opts.delivery || 0, stations: opts.stations || null };
@@ -28,6 +34,7 @@ const E = require(path.join(__dirname, "..", "devon_quote", "web", "engine.js"))
     quantities: result.quantities,
     mappings: result.mappings.map((m) => [m.source.part, m.status, m.note, m.targets]),
     warnings: result.warnings,
+    plan: plan && { counts: plan.counts, widths: plan.widths, panels: plan.panels },
     total: est.total,
     product: est.product,
     crosswalk: E.crosswalkCsv(result),

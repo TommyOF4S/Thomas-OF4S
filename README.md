@@ -16,12 +16,19 @@ drop the CET export, 2D plan image and notes, build, and download the filled Dev
 - An editor stores Devon's calculator once and everyone with access uses it. To update the
   prices, drop the new calculator on the page. Don't share the page by public link, because the
   stored calculator holds dealer pricing.
+- **2D plan from CET as PDF**: the page reads every panel off the drawing and measures every
+  joint. Two panels in a straight line (a break between two 180° panels) become a
+  panel-to-panel connector (`HMP213`), 90° corners `HMA130`, three panels `HMA137`, four panels
+  `HMC132`, and free ends `HMA128` finished ends. These replace the AIS post counts. The plan is
+  drawn beside the flags with a colored dot on every joint so you can check it, and the plan is
+  cross-checked against the BOM (panel count, widths, posts) to catch mismatched revisions.
 - **Fix mapping** on any flagged part saves a correction that's shared with the team and used
   on every later quote. It works like `mappings/overrides.csv`, but lives in the page.
 - Source: `devon_quote/web/hosted.html` + `devon_quote/web/engine.js` (a JavaScript port of the
   Python engine). Rebuild with `python -m devon_quote.web.build_hosted` and republish
   `build/devon_quote_builder.html`. `tests/test_engine_parity.py` checks that the JS port and the
-  Python package produce identical quotes. It needs Node with `jszip` on `NODE_PATH`.
+  Python package produce identical quotes, and `tests/test_plan.py` does the same for plan reading.
+  They need Node with `jszip@3.10.1` and `pdfjs-dist@3.11.174` on `NODE_PATH`.
 
 ### Local drag-and-drop page
 
@@ -69,6 +76,16 @@ It writes three files to `out/`:
   default 0), `--stations` (for cost per station), `--description`.
 - **2D plan / dictation**: `--drawing` and `--notes` are included in the review report so the
   checker has them next to the flagged items. They don't change quantities yet (see below).
+
+### Reading the 2D plan
+
+Give the CET 2D exported as **PDF** (`--drawing plan.pdf`, or drop it on either page).
+`devon_quote/plan.py` finds the panels (the thin, gray-filled outlines whose lengths match
+standard panel widths at that drawing's scale, detected per page), groups panel ends that meet
+into joints, and classifies each joint by how many panels meet and at what angle. Connectors
+then come from the plan instead of the AIS post counts. Runs that end at a wall are counted as
+finished ends, so swap those to wall starts (`HMA199`). Change-of-height kits aren't visible in a
+2D and are flagged when the BOM has more than one panel height.
 
 ### How AIS parts become Devon parts
 
