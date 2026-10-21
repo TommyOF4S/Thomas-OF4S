@@ -103,6 +103,13 @@ has no color yet, so add it by hand. A colored dot that isn't on a joint is flag
 CET plans are full of small black shapes, so a black dot only counts when it's on a joint. If the
 BOM has more than one panel height and the plan has no dots, the review says so.
 
+**Marking panel-to-panel connectors.** Draw a **pink dash** on each panel-to-panel joint. When
+the plan has pink dashes, each marked joint is quoted as one panel-to-panel connector (`HMP213`),
+instead of the measured straight-joint count; two strokes on the same joint count once. The review
+flags straight joints with no dash, dashes on a corner, 3-way or 4-way joint (those joints keep
+their own connector too), and dashes that aren't on a joint. Plans without pink dashes use the
+measured straight joints.
+
 (`HMA224` appears in Devon's calculator but isn't a real SKU; the tool never offers or quotes it.)
 
 ### How AIS parts become Devon parts

@@ -5,5 +5,5 @@ const path = require("path");
 const pdfjs = require("pdfjs-dist/legacy/build/pdf.js");
 const E = require(path.join(__dirname, "..", "devon_quote", "web", "engine.js"));
 E.analyzePdf(pdfjs, new Uint8Array(fs.readFileSync(process.argv[2])))
-  .then(({ result }) => process.stdout.write(JSON.stringify({ counts: result.counts, widths: result.widths, panels: result.panels, pages: result.pages, heightChanges: result.heightChanges })))
+  .then(({ result }) => process.stdout.write(JSON.stringify({ counts: result.counts, widths: result.widths, panels: result.panels, pages: result.pages, heightChanges: result.heightChanges, pinkDashes: result.pinkDashes })))
   .catch((e) => { console.error(e); process.exit(1); });

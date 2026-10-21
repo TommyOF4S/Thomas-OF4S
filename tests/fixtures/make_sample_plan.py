@@ -13,6 +13,10 @@ Page 1 (0.285 pt per inch):
 Page 2 (0.335 pt per inch): one L of two 24" panels -> 1 L, 2 free ends
 
 Totals across both pages are in EXPECTED.
+
+sample_plan_pink.pdf is the same plan with pink dashes drawn on it (EXPECTED_PINK): a stroked line
+on the straight joint at (162,0), a pink bar drawn filled and outlined on (24,100) (two paths, one
+joint), a dash on the corner at (0,0), and a stray dash away from any joint. (48,100) is unmarked.
 """
 
 from pathlib import Path
@@ -22,6 +26,8 @@ EXPECTED = {"straight": 3, "l": 2, "tee": 1, "cross": 1, "ends": 9, "panels": 13
             "height_changes": [("straight", "red"), ("straight", "yellow")]}
 MARKS = [(162, 0, (1, 0, 0)), (48, 100, (1, 1, 0))]  # joint (inches on page 1) and dot color
 DECOY = (100, 40, (0, 0, 0))  # a black blob nowhere near a joint, like CET's chair bases
+EXPECTED_PINK = {"on": {"straight": 2, "l": 1}, "off": 1}
+PINK = (1, 0.4, 0.7)
 
 GAP = 0.7  # half the post width, inches
 
@@ -75,6 +81,19 @@ def page1(k=0.285, ox=100, oy=150):
     return "".join(out)
 
 
+def pink_dashes(k=0.285, ox=100, oy=150):
+    s = lambda v: f"{v * 10:.2f}"
+    pt = lambda x, y: (ox + x * k, oy + y * k)
+    rgb = " ".join(str(c) for c in PINK)
+    out = []
+    for (ax, ay), (bx, by) in (((162, -3), (162, 3)), ((-3, 3), (3, -3)), ((100, 57), (100, 63))):
+        (x0, y0), (x1, y1) = pt(ax, ay), pt(bx, by)
+        out.append(f"{rgb} RG {s(x0)} {s(y0)} m {s(x1)} {s(y1)} l S 0 0 0 RG\n")
+    x, y = pt(23.5, 97)  # a 1" x 6" pink bar across the joint at (24,100), filled and outlined
+    out.append(f"{rgb} RG " + path(x, y, 1 * k, 6 * k, PINK, "B") + "0 0 0 RG\n")
+    return "".join(out)
+
+
 def page2(k=0.335, ox=120, oy=200):
     gray = (0.8627, 0.8627, 0.8627)
     out = []
@@ -89,8 +108,8 @@ def content(body, label):
             f"BT /F1 9 Tf 40 580 Td ({label}) Tj ET\n")
 
 
-def build(path_out: Path):
-    pages = [content(page1(), "Sample plan page 1"), content(page2(), "Sample plan page 2")]
+def build(path_out: Path, pink: bool = False):
+    pages = [content(page1() + (pink_dashes() if pink else ""), "Sample plan page 1"), content(page2(), "Sample plan page 2")]
     objs = ["<< /Type /Catalog /Pages 2 0 R >>", None,
             "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
     kids = []
@@ -116,3 +135,4 @@ def build(path_out: Path):
 
 if __name__ == "__main__":
     build(Path(__file__).with_name("sample_plan.pdf"))
+    build(Path(__file__).with_name("sample_plan_pink.pdf"), pink=True)

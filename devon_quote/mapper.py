@@ -35,6 +35,8 @@ _CONNECTOR_CODES = {
     67: ("67", "62"),
     85: ("85", "80"),
 }
+JOINT_WORDS = {"l": "corner", "tee": "3-way joint", "cross": "4-way joint", "ends": "free end",
+               "angled": "angled joint", "other": "joint of 5+ panels"}
 # A Divi height more than this many inches below the Devon height it rounds up to is flagged.
 HEIGHT_TOLERANCE = 6
 
@@ -374,6 +376,28 @@ class Mapper:
             fillers[part] += 1
         return fillers
 
+    def _pink_dash_count(self, warnings: list[str]) -> int:
+        """Panel-to-panel connectors from the pink dashes on the plan, with checks against the measured joints."""
+        plan = self.plan
+        on = [d for d in plan.pink_dashes if d.joint]
+        off = len(plan.pink_dashes) - len(on)
+        n = lambda k, word: f"{k} {word}" + ("" if k == 1 else "s")
+        unmarked = plan.counts["straight"] - sum(1 for d in on if d.joint == "straight")
+        if unmarked > 0:
+            one = unmarked == 1
+            warnings.append(f"{n(unmarked, 'straight joint')} on the plan {'has' if one else 'have'} no pink dash, so "
+                            f"{'it was' if one else 'they were'} not quoted as panel-to-panel connectors. "
+                            "Add a pink dash in CET, or check the plan.")
+        for kind, k in Counter(d.joint for d in on if d.joint != "straight").items():
+            one = k == 1
+            warnings.append(f"{n(k, 'pink dash')} {'is' if one else 'are'} on a {JOINT_WORDS.get(kind, 'joint')}, which "
+                            f"also gets its own connector; check {'it' if one else 'them'}.")
+        if off:
+            one = off == 1
+            warnings.append(f"{n(off, 'pink dash')} {'is' if one else 'are'}n't on a panel joint, so "
+                            f"{'it was' if one else 'they were'} not quoted. Put each dash right on the joint.")
+        return len(on)
+
     def _plan_connectors(self, lines: list[BomLine], bom_heights: list[int]) -> tuple[list[tuple[str, str, int]], list[str]]:
         """Devon connectors from the joints measured on the 2D plan, plus cross-checks against the BOM."""
         plan = self.plan
@@ -381,11 +405,16 @@ class Mapper:
         c = plan.counts
         warnings = []
         fillers = self._height_changes(warnings)
+        qty = Counter(c)
+        straight_kind = "straight"
+        if plan.pink_dashes:  # the designer marked the panel-to-panel joints: their count wins
+            qty["straight"] = self._pink_dash_count(warnings)
+            straight_kind = "pink"
         parts = [
-            (kind, connector(devon_kind, height), c[kind])
+            (straight_kind if kind == "straight" else kind, connector(devon_kind, height), qty[kind])
             for kind, devon_kind in (("straight", "inline"), ("l", "2way"), ("tee", "3way"),
                                      ("cross", "4way"), ("ends", "finished_end"))
-            if c[kind]
+            if qty[kind]
         ]
         parts += [("filler", p, q) for p, q in fillers.items()]
         if len(bom_heights) > 1 and not plan.height_changes:

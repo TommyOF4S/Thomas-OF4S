@@ -15,6 +15,8 @@ leaves a small gap at each post. So the joints can be measured instead of guesse
 
 Height changes can't be seen in a 2D, so the designer marks them on the CET plan with a
 colored dot on the joint; the color says which high/low filler strip it needs (DOT_COLORS).
+The designer can also draw a pink dash on each panel-to-panel joint; when a plan has pink
+dashes, they set the panel-to-panel connector count instead of the measured straight joints.
 
 The same algorithm is ported to JavaScript in web/engine.js for the hosted page;
 tests/test_plan.py checks both against tests/fixtures/sample_plan.pdf.
@@ -81,6 +83,25 @@ class Shape:
 
 
 @dataclass
+class Stroke:
+    """A stroked path (line, outline): its bounding box, stroke color, and whether it is one straight segment."""
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    color: tuple[float, float, float] | None
+    line: bool
+
+
+@dataclass
+class PinkDash:
+    x: float
+    y: float
+    page: int
+    joint: str | None  # kind of joint the dash sits on (None: not on a joint)
+
+
+@dataclass
 class HeightChange:
     x: float
     y: float
@@ -96,6 +117,7 @@ class PlanResult:
     joints: list[Joint] = field(default_factory=list)
     pages: list[dict] = field(default_factory=list)  # per page: panels found, thickness
     height_changes: list[HeightChange] = field(default_factory=list)
+    pink_dashes: list[PinkDash] = field(default_factory=list)  # one per marked joint (or stray dash)
 
     @property
     def panels(self) -> int:
@@ -218,7 +240,41 @@ def height_marks(shapes: list[Shape], joints: list[Joint], t: float, page: int) 
     return out
 
 
-def analyze_rects(pages: list[list[Rect]], shapes: list[list[Shape]] | None = None) -> PlanResult:
+def is_pink(c) -> bool:
+    return bool(c) and c[0] > 0.8 and c[2] > 0.45 and c[1] < 0.8 and c[0] - c[1] > 0.2
+
+
+def pink_dashes(shapes: list[Shape], strokes: list[Stroke], joints: list[Joint], t: float, page: int) -> list[PinkDash]:
+    """Pink dashes the designer drew on panel-to-panel joints. Several strokes on one joint count once."""
+    cands = [(s.x0, s.y0, s.x1, s.y1, s.fill, False) for s in shapes] + \
+            [(s.x0, s.y0, s.x1, s.y1, s.color, s.line) for s in strokes]
+    out, marked = [], set()
+    for x0, y0, x1, y1, color, line in cands:
+        if not is_pink(color):
+            continue
+        w, h = x1 - x0, y1 - y0
+        length = math.hypot(w, h) if line else max(w, h)
+        if not line and length < 2.5 * min(w, h):
+            continue  # a dot or a blob, not a dash
+        if length < 0.5 * t or length > MARK_MAX_FACTOR * t:
+            continue
+        x, y = (x0 + x1) / 2, (y0 + y1) / 2
+        best, bd = None, None
+        for i, j in enumerate(joints):
+            d = math.hypot(j.x - x, j.y - y)
+            if bd is None or d < bd:
+                best, bd = i, d
+        if best is not None and bd <= MARK_JOINT_FACTOR * t:
+            if best not in marked:
+                marked.add(best)
+                out.append(PinkDash(round(x, 2), round(y, 2), page, joints[best].kind))
+        elif not any(m.joint is None and math.hypot(m.x - x, m.y - y) <= JOIN_FACTOR * t for m in out):
+            out.append(PinkDash(round(x, 2), round(y, 2), page, None))
+    return out
+
+
+def analyze_rects(pages: list[list[Rect]], shapes: list[list[Shape]] | None = None,
+                  strokes: list[list[Stroke]] | None = None) -> PlanResult:
     res = PlanResult()
     for p, rects in enumerate(pages):
         panels, t = find_panels(rects)
@@ -232,7 +288,21 @@ def analyze_rects(pages: list[list[Rect]], shapes: list[list[Shape]] | None = No
         res.counts.update(j.kind for j in js)
         if shapes:
             res.height_changes.extend(height_marks(shapes[p], js, t, p + 1))
+        if shapes or strokes:
+            res.pink_dashes.extend(pink_dashes(shapes[p] if shapes else [], strokes[p] if strokes else [], js, t, p + 1))
     return res
+
+
+def _color(c):
+    if c is None:
+        return None
+    if isinstance(c, (int, float)):
+        return (float(c),) * 3
+    if len(c) == 1:
+        return (float(c[0]),) * 3
+    if len(c) == 3:
+        return tuple(float(v) for v in c)
+    return None  # CMYK and patterns
 
 
 def _rgb(obj):
@@ -248,16 +318,19 @@ def _rgb(obj):
     return None  # CMYK and patterns: not a CET panel fill
 
 
-def read_pdf(path: str | Path) -> tuple[list[list[Rect]], list[list[Shape]]]:
+def read_pdf(path: str | Path) -> tuple[list[list[Rect]], list[list[Shape]], list[list[Stroke]]]:
     import pdfplumber
 
-    pages, extras = [], []
+    pages, shapes, strokes = [], [], []
     with pdfplumber.open(path) as pdf:
         for page in pdf.pages:
             pages.append([Rect(r["x0"], r["top"], r["x1"], r["bottom"], _rgb(r)) for r in page.rects])
-            extras.append([Shape(o["x0"], o["top"], o["x1"], o["bottom"], _rgb(o))
+            shapes.append([Shape(o["x0"], o["top"], o["x1"], o["bottom"], _rgb(o))
                            for o in list(page.rects) + list(page.curves) if o.get("fill")])
-    return pages, extras
+            strokes.append([Stroke(o["x0"], o["top"], o["x1"], o["bottom"], _color(o.get("stroking_color")), kind == "line")
+                            for kind, objs in (("line", page.lines), ("rect", page.rects), ("curve", page.curves))
+                            for o in objs if o.get("stroke", True) and is_pink(_color(o.get("stroking_color")))])
+    return pages, shapes, strokes
 
 
 def analyze_pdf(path: str | Path) -> PlanResult:

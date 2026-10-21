@@ -123,6 +123,7 @@ label.f input, label.f select, .fixform input { width: 100%; border: 1px solid v
 .planread { margin-top: 4px; font-size: 13px; color: var(--fg-2); }
 .planread b { color: var(--fg); font-weight: 600; }
 .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 7px; vertical-align: -1px; box-shadow: 0 0 0 1px rgba(0,0,0,0.35); }
+.dash { display: inline-block; width: 16px; height: 4px; border-radius: 2px; background: #ff66b3; margin-right: 7px; vertical-align: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,0.3); }
 .dotkey { list-style: none; padding: 0; margin: 6px 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 3px 14px; color: var(--fg-2); font-family: var(--mono); font-size: 12px; }
 .tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .tabs button { border: 1px solid var(--line-2); background: var(--surface); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -226,6 +227,7 @@ footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
             <li><span class="dot" style="background:#000000"></span>Black · 53" to 67" · HMHL5367</li>
           </ul>
           The joint keeps its normal connector. 39" to 47" (HMHL3947) has no color yet, so add it by hand.</div>
+        <p class="hint"><span class="dash" aria-hidden="true"></span><b>Panel-to-panel connectors:</b> draw a pink dash on each panel-to-panel joint. When the plan has pink dashes, each marked joint is quoted as one panel-to-panel connector (HMP213), and any straight joint without a dash is flagged. Without pink dashes, the straight joints the page measures are used.</p>
       </div>
 
       <div class="card">
@@ -493,12 +495,12 @@ function loadPdfjs() {
   return pdfjsPromise;
 }
 
-// Joint markers avoid the five dot colors (red, blue, yellow, green, black) used for height changes.
+// Joint markers avoid the designer's mark colors: the five filler-strip dots and the pink panel-to-panel dash.
 const JOINT_STYLE = {
-  straight: { color: "#00acc1", label: "Straight, panel-to-panel" },
+  straight: { color: "#00acc1", label: "Straight joint" },
   l: { color: "#ef6c00", label: "Corner" },
   tee: { color: "#8e24aa", label: "3-way" },
-  cross: { color: "#d81b60", label: "4-way" },
+  cross: { color: "#8d6e63", label: "4-way" },
   ends: { color: "#78909c", label: "Free end" },
   angled: { color: "#795548", label: "Check: odd angle" },
   other: { color: "#795548", label: "Check: 5+ panels" },
@@ -508,8 +510,11 @@ const DOT_STYLE = { red: "#e00000", blue: "#0040ff", yellow: "#ffe000", green: "
 function planSummaryText(r) {
   const c = r.counts;
   const hc = (r.heightChanges || []).length;
+  const pinkOn = (r.pinkDashes || []).filter((d) => d.joint).length;
+  const pinkOff = (r.pinkDashes || []).length - pinkOn;
   return `<b>${r.panels} panels read:</b> ${c.straight} straight · ${c.l} corners · ${c.tee} three-way · ${c.cross} four-way · ${c.ends} free ends` +
     (hc ? ` · <b>${hc} height change${hc === 1 ? "" : "s"} (colored dots)</b>` : "") +
+    (pinkOn + pinkOff ? ` · <b>${pinkOn} pink-dash panel-to-panel joint${pinkOn === 1 ? "" : "s"}</b>${pinkOff ? ` (${pinkOff} off a joint)` : ""}` : "") +
     (c.angled + c.other ? ` · <b>${c.angled + c.other} to check</b>` : "");
 }
 
@@ -531,10 +536,11 @@ async function readPlan(p) {
 function combinedPlan() {
   const read = state.plans.filter((p) => p.status === "done");
   if (!read.length) return null;
-  const out = { counts: {}, widths: {}, joints: [], pages: [], panels: 0, heightChanges: [] };
+  const out = { counts: {}, widths: {}, joints: [], pages: [], panels: 0, heightChanges: [], pinkDashes: [] };
   for (const p of read) {
     const r = p.analysis;
     out.heightChanges.push(...(r.heightChanges || []));
+    out.pinkDashes.push(...(r.pinkDashes || []));
     for (const [k, v] of Object.entries(r.counts)) out.counts[k] = (out.counts[k] || 0) + v;
     for (const [k, v] of Object.entries(r.widths)) out.widths[k] = (out.widths[k] || 0) + v;
     out.panels += r.panels;
@@ -800,7 +806,8 @@ function planViews() {
       p.analysis.pages.forEach((pg, i) => {
         if (pg.panels) views.push({ kind: "pdf", name: p.pdfPages.length > 1 ? `${p.file.name} · p${pg.page}` : p.file.name,
           page: p.pdfPages[i], joints: p.analysis.joints.filter((j) => j.page === pg.page),
-          marks: (p.analysis.heightChanges || []).filter((m) => m.page === pg.page) });
+          marks: (p.analysis.heightChanges || []).filter((m) => m.page === pg.page),
+          dashes: (p.analysis.pinkDashes || []).filter((m) => m.page === pg.page) });
       });
     }
   }
@@ -812,7 +819,7 @@ async function drawPdfView(v) {
   const token = ++renderToken;
   // Crop to the part of the page that holds panels, with a margin.
   const base = v.page.getViewport({ scale: 1 });
-  const pts = [...v.joints, ...v.marks].map((j) => base.convertToViewportPoint(j.x, j.y));
+  const pts = [...v.joints, ...v.marks, ...v.dashes].map((j) => base.convertToViewportPoint(j.x, j.y));
   let [x0, y0, x1, y1] = [0, 0, base.width, base.height];
   if (pts.length) {
     x0 = Math.min(...pts.map((p) => p[0])); x1 = Math.max(...pts.map((p) => p[0]));
@@ -832,6 +839,7 @@ async function drawPdfView(v) {
   v.joints.forEach((j) => (counts[j.kind] = (counts[j.kind] || 0) + 1));
   const legend = Object.entries(JOINT_STYLE).filter(([k]) => counts[k])
     .map(([k, st]) => `<span><i style="background:${st.color}"></i>${st.label} ${counts[k]}</span>`).join("") +
+    (v.dashes.length ? `<span><i style="background:#ff66b3;border-radius:2px;height:5px;width:16px"></i>Pink dash ${v.dashes.filter((d) => d.joint).length}${v.dashes.some((d) => !d.joint) ? ` (+${v.dashes.filter((d) => !d.joint).length} off a joint)` : ""}</span>` : "") +
     Object.entries(DOT_STYLE).map(([color, hex]) => {
       const n = v.marks.filter((m) => m.color === color).length;
       return n ? `<span><i style="background:transparent;border:3px solid ${hex}"></i>${E.DOT_COLORS[color]} ${n}</span>` : "";
@@ -851,6 +859,17 @@ async function drawPdfView(v) {
     ctx.arc(x, y, r, 0, Math.PI * 2);
     if (j.kind === "ends") { ctx.strokeStyle = st.color; ctx.stroke(); }
     else { ctx.globalAlpha = 0.8; ctx.fillStyle = st.color; ctx.fill(); ctx.globalAlpha = 1; }
+  }
+  // Pink dashes found on the plan: a dark-outlined box so they stand out; off-joint ones are labeled
+  for (const d of v.dashes) {
+    const [x, y] = viewport.convertToViewportPoint(d.x, d.y);
+    ctx.lineWidth = Math.max(2.5, r / 1.8); ctx.strokeStyle = "#1a1814";
+    ctx.strokeRect(x - r * 2, y - r * 2, r * 4, r * 4);
+    if (!d.joint) {
+      ctx.font = `600 ${Math.round(r * 2.2)}px Geist, system-ui, sans-serif`;
+      ctx.lineWidth = Math.max(3, r / 1.2); ctx.strokeStyle = "#ffffff"; ctx.strokeText("not on a joint", x + r * 3, y + r * 3);
+      ctx.fillStyle = "#1a1814"; ctx.fillText("not on a joint", x + r * 3, y + r * 3);
+    }
   }
   // Height-change marks: a ring in the dot's color (outlined so yellow shows on white) and its filler strip
   ctx.font = `600 ${Math.round(r * 2.2)}px Geist, system-ui, sans-serif`;

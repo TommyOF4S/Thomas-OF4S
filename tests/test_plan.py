@@ -11,7 +11,7 @@ import pytest
 from devon_quote.bom import BomLine, load_bom
 from devon_quote.catalog import load_catalog
 from devon_quote.mapper import Mapper
-from devon_quote.plan import DOT_COLORS, Rect, Shape, analyze_pdf, analyze_rects, nominal_width
+from devon_quote.plan import DOT_COLORS, Rect, Shape, Stroke, analyze_pdf, analyze_rects, nominal_width
 from devon_quote.pricing import estimate
 from devon_quote.report import write_report
 from devon_quote.service import find_template
@@ -20,7 +20,9 @@ ROOT = Path(__file__).resolve().parent.parent
 PLAN = ROOT / "tests" / "fixtures" / "sample_plan.pdf"
 SAMPLE = ROOT / "tests" / "fixtures" / "sample_ais_divi.sif"
 sys.path.insert(0, str(ROOT / "tests" / "fixtures"))
-from make_sample_plan import EXPECTED  # noqa: E402
+from make_sample_plan import EXPECTED, EXPECTED_PINK  # noqa: E402
+
+PINK_PLAN = ROOT / "tests" / "fixtures" / "sample_plan_pink.pdf"
 
 
 def _node_has(mod):
@@ -215,3 +217,104 @@ def test_bom_with_two_heights_and_no_dots_asks_for_marks():
     plan = analyze_rects([_run()], [[]])
     res = Mapper(cat).map(_lines([50, 42]), plan)
     assert any("colored dot (red 39/53" in w for w in res.warnings)
+
+
+# ---- pink dashes: the designer's panel-to-panel marks
+
+def _pink_summary(dashes, joint_key):
+    on = {}
+    off = 0
+    for d in dashes:
+        k = joint_key(d)
+        if k:
+            on[k] = on.get(k, 0) + 1
+        else:
+            off += 1
+    return {"on": on, "off": off}
+
+
+def test_python_reads_pink_dashes():
+    res = analyze_pdf(PINK_PLAN)
+    check_expected(res.counts, res.widths, res.panels)  # same panels and joints as the plain plan
+    assert _pink_summary(res.pink_dashes, lambda d: d.joint) == EXPECTED_PINK
+    assert analyze_pdf(PLAN).pink_dashes == []
+
+
+@needs_pdfjs
+def test_js_reads_pink_dashes():
+    out = json.loads(subprocess.run(["node", str(ROOT / "tests" / "plan_harness.js"), str(PINK_PLAN)],
+                                    capture_output=True, text=True, check=True).stdout)
+    check_expected(out["counts"], out["widths"], out["panels"])
+    assert _pink_summary(out["pinkDashes"], lambda d: d["joint"]) == EXPECTED_PINK
+
+
+@needs_template
+def test_pink_dashes_set_panel_to_panel_count():
+    cat = load_catalog(TEMPLATE)
+    res = Mapper(cat).map(load_bom(SAMPLE), analyze_pdf(PINK_PLAN))
+    assert res.quantities["HMP213.48"] == 3  # three marked joints: two straight, one corner
+    assert ("pink", "HMP213.48", 3) in res.plan_parts
+    assert any("1 straight joint on the plan has no pink dash" in w for w in res.warnings)
+    assert any("1 pink dash is on a corner" in w for w in res.warnings)
+    assert any("1 pink dash isn't on a panel joint" in w for w in res.warnings)
+    # the corner keeps its own 2-way connector; other joint types are unchanged
+    assert res.quantities["HMA130.53"] == 2 and res.quantities["HMA137.53"] == 1
+
+
+@needs_template
+@needs_pdfjs
+def test_js_quote_with_pink_dashes_matches_python(tmp_path):
+    out = tmp_path / "q.xlsx"
+    p = subprocess.run(["node", str(ROOT / "tests" / "engine_harness.js"), str(TEMPLATE), str(SAMPLE), str(out),
+                        json.dumps({"plan": str(PINK_PLAN), "delivery": 0, "project": "Pink"})],
+                       capture_output=True, text=True, check=True)
+    js = json.loads(p.stdout)
+    cat = load_catalog(TEMPLATE)
+    lines = load_bom(SAMPLE)
+    res = Mapper(cat).map(lines, analyze_pdf(PINK_PLAN))
+    assert js["quantities"] == res.quantities
+    assert js["warnings"] == res.warnings
+    rp = tmp_path / "r.md"
+    write_report(rp, project="Pink", bom_file=SAMPLE.name, quote_file="q.xlsx", catalog=cat, grade=0,
+                 lines=lines, result=res, est=estimate(cat, res.quantities, 0, 0, None))
+    strip = lambda t: [l for l in t.splitlines() if "overrides.csv" not in l and "save a correction" not in l]
+    assert strip(js["report"]) == strip(rp.read_text(encoding="utf-8"))
+
+
+PINK = (1.0, 0.4, 0.7)
+PINK_CASES = [
+    # (name, rects, shapes, strokes, expected HMP213.48, warning snippets)
+    ("all straight joints marked", _run(), [], [Stroke(6.65, -0.6, 6.65, 1.2, PINK, True)], 1, []),
+    ("two strokes, one joint", _run(), [Shape(6.5, -0.6, 6.8, 1.2, PINK)], [Stroke(6.65, -0.6, 6.65, 1.2, PINK, True)], 1, []),
+    ("pink dot is not a dash", _run(), [Shape(6.35, 0.0, 6.95, 0.6, PINK)], [], 1, []),  # no dashes: measured joints
+    ("dash off the joint", _run(), [], [Stroke(30, 30, 30, 31.8, PINK, True)], None, ["1 straight joint on the plan has no pink dash",
+                                                                                  "1 pink dash isn't on a panel joint"]),
+    ("magenta counts as pink", _run(), [], [Stroke(6.65, -0.6, 6.65, 1.2, (1.0, 0.0, 1.0), True)], 1, []),
+    ("red is not pink", _run(), [], [Stroke(6.65, -0.6, 6.65, 1.2, (1.0, 0.0, 0.0), True)], 1, []),  # ignored: measured joints
+]
+
+
+@needs_template
+@pytest.mark.parametrize("case", PINK_CASES, ids=[c[0] for c in PINK_CASES])
+def test_pink_dash_cases(case):
+    name, rects, shapes, strokes, hmp, snippets = case
+    cat = load_catalog(TEMPLATE)
+    plan = analyze_rects([rects], [shapes], [strokes])
+    res = Mapper(cat).map(_lines([50]), plan)
+    assert res.quantities.get("HMP213.48") == hmp
+    for snip in snippets:
+        assert any(snip in w for w in res.warnings), (snip, res.warnings)
+    if not snippets:
+        assert res.warnings == []
+    if _node_has("jszip"):
+        payload = {
+            "calc": str(TEMPLATE),
+            "pages": [[{"x0": r.x0, "y0": r.y0, "x1": r.x1, "y1": r.y1, "fill": list(r.fill) if r.fill else None} for r in rects]],
+            "extras": [[{"x0": s.x0, "y0": s.y0, "x1": s.x1, "y1": s.y1, "fill": list(s.fill)} for s in shapes]],
+            "strokes": [[{"x0": s.x0, "y0": s.y0, "x1": s.x1, "y1": s.y1, "color": list(s.color), "line": s.line} for s in strokes]],
+            "lines": [{"part": l.part, "description": l.description, "qty": l.qty} for l in _lines([50])],
+        }
+        out = json.loads(subprocess.run(["node", str(ROOT / "tests" / "mark_harness.js")], input=json.dumps(payload),
+                                        capture_output=True, text=True, check=True).stdout)
+        assert out["warnings"] == res.warnings
+        assert out["quantities"] == res.quantities

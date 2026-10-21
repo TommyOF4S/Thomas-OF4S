@@ -488,6 +488,31 @@
       return added;
     }
 
+    const JOINT_WORDS = { l: "corner", tee: "3-way joint", cross: "4-way joint", ends: "free end", angled: "angled joint", other: "joint of 5+ panels" };
+
+    function pinkDashCount(warnings) {
+      const dashes = plan.pinkDashes || [];
+      const on = dashes.filter((d) => d.joint);
+      const off = dashes.length - on.length;
+      const n = (k, word) => `${k} ${word}` + (k === 1 ? "" : "s");
+      const unmarked = plan.counts.straight - on.filter((d) => d.joint === "straight").length;
+      if (unmarked > 0) {
+        const one = unmarked === 1;
+        warnings.push(`${n(unmarked, "straight joint")} on the plan ${one ? "has" : "have"} no pink dash, so ${one ? "it was" : "they were"} not quoted as panel-to-panel connectors. Add a pink dash in CET, or check the plan.`);
+      }
+      const other = new Map();
+      for (const d of on) if (d.joint !== "straight") other.set(d.joint, (other.get(d.joint) || 0) + 1);
+      for (const [kind, k] of other) {
+        const one = k === 1;
+        warnings.push(`${n(k, "pink dash")} ${one ? "is" : "are"} on a ${JOINT_WORDS[kind] || "joint"}, which also gets its own connector; check ${one ? "it" : "them"}.`);
+      }
+      if (off) {
+        const one = off === 1;
+        warnings.push(`${n(off, "pink dash")} ${one ? "is" : "are"}n't on a panel joint, so ${one ? "it was" : "they were"} not quoted. Put each dash right on the joint.`);
+      }
+      return on.length;
+    }
+
     function heightChanges(warnings) {
       const fillers = new Map();
       for (const ch of plan.heightChanges || []) {
@@ -504,8 +529,11 @@
       const c = plan.counts;
       const warnings = [];
       const fillers = heightChanges(warnings);
+      const qty = { ...c };
+      let straightKind = "straight";
+      if ((plan.pinkDashes || []).length) { qty.straight = pinkDashCount(warnings); straightKind = "pink"; } // the designer's marks win
       const parts = [["straight", "inline"], ["l", "2way"], ["tee", "3way"], ["cross", "4way"], ["ends", "finished_end"]]
-        .filter(([kind]) => c[kind]).map(([kind, dk]) => [kind, connector(dk, height), c[kind]]);
+        .filter(([kind]) => qty[kind]).map(([kind, dk]) => [kind === "straight" ? straightKind : kind, connector(dk, height), qty[kind]]);
       for (const [p, q] of fillers) parts.push(["filler", p, q]);
       if (bomHeights.length > 1 && !(plan.heightChanges || []).length) {
         warnings.push(`The BOM has panels at more than one height; plan connectors are all quoted at ${height}"H. Mark each height change on the CET plan with a colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, black 53/67) to add its high/low filler strip.`);
@@ -698,9 +726,34 @@
     return out;
   }
 
-  /** pages: [[{x0, y0, x1, y1, fill: [r, g, b] | null}]] (0-1 colors); shapes: filled paths per page, same form */
-  function analyzeRects(pages, shapes = null) {
-    const res = { counts: Object.fromEntries(PLAN_KINDS.map((k) => [k, 0])), widths: {}, joints: [], pages: [], panels: 0, heightChanges: [] };
+  const isPink = (c) => !!c && c[0] > 0.8 && c[2] > 0.45 && c[1] < 0.8 && c[0] - c[1] > 0.2;
+
+  /** Pink dashes the designer drew on panel-to-panel joints. Several strokes on one joint count once. */
+  function pinkDashes(shapes, strokes, joints, t, page) {
+    const cands = [...shapes.map((s) => [s.x0, s.y0, s.x1, s.y1, s.fill, false]), ...strokes.map((s) => [s.x0, s.y0, s.x1, s.y1, s.color, s.line])];
+    const out = [], marked = new Set();
+    for (const [x0, y0, x1, y1, color, line] of cands) {
+      if (!isPink(color)) continue;
+      const w = x1 - x0, h = y1 - y0;
+      const length = line ? Math.hypot(w, h) : Math.max(w, h);
+      if (!line && length < 2.5 * Math.min(w, h)) continue; // a dot or a blob, not a dash
+      if (length < 0.5 * t || length > MARK_MAX_FACTOR * t) continue;
+      const x = (x0 + x1) / 2, y = (y0 + y1) / 2;
+      let best = null, bd = null;
+      joints.forEach((j, i) => { const d = Math.hypot(j.x - x, j.y - y); if (bd === null || d < bd) { best = i; bd = d; } });
+      if (best !== null && bd <= MARK_JOINT_FACTOR * t) {
+        if (!marked.has(best)) { marked.add(best); out.push({ x, y, page, joint: joints[best].kind }); }
+      } else if (!out.some((m) => m.joint === null && Math.hypot(m.x - x, m.y - y) <= JOIN_FACTOR * t)) {
+        out.push({ x, y, page, joint: null });
+      }
+    }
+    return out;
+  }
+
+  /** pages: [[{x0, y0, x1, y1, fill: [r, g, b] | null}]] (0-1 colors); shapes: filled paths per page, same form;
+   *  strokes: pink stroked paths per page ({x0, y0, x1, y1, color, line}) */
+  function analyzeRects(pages, shapes = null, strokes = null) {
+    const res = { counts: Object.fromEntries(PLAN_KINDS.map((k) => [k, 0])), widths: {}, joints: [], pages: [], panels: 0, heightChanges: [], pinkDashes: [] };
     pages.forEach((rects, p) => {
       const [panels, t] = findPanels(rects);
       res.pages.push({ page: p + 1, panels: panels.length, thickness: t });
@@ -714,6 +767,7 @@
       res.joints.push(...js);
       js.forEach((j) => res.counts[j.kind]++);
       if (shapes) res.heightChanges.push(...heightMarks(shapes[p], js, t, p + 1));
+      if (shapes || strokes) res.pinkDashes.push(...pinkDashes(shapes ? shapes[p] : [], strokes ? strokes[p] : [], js, t, p + 1));
     });
     return res;
   }
@@ -722,13 +776,13 @@
   async function pdfRects(pdfjsLib, bytes, { maxPages = 20 } = {}) {
     const OPS = pdfjsLib.OPS;
     const doc = await pdfjsLib.getDocument({ data: bytes, disableFontFace: true, isEvalSupported: false }).promise;
-    const pages = [], extras = [];
+    const pages = [], extras = [], strokeLists = [];
     const views = [];
     for (let n = 1; n <= Math.min(doc.numPages, maxPages); n++) {
       const page = await doc.getPage(n);
       const ops = await page.getOperatorList();
-      const rects = [], shapes = [];
-      let ctm = [1, 0, 0, 1, 0, 0], fill = [0, 0, 0];
+      const rects = [], shapes = [], strokes = [];
+      let ctm = [1, 0, 0, 1, 0, 0], fill = [0, 0, 0], stroke = [0, 0, 0];
       const stack = [];
       let pending = [];
       const mul = (m, c) => [m[0] * c[0] + m[1] * c[2], m[0] * c[1] + m[1] * c[3], m[2] * c[0] + m[3] * c[2], m[2] * c[1] + m[3] * c[3],
@@ -746,12 +800,13 @@
       };
       for (let i = 0; i < ops.fnArray.length; i++) {
         const fn = ops.fnArray[i], args = ops.argsArray[i];
-        if (fn === OPS.save) stack.push([ctm, fill]);
-        else if (fn === OPS.restore) { const s = stack.pop(); if (s) [ctm, fill] = s; }
+        if (fn === OPS.save) stack.push([ctm, fill, stroke]);
+        else if (fn === OPS.restore) { const s = stack.pop(); if (s) [ctm, fill, stroke] = s; }
         else if (fn === OPS.transform) ctm = mul(args, ctm);
-        else if (fn === OPS.paintFormXObjectBegin) { stack.push([ctm, fill]); if (args && args[0]) ctm = mul(args[0], ctm); }
-        else if (fn === OPS.paintFormXObjectEnd) { const s = stack.pop(); if (s) [ctm, fill] = s; }
+        else if (fn === OPS.paintFormXObjectBegin) { stack.push([ctm, fill, stroke]); if (args && args[0]) ctm = mul(args[0], ctm); }
+        else if (fn === OPS.paintFormXObjectEnd) { const s = stack.pop(); if (s) [ctm, fill, stroke] = s; }
         else if (fn === OPS.setFillRGBColor) fill = [args[0] / 255, args[1] / 255, args[2] / 255];
+        else if (fn === OPS.setStrokeRGBColor) stroke = [args[0] / 255, args[1] / 255, args[2] / 255];
         else if (fn === OPS.constructPath) {
           const [sub, coords] = args;
           let k = 0, cur = null;
@@ -778,14 +833,16 @@
         } else if ([OPS.fill, OPS.eoFill, OPS.fillStroke, OPS.eoFillStroke, OPS.closeFillStroke, OPS.closeEOFillStroke,
           OPS.stroke, OPS.closeStroke, OPS.endPath].includes(fn)) {
           const filled = [OPS.fill, OPS.eoFill, OPS.fillStroke, OPS.eoFillStroke, OPS.closeFillStroke, OPS.closeEOFillStroke].includes(fn);
+          const stroked = [OPS.stroke, OPS.closeStroke, OPS.fillStroke, OPS.eoFillStroke, OPS.closeFillStroke, OPS.closeEOFillStroke].includes(fn);
           if (fn !== OPS.endPath) {
             for (const pts of pending) {
               const r = pts.curved ? null : toRect(pts);
               if (r) rects.push({ ...r, fill: filled ? fill.slice() : null });
-              if (filled && pts.length) {
-                const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
-                shapes.push({ x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys), fill: fill.slice() });
-              }
+              if (!pts.length) continue;
+              const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+              const box = { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
+              if (filled) shapes.push({ ...box, fill: fill.slice() });
+              if (stroked && isPink(stroke)) strokes.push({ ...box, color: stroke.slice(), line: pts.length === 2 && !pts.curved });
             }
           }
           pending = [];
@@ -793,14 +850,15 @@
       }
       pages.push(rects);
       extras.push(shapes);
+      strokeLists.push(strokes);
       views.push(page);
     }
-    return { pages, extras, pdfPages: views };
+    return { pages, extras, strokes: strokeLists, pdfPages: views };
   }
 
   async function analyzePdf(pdfjsLib, bytes) {
-    const { pages, extras, pdfPages } = await pdfRects(pdfjsLib, bytes);
-    return { result: analyzeRects(pages, extras), pdfPages };
+    const { pages, extras, strokes, pdfPages } = await pdfRects(pdfjsLib, bytes);
+    return { result: analyzeRects(pages, extras, strokes), pdfPages };
   }
 
   // ---------------------------------------------------------------- pricing
@@ -987,8 +1045,9 @@
     if (result.plan) {
       w("## Connectors from the 2D plan\n");
       w(`Read ${result.plan.panels} panels off the plan and measured every joint. These replace the AIS post counts.\n`);
+      if ((result.plan.pinkDashes || []).length) w("Panel-to-panel connectors are counted from the pink dashes drawn on the plan, one per marked joint.\n");
       w("| Joint on the plan | Qty | Devon part |\n|---|---:|---|");
-      const labels = { straight: "Two panels in a straight line (180°)", l: "Corner, two panels at 90°", tee: "Three panels", cross: "Four panels", ends: "Free end of a run",
+      const labels = { straight: "Two panels in a straight line (180°)", pink: "Panel-to-panel joint (pink dash on the plan)", l: "Corner, two panels at 90°", tee: "Three panels", cross: "Four panels", ends: "Free end of a run",
         filler: "Height change (colored dot): high/low filler strip" };
       for (const [k, p, q] of result.planParts) w(`| ${labels[k]} | ${q} | ${p} |`);
       w("");

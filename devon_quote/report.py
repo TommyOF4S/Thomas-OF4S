@@ -103,8 +103,10 @@ def write_report(
     if result.plan is not None:
         w("## Connectors from the 2D plan\n")
         w(f"Read {result.plan.panels} panels off the plan and measured every joint. These replace the AIS post counts.\n")
+        if result.plan.pink_dashes:
+            w("Panel-to-panel connectors are counted from the pink dashes drawn on the plan, one per marked joint.\n")
         w("| Joint on the plan | Qty | Devon part |\n|---|---:|---|")
-        labels = {"straight": "Two panels in a straight line (180°)", "l": "Corner, two panels at 90°",
+        labels = {"straight": "Two panels in a straight line (180°)", "pink": "Panel-to-panel joint (pink dash on the plan)", "l": "Corner, two panels at 90°",
                   "tee": "Three panels", "cross": "Four panels", "ends": "Free end of a run",
                   "filler": "Height change (colored dot): high/low filler strip"}
         for kind, part, qty in result.plan_parts:
