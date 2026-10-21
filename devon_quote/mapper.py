@@ -35,6 +35,8 @@ _CONNECTOR_CODES = {
     67: ("67", "62"),
     85: ("85", "80"),
 }
+JOINT_WORDS = {"l": "corner", "tee": "3-way joint", "cross": "4-way joint", "ends": "free end",
+               "angled": "angled joint", "other": "joint of 5+ panels"}
 # A Divi height more than this many inches below the Devon height it rounds up to is flagged.
 HEIGHT_TOLERANCE = 6
 
@@ -340,7 +342,7 @@ class Mapper:
         warnings = []
         plan_parts = []
         if self.plan is not None:
-            plan_parts, plan_warnings = self._plan_connectors(lines, len(heights))
+            plan_parts, plan_warnings = self._plan_connectors(lines, list(heights))
             warnings += plan_warnings
             for _, part, qty in plan_parts:
                 raw[part] += qty
@@ -356,21 +358,61 @@ class Mapper:
         auto_added = self._auto_add(quantities)
         return MapResult(mappings, quantities, dict(sources), auto_added, warnings, self.plan, plan_parts)
 
-    def _plan_connectors(self, lines: list[BomLine], n_heights: int) -> tuple[list[tuple[str, str, int]], list[str]]:
+    def _height_changes(self, bom_heights: list[int], warnings: list[str]) -> tuple[Counter, Counter, int]:
+        """Change-of-height kits and filler strips from the red dots on the plan."""
+        kits, fillers, on_straight = Counter(), Counter(), 0
+        for ch in self.plan.height_changes:
+            where = f"the red dot on page {ch.page}" + (f' labeled "{ch.label}"' if ch.label else "")
+            Where = where[0].upper() + where[1:]
+            if ch.joint is None:
+                warnings.append(f"{Where} isn't on a panel joint, so it was not quoted. Put the dot right on the joint.")
+                continue
+            if ch.heights:
+                lo, hi = sorted(devon_height(h)[0] for h in ch.heights)
+            elif len(bom_heights) == 2:
+                lo, hi = sorted(bom_heights)
+                warnings.append(f'{Where} has no height label; used the BOM\'s two heights, {lo}" and {hi}". Add a label like {lo}/{hi}.')
+            else:
+                warnings.append(f"{Where} has no height label like 47/53, so it was not quoted.")
+                continue
+            if lo == hi:
+                warnings.append(f'{Where}: both heights are {lo}"H on Devon, so no change-of-height parts are needed.')
+                continue
+            if ch.joint == "straight":
+                on_straight += 1
+            else:
+                warnings.append(f"{Where} sits on a {JOINT_WORDS.get(ch.joint, 'joint')}; Devon's change-of-height kit is "
+                                "for straight runs. The kit and filler strip are quoted there; check it.")
+            kits[connector("change_height", hi)] += 1
+            filler = f"HMHL{lo}{hi}"
+            if filler in self.catalog:
+                fillers[filler] += 1
+            else:
+                warnings.append(f'Devon has no filler strip for {lo}" to {hi}" ({where}); add one by hand.')
+        return kits, fillers, on_straight
+
+    def _plan_connectors(self, lines: list[BomLine], bom_heights: list[int]) -> tuple[list[tuple[str, str, int]], list[str]]:
         """Devon connectors from the joints measured on the 2D plan, plus cross-checks against the BOM."""
         plan = self.plan
         height = self.run_height or 53
         c = plan.counts
+        warnings = []
+        kits, fillers, on_straight = self._height_changes(bom_heights, warnings)
+        # A change-of-height kit includes the panel-to-panel connector for its joint.
+        joint_qty = Counter(c)
+        joint_qty["straight"] -= on_straight
         parts = [
-            (kind, connector(devon_kind, height), c[kind])
+            (kind, connector(devon_kind, height), joint_qty[kind])
             for kind, devon_kind in (("straight", "inline"), ("l", "2way"), ("tee", "3way"),
                                      ("cross", "4way"), ("ends", "finished_end"))
-            if c[kind]
+            if joint_qty[kind] > 0
         ]
-        warnings = []
-        if n_heights > 1:
+        parts += [("change_height", p, q) for p, q in kits.items()]
+        parts += [("filler", p, q) for p, q in fillers.items()]
+        if len(bom_heights) > 1 and not plan.height_changes:
             warnings.append(f'The BOM has panels at more than one height; plan connectors are all quoted at {height}"H. '
-                            "Add change-of-height kits (HMA224) where heights meet.")
+                            "Mark each height change on the CET plan with a red dot and a label like 47/53 "
+                            "to add the change-of-height kit (HMA224) and filler strip.")
         if c["angled"]:
             warnings.append(f"The 2D plan has {c['angled']} joint(s) at an angle other than 90 or 180 degrees. "
                             "Devon has no angled connector; check those runs.")

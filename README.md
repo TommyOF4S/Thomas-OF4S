@@ -19,7 +19,8 @@ drop the CET export, 2D plan image and notes, build, and download the filled Dev
 - **2D plan from CET as PDF**: the page reads every panel off the drawing and measures every
   joint. Two panels in a straight line (a break between two 180° panels) become a
   panel-to-panel connector (`HMP213`), 90° corners `HMA130`, three panels `HMA137`, four panels
-  `HMC132`, and free ends `HMA128` finished ends. These replace the AIS post counts. The plan is
+  `HMC132`, and free ends `HMA128` finished ends. Red dots marked on the plan become
+  change-of-height kits with the right high/low filler strip. These replace the AIS post counts. The plan is
   drawn beside the flags with a colored dot on every joint so you can check it, and the plan is
   cross-checked against the BOM (panel count, widths, posts) to catch mismatched revisions.
 - **Fix mapping** on any flagged part saves a correction that's shared with the team and used
@@ -84,8 +85,20 @@ Give the CET 2D exported as **PDF** (`--drawing plan.pdf`, or drop it on either 
 standard panel widths at that drawing's scale, detected per page), groups panel ends that meet
 into joints, and classifies each joint by how many panels meet and at what angle. Connectors
 then come from the plan instead of the AIS post counts. Runs that end at a wall are counted as
-finished ends, so swap those to wall starts (`HMA199`). Change-of-height kits aren't visible in a
-2D and are flagged when the BOM has more than one panel height.
+finished ends, so swap those to wall starts (`HMA199`).
+
+**Marking height changes.** A 2D can't show panel heights, so mark them in CET before exporting:
+
+> **Red dot on a joint = change of height.** Put a red-filled dot on the joint and a label next
+> to it with the two heights, e.g. `47/53` (also `47-53`, `47 to 53`; AIS heights like `42/50`
+> work too and round up to Devon heights).
+
+Each red dot is quoted as a change-of-height connector kit at the taller height (`HMA224.48` for
+53") plus the high/low filler strip for that pair (`HMHL4753`), replacing the joint's
+panel-to-panel connector. Devon makes filler strips for 39/47, 39/53, 39/67, 47/53, 47/67 and
+53/67. Any other pair, a dot off a joint, a dot without a label, or a dot on a corner or 3/4-way
+joint is flagged. If the BOM has more than one panel height and the plan has no red dots, the
+review says so.
 
 ### How AIS parts become Devon parts
 

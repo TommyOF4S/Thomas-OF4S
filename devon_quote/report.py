@@ -101,16 +101,15 @@ def write_report(
         w("Nothing flagged.\n")
 
     if result.plan is not None:
-        c = result.plan.counts
         w("## Connectors from the 2D plan\n")
         w(f"Read {result.plan.panels} panels off the plan and measured every joint. These replace the AIS post counts.\n")
-        w("| Joint on the plan | Count | Devon part |\n|---|---:|---|")
+        w("| Joint on the plan | Qty | Devon part |\n|---|---:|---|")
         labels = {"straight": "Two panels in a straight line (180°)", "l": "Corner, two panels at 90°",
-                  "tee": "Three panels", "cross": "Four panels", "ends": "Free end of a run"}
-        parts = {kind: part for kind, part, _ in result.plan_parts}
-        for kind in ("straight", "l", "tee", "cross", "ends"):
-            if c[kind]:
-                w(f"| {labels[kind]} | {c[kind]} | {parts.get(kind, '')} |")
+                  "tee": "Three panels", "cross": "Four panels", "ends": "Free end of a run",
+                  "change_height": "Height change (red dot): connector kit",
+                  "filler": "Height change (red dot): high/low filler strip"}
+        for kind, part, qty in result.plan_parts:
+            w(f"| {labels[kind]} | {qty} | {part} |")
         w("")
         w("Free ends are quoted as finished ends. Swap any that stop at a wall to a wall start (HMA199).\n")
 

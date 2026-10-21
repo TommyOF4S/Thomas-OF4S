@@ -34,7 +34,7 @@ const E = require(path.join(__dirname, "..", "devon_quote", "web", "engine.js"))
     quantities: result.quantities,
     mappings: result.mappings.map((m) => [m.source.part, m.status, m.note, m.targets]),
     warnings: result.warnings,
-    plan: plan && { counts: plan.counts, widths: plan.widths, panels: plan.panels },
+    plan: plan && { counts: plan.counts, widths: plan.widths, panels: plan.panels, heightChanges: plan.heightChanges },
     total: est.total,
     product: est.product,
     crosswalk: E.crosswalkCsv(result),

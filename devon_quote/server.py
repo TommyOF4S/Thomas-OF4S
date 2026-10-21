@@ -143,6 +143,7 @@ def _build(body: dict) -> dict:
         "plan": None if res.plan is None else {
             "panels": res.plan.panels,
             "counts": {k: res.plan.counts[k] for k in ("straight", "l", "tee", "cross", "ends", "angled", "other")},
+            "height_changes": len(res.plan.height_changes),
             "parts": [{"kind": k, "part": p, "qty": q} for k, p, q in res.plan_parts],
         },
         "unmapped": [row(m) for m in res.unmapped],

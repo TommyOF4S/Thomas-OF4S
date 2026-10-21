@@ -477,13 +477,46 @@
       return added;
     }
 
-    function planConnectors(lines, nHeights) {
+    const JOINT_WORDS = { l: "corner", tee: "3-way joint", cross: "4-way joint", ends: "free end", angled: "angled joint", other: "joint of 5+ panels" };
+
+    function heightChanges(bomHeights, warnings) {
+      const kits = new Map(), fillers = new Map();
+      let onStraight = 0;
+      const inc = (m, k) => m.set(k, (m.get(k) || 0) + 1);
+      for (const ch of plan.heightChanges || []) {
+        const where = `the red dot on page ${ch.page}` + (ch.label ? ` labeled "${ch.label}"` : "");
+        const Where = where[0].toUpperCase() + where.slice(1);
+        if (!ch.joint) { warnings.push(`${Where} isn't on a panel joint, so it was not quoted. Put the dot right on the joint.`); continue; }
+        let lo, hi;
+        if (ch.heights) [lo, hi] = ch.heights.map((h) => devonHeight(h)[0]).sort((a, b) => a - b);
+        else if (bomHeights.length === 2) {
+          [lo, hi] = [...bomHeights].sort((a, b) => a - b);
+          warnings.push(`${Where} has no height label; used the BOM's two heights, ${lo}" and ${hi}". Add a label like ${lo}/${hi}.`);
+        } else { warnings.push(`${Where} has no height label like 47/53, so it was not quoted.`); continue; }
+        if (lo === hi) { warnings.push(`${Where}: both heights are ${lo}"H on Devon, so no change-of-height parts are needed.`); continue; }
+        if (ch.joint === "straight") onStraight++;
+        else warnings.push(`${Where} sits on a ${JOINT_WORDS[ch.joint] || "joint"}; Devon's change-of-height kit is for straight runs. The kit and filler strip are quoted there; check it.`);
+        inc(kits, connector("change_height", hi));
+        const filler = `HMHL${lo}${hi}`;
+        if (has(filler)) inc(fillers, filler);
+        else warnings.push(`Devon has no filler strip for ${lo}" to ${hi}" (${where}); add one by hand.`);
+      }
+      return [kits, fillers, onStraight];
+    }
+
+    function planConnectors(lines, bomHeights) {
       const height = runHeight || 53;
       const c = plan.counts;
-      const parts = [["straight", "inline"], ["l", "2way"], ["tee", "3way"], ["cross", "4way"], ["ends", "finished_end"]]
-        .filter(([kind]) => c[kind]).map(([kind, dk]) => [kind, connector(dk, height), c[kind]]);
       const warnings = [];
-      if (nHeights > 1) warnings.push(`The BOM has panels at more than one height; plan connectors are all quoted at ${height}"H. Add change-of-height kits (HMA224) where heights meet.`);
+      const [kits, fillers, onStraight] = heightChanges(bomHeights, warnings);
+      const jq = { ...c, straight: c.straight - onStraight }; // a change-of-height kit includes the joint's connector
+      const parts = [["straight", "inline"], ["l", "2way"], ["tee", "3way"], ["cross", "4way"], ["ends", "finished_end"]]
+        .filter(([kind]) => jq[kind] > 0).map(([kind, dk]) => [kind, connector(dk, height), jq[kind]]);
+      for (const [p, q] of kits) parts.push(["change_height", p, q]);
+      for (const [p, q] of fillers) parts.push(["filler", p, q]);
+      if (bomHeights.length > 1 && !(plan.heightChanges || []).length) {
+        warnings.push(`The BOM has panels at more than one height; plan connectors are all quoted at ${height}"H. Mark each height change on the CET plan with a red dot and a label like 47/53 to add the change-of-height kit (HMA224) and filler strip.`);
+      }
       if (c.angled) warnings.push(`The 2D plan has ${c.angled} joint(s) at an angle other than 90 or 180 degrees. Devon has no angled connector; check those runs.`);
       if (c.other) warnings.push(`The 2D plan has ${c.other} joint(s) where more than four panels meet. Check those by hand.`);
       const bom = { panels: 0, pf2: 0, pf3: 0, pf4: 0, seor: 0 };
@@ -546,7 +579,7 @@
       const warnings = [];
       let planParts = [];
       if (plan) {
-        const [parts, planWarnings] = planConnectors(lines, heights.size);
+        const [parts, planWarnings] = planConnectors(lines, [...heights.keys()]);
         planParts = parts;
         warnings.push(...planWarnings);
         for (const [, part, qty] of parts) {
@@ -578,6 +611,35 @@
   const STD_WIDTHS = [12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72];
   const PANEL_INCHES = 2.0, POST_GAP = 1.4, WIDTH_TOLERANCE = 1.5, JOIN_FACTOR = 2.0;
   const PLAN_KINDS = ["straight", "l", "tee", "cross", "ends", "angled", "other"];
+  const MARK_JOINT_FACTOR = 6.0, MARK_LABEL_FACTOR = 60.0, MARK_MAX_FACTOR = 20.0;
+  const HEIGHT_PAIR = /(\d{2})\s*(?:"|in\.?|''|”)?\s*(?:\/|-|–|to|>|→|x)\s*(\d{2})/i;
+  const isRed = (f) => !!f && f[0] > 0.6 && f[1] < 0.4 && f[2] < 0.4;
+
+  /** Red dots the designer put on joints where the panel height changes, with their labels. */
+  function heightMarks(shapes, words, joints, t, page) {
+    const labels = [];
+    for (const w of words) {
+      const m = w.text.match(HEIGHT_PAIR);
+      if (m) labels.push([w, [+m[1], +m[2]]]);
+    }
+    const nearest = (list, x, y, pos) => {
+      let best = null, bd = Infinity;
+      for (const it of list) { const [px, py] = pos(it); const d = Math.hypot(px - x, py - y); if (d < bd) { bd = d; best = it; } }
+      return [best, bd];
+    };
+    const out = [];
+    for (const s of shapes) {
+      const w = s.x1 - s.x0, h = s.y1 - s.y0;
+      if (!isRed(s.fill) || Math.max(w, h) > MARK_MAX_FACTOR * t || Math.min(w, h) <= 0 || w / h < 0.5 || w / h > 2) continue;
+      const x = (s.x0 + s.x1) / 2, y = (s.y0 + s.y1) / 2;
+      const [near, nd] = nearest(joints, x, y, (j) => [j.x, j.y]);
+      const joint = near && nd <= MARK_JOINT_FACTOR * t ? near.kind : null;
+      let [lab, ld] = nearest(labels, x, y, (l) => [l[0].x, l[0].y]);
+      if (lab && ld > MARK_LABEL_FACTOR * t) lab = null;
+      out.push({ x, y, page, joint, heights: lab ? lab[1] : null, label: lab ? lab[0].text : "" });
+    }
+    return out;
+  }
   const r2 = (v) => Math.round(v * 100) / 100;
 
   function nominalWidth(length, t) {
@@ -645,9 +707,9 @@
     return out;
   }
 
-  /** pages: [[{x0, y0, x1, y1, fill: [r, g, b] | null}]] (0-1 colors) */
-  function analyzeRects(pages) {
-    const res = { counts: Object.fromEntries(PLAN_KINDS.map((k) => [k, 0])), widths: {}, joints: [], pages: [], panels: 0 };
+  /** pages: [[{x0, y0, x1, y1, fill: [r, g, b] | null}]] (0-1 colors); extras: [[shapes, words]] per page */
+  function analyzeRects(pages, extras = null) {
+    const res = { counts: Object.fromEntries(PLAN_KINDS.map((k) => [k, 0])), widths: {}, joints: [], pages: [], panels: 0, heightChanges: [] };
     pages.forEach((rects, p) => {
       const [panels, t] = findPanels(rects);
       res.pages.push({ page: p + 1, panels: panels.length, thickness: t });
@@ -660,6 +722,7 @@
       const js = jointsOnPage(panels, t, p + 1);
       res.joints.push(...js);
       js.forEach((j) => res.counts[j.kind]++);
+      if (extras) res.heightChanges.push(...heightMarks(extras[p][0], extras[p][1], js, t, p + 1));
     });
     return res;
   }
@@ -668,12 +731,12 @@
   async function pdfRects(pdfjsLib, bytes, { maxPages = 20 } = {}) {
     const OPS = pdfjsLib.OPS;
     const doc = await pdfjsLib.getDocument({ data: bytes, disableFontFace: true, isEvalSupported: false }).promise;
-    const pages = [];
+    const pages = [], extras = [];
     const views = [];
     for (let n = 1; n <= Math.min(doc.numPages, maxPages); n++) {
       const page = await doc.getPage(n);
       const ops = await page.getOperatorList();
-      const rects = [];
+      const rects = [], shapes = [];
       let ctm = [1, 0, 0, 1, 0, 0], fill = [0, 0, 0];
       const stack = [];
       let pending = [];
@@ -701,35 +764,56 @@
         else if (fn === OPS.constructPath) {
           const [sub, coords] = args;
           let k = 0, cur = null;
+          const push = () => { if (cur) pending.push(cur); cur = null; };
           for (const op of sub) {
-            if (op === OPS.moveTo) { if (cur) pending.push(cur); cur = [tp(coords[k], coords[k + 1])]; k += 2; }
+            if (op === OPS.moveTo) { push(); cur = [tp(coords[k], coords[k + 1])]; k += 2; }
             else if (op === OPS.lineTo) { (cur ||= []).push(tp(coords[k], coords[k + 1])); k += 2; }
-            else if (op === OPS.curveTo) { k += 6; cur = null; }
-            else if (op === OPS.curveTo2 || op === OPS.curveTo3) { k += 4; cur = null; }
-            else if (op === OPS.closePath) { if (cur) { pending.push(cur); cur = null; } }
+            else if (op === OPS.curveTo) {
+              (cur ||= []).curved = true;
+              for (let q = 0; q < 6; q += 2) cur.push(tp(coords[k + q], coords[k + q + 1]));
+              k += 6;
+            } else if (op === OPS.curveTo2 || op === OPS.curveTo3) {
+              (cur ||= []).curved = true;
+              for (let q = 0; q < 4; q += 2) cur.push(tp(coords[k + q], coords[k + q + 1]));
+              k += 4;
+            } else if (op === OPS.closePath) push();
             else if (op === OPS.rectangle) {
               const [x, y, w, h] = coords.slice(k, k + 4); k += 4;
-              if (cur) { pending.push(cur); cur = null; }
+              push();
               pending.push([tp(x, y), tp(x + w, y), tp(x + w, y + h), tp(x, y + h)]);
             }
           }
-          if (cur) pending.push(cur);
+          push();
         } else if ([OPS.fill, OPS.eoFill, OPS.fillStroke, OPS.eoFillStroke, OPS.closeFillStroke, OPS.closeEOFillStroke,
           OPS.stroke, OPS.closeStroke, OPS.endPath].includes(fn)) {
           const filled = [OPS.fill, OPS.eoFill, OPS.fillStroke, OPS.eoFillStroke, OPS.closeFillStroke, OPS.closeEOFillStroke].includes(fn);
-          if (fn !== OPS.endPath) for (const pts of pending) { const r = toRect(pts); if (r) rects.push({ ...r, fill: filled ? fill.slice() : null }); }
+          if (fn !== OPS.endPath) {
+            for (const pts of pending) {
+              const r = pts.curved ? null : toRect(pts);
+              if (r) rects.push({ ...r, fill: filled ? fill.slice() : null });
+              if (filled && pts.length) {
+                const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+                shapes.push({ x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys), fill: fill.slice() });
+              }
+            }
+          }
           pending = [];
         }
       }
+      const text = await page.getTextContent();
+      const words = text.items.filter((it) => it.str && it.str.trim()).map((it) => ({
+        text: it.str, x: it.transform[4] + (it.width || 0) / 2, y: it.transform[5] + (it.height || Math.abs(it.transform[3]) || 0) / 2,
+      }));
       pages.push(rects);
+      extras.push([shapes, words]);
       views.push(page);
     }
-    return { pages, pdfPages: views };
+    return { pages, extras, pdfPages: views };
   }
 
   async function analyzePdf(pdfjsLib, bytes) {
-    const { pages, pdfPages } = await pdfRects(pdfjsLib, bytes);
-    return { result: analyzeRects(pages), pdfPages };
+    const { pages, extras, pdfPages } = await pdfRects(pdfjsLib, bytes);
+    return { result: analyzeRects(pages, extras), pdfPages };
   }
 
   // ---------------------------------------------------------------- pricing
@@ -914,13 +998,12 @@
     }
     if (!unmapped.length && !review.length && !result.warnings.length) w("Nothing flagged.\n");
     if (result.plan) {
-      const c = result.plan.counts;
       w("## Connectors from the 2D plan\n");
       w(`Read ${result.plan.panels} panels off the plan and measured every joint. These replace the AIS post counts.\n`);
-      w("| Joint on the plan | Count | Devon part |\n|---|---:|---|");
-      const labels = { straight: "Two panels in a straight line (180°)", l: "Corner, two panels at 90°", tee: "Three panels", cross: "Four panels", ends: "Free end of a run" };
-      const parts = Object.fromEntries(result.planParts.map(([k, p]) => [k, p]));
-      for (const k of ["straight", "l", "tee", "cross", "ends"]) if (c[k]) w(`| ${labels[k]} | ${c[k]} | ${parts[k] || ""} |`);
+      w("| Joint on the plan | Qty | Devon part |\n|---|---:|---|");
+      const labels = { straight: "Two panels in a straight line (180°)", l: "Corner, two panels at 90°", tee: "Three panels", cross: "Four panels", ends: "Free end of a run",
+        change_height: "Height change (red dot): connector kit", filler: "Height change (red dot): high/low filler strip" };
+      for (const [k, p, q] of result.planParts) w(`| ${labels[k]} | ${q} | ${p} |`);
       w("");
       w("Free ends are quoted as finished ends. Swap any that stop at a wall to a wall start (HMA199).\n");
     }

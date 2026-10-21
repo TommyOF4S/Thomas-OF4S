@@ -8,6 +8,8 @@ Page 1 (0.285 pt per inch):
        (60,24), (60,-24), (120,24)
   separate run y=100: 0-24, 24-48, 48-72 -> 2 straight joints, 2 free ends
   plus decoys: worksurfaces, pedestal outlines, a thick gray box, text
+  height-change marks (red dot + label): "47/53" on the straight joint at (162,0),
+  "39-53" on the straight joint at (48,100)
 Page 2 (0.335 pt per inch): one L of two 24" panels -> 1 L, 2 free ends
 
 Totals across both pages are in EXPECTED.
@@ -16,7 +18,9 @@ Totals across both pages are in EXPECTED.
 from pathlib import Path
 
 EXPECTED = {"straight": 3, "l": 2, "tee": 1, "cross": 1, "ends": 9, "panels": 13,
-            "widths": {24: 10, 42: 1, 60: 2}}
+            "widths": {24: 10, 42: 1, 60: 2},
+            "height_changes": [("straight", (47, 53), "47/53"), ("straight", (39, 53), "39-53")]}
+MARKS = [(162, 0, "47/53"), (48, 100, "39-53")]  # joint (inches on page 1) and its label
 
 GAP = 0.7  # half the post width, inches
 
@@ -34,6 +38,23 @@ def path(x, y, w, h, fill, paint="B"):
     pts = f"{s(x)} {s(y)} m {s(x + w)} {s(y)} l {s(x + w)} {s(y + h)} l {s(x)} {s(y + h)} l h"
     color = f"{fill[0]} {fill[1]} {fill[2]} rg " if fill else ""
     return f"{color}{pts} {paint}\n"
+
+
+def dot(cx, cy, r):
+    """A filled red circle (four Bezier arcs), as CET draws a 2D circle."""
+    s = lambda v: f"{v * 10:.2f}"
+    c = 0.5523 * r
+    return (f"1 0 0 rg {s(cx + r)} {s(cy)} m "
+            f"{s(cx + r)} {s(cy + c)} {s(cx + c)} {s(cy + r)} {s(cx)} {s(cy + r)} c "
+            f"{s(cx - c)} {s(cy + r)} {s(cx - r)} {s(cy + c)} {s(cx - r)} {s(cy)} c "
+            f"{s(cx - r)} {s(cy - c)} {s(cx - c)} {s(cy - r)} {s(cx)} {s(cy - r)} c "
+            f"{s(cx + c)} {s(cy - r)} {s(cx + r)} {s(cy - c)} {s(cx + r)} {s(cy)} c h f\n")
+
+
+def labels(k=0.285, ox=100, oy=150):
+    """Mark labels as page text (outside the flipped transform: y measured from the bottom)."""
+    return "".join(f"BT /F1 3 Tf {ox + (jx + 4) * k:.2f} {612 - (oy + (jy - 4) * k):.2f} Td ({text}) Tj ET\n"
+                   for jx, jy, text in MARKS)
 
 
 def page1(k=0.285, ox=100, oy=150):
@@ -54,6 +75,8 @@ def page1(k=0.285, ox=100, oy=150):
     for i in range(4):
         out.append(path(ox + (10 + 15 * i) * k, oy + 40 * k, 1.25 * k, 24 * k, None, "S"))
     out.append(path(ox + 200 * k, oy + 10 * k, 30 * k, 7 * k, (0.784, 0.784, 0.784)))
+    for jx, jy, _ in MARKS:
+        out.append(dot(ox + jx * k, oy + jy * k, 3 * k))
     return "".join(out)
 
 
@@ -66,13 +89,13 @@ def page2(k=0.335, ox=120, oy=200):
     return "".join(out)
 
 
-def content(body, label):
+def content(body, label, extra=""):
     return (f"q 1 0 0 -1 0 612 cm 0.1 0 0 0.1 0 0 cm 0 0 0 RG 5 w\n{body}Q\n"
-            f"BT /F1 9 Tf 40 580 Td ({label}) Tj ET\n")
+            f"BT /F1 9 Tf 40 580 Td ({label}) Tj ET\n{extra}")
 
 
 def build(path_out: Path):
-    pages = [content(page1(), "Sample plan page 1"), content(page2(), "Sample plan page 2")]
+    pages = [content(page1(), "Sample plan page 1", labels()), content(page2(), "Sample plan page 2")]
     objs = ["<< /Type /Catalog /Pages 2 0 R >>", None,
             "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
     kids = []

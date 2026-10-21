@@ -122,6 +122,7 @@ label.f input, label.f select, .fixform input { width: 100%; border: 1px solid v
 .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
 .planread { margin-top: 4px; font-size: 13px; color: var(--fg-2); }
 .planread b { color: var(--fg); font-weight: 600; }
+.reddot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #d50000; margin-right: 6px; vertical-align: 0; }
 .tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .tabs button { border: 1px solid var(--line-2); background: var(--surface); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tabs button.on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
@@ -215,6 +216,7 @@ footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
         </div>
         <input id="planInput" type="file" accept=".pdf,image/*" multiple hidden>
         <div id="planList"></div>
+        <p class="hint"><span class="reddot" aria-hidden="true"></span><b>Height changes:</b> in CET, put a red dot on each joint where the panel height changes and a label beside it with the two heights, like <span class="kbd">47/53</span>. Each red dot is quoted as a change-of-height connector kit (HMA224) plus the matching high/low filler strip (HMHL4753), in place of that joint's panel-to-panel connector.</p>
       </div>
 
       <div class="card">
@@ -486,7 +488,7 @@ const JOINT_STYLE = {
   straight: { color: "#2e7d32", label: "Straight, panel-to-panel" },
   l: { color: "#e65100", label: "Corner" },
   tee: { color: "#6a1b9a", label: "3-way" },
-  cross: { color: "#c62828", label: "4-way" },
+  cross: { color: "#1565c0", label: "4-way" },
   ends: { color: "#546e7a", label: "Free end" },
   angled: { color: "#000000", label: "Check: odd angle" },
   other: { color: "#000000", label: "Check: 5+ panels" },
@@ -494,7 +496,9 @@ const JOINT_STYLE = {
 
 function planSummaryText(r) {
   const c = r.counts;
+  const hc = (r.heightChanges || []).length;
   return `<b>${r.panels} panels read:</b> ${c.straight} straight · ${c.l} corners · ${c.tee} three-way · ${c.cross} four-way · ${c.ends} free ends` +
+    (hc ? ` · <b>${hc} height change${hc === 1 ? "" : "s"} (red dots)</b>` : "") +
     (c.angled + c.other ? ` · <b>${c.angled + c.other} to check</b>` : "");
 }
 
@@ -516,9 +520,10 @@ async function readPlan(p) {
 function combinedPlan() {
   const read = state.plans.filter((p) => p.status === "done");
   if (!read.length) return null;
-  const out = { counts: {}, widths: {}, joints: [], pages: [], panels: 0 };
+  const out = { counts: {}, widths: {}, joints: [], pages: [], panels: 0, heightChanges: [] };
   for (const p of read) {
     const r = p.analysis;
+    out.heightChanges.push(...(r.heightChanges || []));
     for (const [k, v] of Object.entries(r.counts)) out.counts[k] = (out.counts[k] || 0) + v;
     for (const [k, v] of Object.entries(r.widths)) out.widths[k] = (out.widths[k] || 0) + v;
     out.panels += r.panels;
@@ -783,7 +788,8 @@ function planViews() {
     else if (p.status === "done") {
       p.analysis.pages.forEach((pg, i) => {
         if (pg.panels) views.push({ kind: "pdf", name: p.pdfPages.length > 1 ? `${p.file.name} · p${pg.page}` : p.file.name,
-          page: p.pdfPages[i], joints: p.analysis.joints.filter((j) => j.page === pg.page) });
+          page: p.pdfPages[i], joints: p.analysis.joints.filter((j) => j.page === pg.page),
+          marks: (p.analysis.heightChanges || []).filter((m) => m.page === pg.page) });
       });
     }
   }
@@ -793,10 +799,20 @@ function planViews() {
 let renderToken = 0;
 async function drawPdfView(v) {
   const token = ++renderToken;
+  // Crop to the part of the page that holds panels, with a margin.
   const base = v.page.getViewport({ scale: 1 });
-  const viewport = v.page.getViewport({ scale: Math.min(4, 2400 / base.width) });
+  const pts = [...v.joints, ...v.marks].map((j) => base.convertToViewportPoint(j.x, j.y));
+  let [x0, y0, x1, y1] = [0, 0, base.width, base.height];
+  if (pts.length) {
+    x0 = Math.min(...pts.map((p) => p[0])); x1 = Math.max(...pts.map((p) => p[0]));
+    y0 = Math.min(...pts.map((p) => p[1])); y1 = Math.max(...pts.map((p) => p[1]));
+    const m = Math.max(24, 0.08 * Math.max(x1 - x0, y1 - y0));
+    x0 = Math.max(0, x0 - m); y0 = Math.max(0, y0 - m); x1 = Math.min(base.width, x1 + m); y1 = Math.min(base.height, y1 + m);
+  }
+  const scale = Math.min(8, 2400 / Math.max(1, x1 - x0));
+  const viewport = v.page.getViewport({ scale, offsetX: -x0 * scale, offsetY: -y0 * scale });
   const canvas = document.createElement("canvas");
-  canvas.width = Math.round(viewport.width); canvas.height = Math.round(viewport.height);
+  canvas.width = Math.round((x1 - x0) * scale); canvas.height = Math.round((y1 - y0) * scale);
   const box = document.createElement("div");
   box.className = "canvasbox"; box.title = "Click to zoom";
   box.appendChild(canvas);
@@ -804,7 +820,8 @@ async function drawPdfView(v) {
   const counts = {};
   v.joints.forEach((j) => (counts[j.kind] = (counts[j.kind] || 0) + 1));
   const legend = Object.entries(JOINT_STYLE).filter(([k]) => counts[k])
-    .map(([k, st]) => `<span><i style="background:${st.color}"></i>${st.label} ${counts[k]}</span>`).join("");
+    .map(([k, st]) => `<span><i style="background:${st.color}"></i>${st.label} ${counts[k]}</span>`).join("") +
+    (v.marks.length ? `<span><i style="background:transparent;border:2px solid #d50000"></i>Height change ${v.marks.length}</span>` : "");
   $("planFrame").innerHTML = "";
   $("planFrame").appendChild(box);
   $("planFrame").insertAdjacentHTML("beforeend", `<div class="legend">${legend}<span class="meta">Click the plan to zoom.</span></div>`);
@@ -820,6 +837,16 @@ async function drawPdfView(v) {
     ctx.arc(x, y, r, 0, Math.PI * 2);
     if (j.kind === "ends") { ctx.strokeStyle = st.color; ctx.stroke(); }
     else { ctx.globalAlpha = 0.8; ctx.fillStyle = st.color; ctx.fill(); ctx.globalAlpha = 1; }
+  }
+  // Height-change marks: a red ring with the heights read from the label
+  ctx.font = `600 ${Math.round(r * 2.2)}px Geist, system-ui, sans-serif`;
+  for (const m of v.marks) {
+    const [x, y] = viewport.convertToViewportPoint(m.x, m.y);
+    ctx.beginPath(); ctx.arc(x, y, r * 2.4, 0, Math.PI * 2);
+    ctx.lineWidth = Math.max(2, r / 1.6); ctx.strokeStyle = "#d50000"; ctx.stroke();
+    const text = m.heights ? `${m.heights[0]}→${m.heights[1]}` : "no label";
+    ctx.lineWidth = Math.max(3, r / 1.2); ctx.strokeStyle = "#ffffff"; ctx.strokeText(text, x + r * 3, y - r * 2);
+    ctx.fillStyle = "#d50000"; ctx.fillText(text, x + r * 3, y - r * 2);
   }
 }
 

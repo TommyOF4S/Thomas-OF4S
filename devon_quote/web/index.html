@@ -476,7 +476,7 @@ function showResults(r) {
     : '<span class="ok">Every AIS part mapped cleanly.</span>';
   if (r.plan) {
     const c = r.plan.counts;
-    items.unshift(`<div class="item" style="border-left-color:var(--navy-500)"><div class="note"><b>Read from the 2D plan:</b> ${r.plan.panels} panels, ${c.straight} straight joints, ${c.l} corners, ${c.tee} three-way, ${c.cross} four-way, ${c.ends} free ends. Connectors are quoted from these counts: ${esc(r.plan.parts.map((x) => x.part + " × " + x.qty).join(", "))}.</div></div>`);
+    items.unshift(`<div class="item" style="border-left-color:var(--navy-500)"><div class="note"><b>Read from the 2D plan:</b> ${r.plan.panels} panels, ${c.straight} straight joints, ${c.l} corners, ${c.tee} three-way, ${c.cross} four-way, ${c.ends} free ends${r.plan.height_changes ? `, ${r.plan.height_changes} height changes (red dots)` : ""}. Connectors are quoted from these counts: ${esc(r.plan.parts.map((x) => x.part + " × " + x.qty).join(", "))}.</div></div>`);
   }
   $("attnItems").innerHTML = items.join("");
 
