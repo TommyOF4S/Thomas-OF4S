@@ -153,3 +153,28 @@ def test_label_cases(case):
                                         capture_output=True, text=True, check=True).stdout)
         assert out["warnings"] == res.warnings
         assert out["quantities"] == res.quantities
+
+
+SAVED = [("P-DLPF266", "HMA130.67"), ("P-DLSEOR", "HMA128.67")]  # corrections saved on the hosted page for quotes without a 2D
+
+
+@needs_template
+def test_saved_corrections_dont_double_the_plan_connectors(tmp_path):
+    from devon_quote.mapper import Override
+
+    cat = load_catalog(TEMPLATE)
+    res = Mapper(cat, [Override(a, d, 1.0, "") for a, d in SAVED]).map(load_bom(BOM), analyze_pdf(PLAN))
+    assert res.quantities["HMA130.67"] == 4  # 4 corners on the plan, 4 AIS 2-way corner posts: 4, not 8
+    assert res.quantities["HMA128.67"] == 3
+    post = [m for m in res.mappings if m.source.part == "P-DLPF266"][0]
+    assert post.targets == [] and "saved correction to HMA130.67 is used only without a 2D" in post.note
+    # without a plan the corrections still apply
+    assert Mapper(cat, [Override(a, d, 1.0, "") for a, d in SAVED]).map(load_bom(BOM)).quantities["HMA130.67"] == 6
+
+    if _node_has("pdfjs-dist/legacy/build/pdf.js") and _node_has("jszip"):
+        overrides = [{"ais_part": a, "devon_part": d, "ratio": 1, "note": ""} for a, d in SAVED]
+        js = json.loads(subprocess.run(
+            ["node", str(ROOT / "tests" / "engine_harness.js"), str(TEMPLATE), str(BOM), str(tmp_path / "q.xlsx"),
+             json.dumps({"plan": str(PLAN), "overrides": overrides})], capture_output=True, text=True, check=True).stdout)
+        assert js["quantities"] == res.quantities
+        assert [m[2] for m in js["mappings"]] == [m.note for m in res.mappings]

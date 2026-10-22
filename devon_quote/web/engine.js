@@ -324,6 +324,20 @@
     const has = (p) => catalog.has(p);
 
     const rules = [
+      // Posts and end-of-run shrouds the 2D counts. Runs before saved corrections, so a correction made for a
+      // quote without a 2D doesn't add the same connectors a second time.
+      function drawing(line) {
+        const pn = line.part.toUpperCase();
+        const m = pn.match(POST);
+        const isEnd = pn === "P-DLSEOR" || line.description.toUpperCase().includes("END OF RUN");
+        let note;
+        if (plan && (m || isEnd)) note = "connectors and finished ends are counted from the 2D plan";
+        else if (marks && m && m[1] === "2" && marks.pink) note = "2-way posts are split into panel-to-panel connectors (pink dashes on the 2D) and 2-way corners";
+        else return null;
+        const saved = rules[1](line);
+        if (saved && saved.targets.length) note += `; the saved correction to ${saved.targets.map(([p]) => p).join(", ")} is used only without a 2D`;
+        return M(line, [], "ok", note, plan ? "plan" : "marks");
+      },
       function override(line) {
         const pn = line.part.toUpperCase();
         let hits = ovs.filter((o) => o.re.test(pn));
@@ -364,8 +378,6 @@
         const pn = line.part.toUpperCase();
         const m = pn.match(POST);
         const isEnd = pn === "P-DLSEOR" || line.description.toUpperCase().includes("END OF RUN");
-        if (plan && (m || isEnd)) return M(line, [], "ok", "connectors and finished ends are counted from the 2D plan", "plan");
-        if (!plan && marks && m && m[1] === "2" && marks.pink) return M(line, [], "ok", "2-way posts are split into panel-to-panel connectors (pink dashes on the 2D) and 2-way corners", "marks");
         if (m) {
           const ways = +m[1];
           const [height, hnote] = devonHeight(+m[2]);

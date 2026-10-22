@@ -201,15 +201,27 @@ class Mapper:
             return Mapping(line, [], "unmapped", f'no Devon {height}"H x {w}"W {"powered " if powered else ""}{"glass " if glass else ""}panel ({part})', "panel")
         return Mapping(line, [(part, 1)], "review" if notes else "ok", "; ".join(notes), "panel")
 
-    def _rule_post(self, line: BomLine) -> Mapping | None:
+    def _rule_drawing(self, line: BomLine) -> Mapping | None:
+        """Posts and end-of-run shrouds the 2D counts. Runs before saved corrections, so a correction made for a
+        quote without a 2D doesn't add the same connectors a second time."""
         pn = line.part.upper()
         m = _POST.match(pn)
         is_end = pn == "P-DLSEOR" or "END OF RUN" in line.description.upper()
         if self.plan is not None and (m or is_end):
-            return Mapping(line, [], "ok", "connectors and finished ends are counted from the 2D plan", "plan")
-        if self.marks is not None and m and m.group(1) == "2" and self.marks.pink:
-            return Mapping(line, [], "ok", "2-way posts are split into panel-to-panel connectors (pink dashes on the 2D) "
-                                            "and 2-way corners", "marks")
+            note = "connectors and finished ends are counted from the 2D plan"
+        elif self.marks is not None and m and m.group(1) == "2" and self.marks.pink:
+            note = "2-way posts are split into panel-to-panel connectors (pink dashes on the 2D) and 2-way corners"
+        else:
+            return None
+        saved = self._rule_override(line)
+        if saved is not None and saved.targets:
+            note += f"; the saved correction to {', '.join(p for p, _ in saved.targets)} is used only without a 2D"
+        return Mapping(line, [], "ok", note, "plan" if self.plan is not None else "marks")
+
+    def _rule_post(self, line: BomLine) -> Mapping | None:
+        pn = line.part.upper()
+        m = _POST.match(pn)
+        is_end = pn == "P-DLSEOR" or "END OF RUN" in line.description.upper()
         if m:
             ways, h = int(m.group(1)), int(m.group(2))
             height, hnote = devon_height(h)
@@ -330,7 +342,7 @@ class Mapper:
             return Mapping(line, [(f"TB{w}", 1)], "ok", "", "storage")
         return None
 
-    RULES = ("_rule_override", "_rule_panel", "_rule_post", "_rule_electrical", "_rule_worksurface", "_rule_support", "_rule_storage")
+    RULES = ("_rule_drawing", "_rule_override", "_rule_panel", "_rule_post", "_rule_electrical", "_rule_worksurface", "_rule_support", "_rule_storage")
 
     def map_line(self, line: BomLine) -> Mapping:
         for name in self.RULES:
