@@ -105,6 +105,7 @@ def test_plan_matching_bom_has_no_revision_warning():
              BomLine("P-DLSEOR", "Divi Linear Base - End of Run Shroud", 9)]
     res = Mapper(cat).map(lines, analyze_pdf(PLAN))
     assert res.warnings == []
+    assert res.quantities["HMC132.48"] == 1  # the SIF's 4-way post and the plan's 4-way joint are one connector
 
 
 @needs_template
