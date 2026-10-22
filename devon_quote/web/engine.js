@@ -1172,6 +1172,12 @@
   }
 
   // ---------------------------------------------------------------- pricing
+  // Delivery estimate from the order weight, fitted to 25 Devon quotes to OF4S (33010), Aug 2024 - Oct 2026:
+  // freight ~ $445 + $0.27/lb (R^2 0.96, typical miss about $110). Devon confirms the real figure.
+  const DELIVERY_BASE = 445, DELIVERY_PER_LB = 0.27;
+  const estimateDelivery = (weight) => (weight > 0 ? Math.floor((DELIVERY_BASE + DELIVERY_PER_LB * weight) / 5 + 0.5) * 5 : 0);
+
+  /** delivery null/undefined: estimated from the order weight. */
   function estimate(catalog, quantities, grade, delivery, stations) {
     const lines = Object.entries(quantities).map(([part, qty]) => {
       const item = catalog.items[part];
@@ -1181,10 +1187,13 @@
     lines.forEach((l) => { l.netExt = l.netEach * l.qty; l.listExt = l.listEach * l.qty; });
     const product = lines.reduce((s, l) => s + l.netExt, 0);
     const surcharge = product * catalog.surchargeRate;
-    const total = product + surcharge + (delivery || 0);
+    const weight = lines.reduce((s, l) => s + l.weight, 0);
+    const deliveryAuto = delivery === null || delivery === undefined;
+    if (deliveryAuto) delivery = estimateDelivery(weight);
+    const total = product + surcharge + delivery;
     return {
-      lines, listTotal: lines.reduce((s, l) => s + l.listExt, 0), product, surcharge, delivery: delivery || 0, total,
-      weight: lines.reduce((s, l) => s + l.weight, 0), stations: stations || null,
+      lines, listTotal: lines.reduce((s, l) => s + l.listExt, 0), product, surcharge, delivery, deliveryAuto, total,
+      weight, stations: stations || null,
       perStation: stations ? total / stations : null,
     };
   }
@@ -1330,7 +1339,7 @@
     w(`| List | ${money(est.listTotal)} |`);
     w(`| Product net | ${money(est.product)} |`);
     w(`| Surcharge (${Math.round(catalog.surchargeRate * 100)}%) | ${money(est.surcharge)} |`);
-    w(`| Delivery (estimate) | ${money(est.delivery)} |`);
+    w(est.deliveryAuto ? `| Delivery (estimated from ${Math.round(est.weight).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")} lbs: $445 + $0.27/lb; Devon confirms) | ${money(est.delivery)} |` : `| Delivery (estimate) | ${money(est.delivery)} |`);
     w(`| **Total** | **${money(est.total)}** |`);
     if (est.perStation) w(`| Per station (${est.stations}) | ${money(est.perStation)} |`);
     w(`| Weight (approx.) | ${est.weight.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} lbs |\n`);
@@ -1408,7 +1417,7 @@
 
   return {
     GRADES, buildCatalog, loadCalculator, listPrice, parseSif, parseCsv, parseTable, parseBom,
-    makeMapper, devonHeight, connector, DOT_COLORS, estimate, setCell, fillSheet, writeQuote,
+    makeMapper, devonHeight, estimateDelivery, connector, DOT_COLORS, estimate, setCell, fillSheet, writeQuote,
     finishes, crosswalkCsv, reportMd, safeStem, analyzeRects, pdfRects, analyzePdf, nominalWidth, imageMarks, summarizeMarks,
   };
 });

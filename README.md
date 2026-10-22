@@ -39,7 +39,7 @@ or run `python -m devon_quote serve`. A page opens in your browser:
 1. Drop the CET export (`.sif`, or a `.csv`/`.xlsx` with part numbers and quantities).
 2. Drop the 2D plan (PDF or image). It's shown next to the flagged items so you can check them.
 3. Type notes, or click **Dictate** and talk (Chrome/Edge).
-4. Fill in project, zip, grade, stations and delivery, then click **Build Devon quote**.
+4. Fill in project, zip, grade and stations (leave delivery blank to estimate it from the weight), then click **Build Devon quote**.
 
 You get the estimated Devon total, everything that needs a look, and downloads for the filled
 Devon calculator, the review report and the crosswalk. Copies are saved in `out/`. To swap in a
@@ -73,8 +73,14 @@ It writes three files to `out/`:
 
 - **BOM**: CET's SIF export (`.sif`) works best, because it carries finishes. A `.csv` or `.xlsx`
   with *Part Number* and *Qty* columns also works.
-- **Options**: `--grade keystone|summit|aspen`, `--trim`, `--delivery` (Devon's freight estimate,
-  default 0), `--stations` (for cost per station), `--description`.
+- **Options**: `--grade keystone|summit|aspen`, `--trim`, `--delivery` (Devon's freight; leave it
+  out to estimate it from the weight, below), `--stations` (for cost per station), `--description`.
+- **Delivery estimate**: with no delivery entered, the quote uses **$445 + $0.27 per pound** of the
+  order weight, rounded to $5, and writes it into the calculator's delivery cell. The rule is fitted
+  to the freight on 25 Devon quotes to OF4S (all shipping to 33010, Aug 2024 to Oct 2026): it explains
+  96% of the variation and is typically within about $110 (worst miss about 30%, mid-size orders,
+  where Devon's carrier quotes vary most). Devon confirms the real number; type a delivery amount
+  (including 0 for a pickup) to override it.
 - **2D plan / dictation**: `--drawing` and `--notes` are included in the review report so the
   checker has them next to the flagged items. They don't change quantities yet (see below).
 

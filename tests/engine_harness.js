@@ -18,8 +18,9 @@ const E = require(path.join(__dirname, "..", "devon_quote", "web", "engine.js"))
   }
   const result = E.makeMapper(catalog, opts.overrides || []).map(lines, plan, opts.marks || null);
   const grade = opts.grade || 0;
-  const est = E.estimate(catalog, result.quantities, grade, opts.delivery || 0, opts.stations || null);
-  const header = { project: opts.project || "", description: "WORKSTATIONS", date: "1.2.26", shipTo: "33010", grade, delivery: opts.delivery || 0, stations: opts.stations || null };
+  const delivery = "delivery" in opts ? opts.delivery : null; // no delivery given: estimated from the weight
+  const est = E.estimate(catalog, result.quantities, grade, delivery, opts.stations || null);
+  const header = { project: opts.project || "", description: "WORKSTATIONS", date: "1.2.26", shipTo: "33010", grade, delivery: est.delivery, stations: opts.stations || null };
   const bytes = await E.writeQuote(JSZip, fs.readFileSync(calcPath), catalog, result.quantities, header, outPath.endsWith(".xlsx") ? "xlsx" : "xlsm");
   fs.writeFileSync(outPath, bytes);
   const catalogDump = {};

@@ -101,7 +101,7 @@ def _build(body: dict) -> dict:
         ship_to=(body.get("ship_to") or "").strip(),
         grade=grade,
         trim=(body.get("trim") or "").strip() or None,
-        delivery=_num(body.get("delivery"), float) or 0.0,
+        delivery=_num(body.get("delivery"), float),  # blank: estimated from the weight
         stations=_num(body.get("stations"), int),
         notes=body.get("notes") or "",
         drawings=[Path(d).name for d in body.get("drawings") or []],
@@ -135,6 +135,7 @@ def _build(body: dict) -> dict:
             "surcharge": est.surcharge,
             "surcharge_rate": out.catalog.surcharge_rate,
             "delivery": est.delivery,
+            "delivery_auto": est.delivery_auto,
             "total": est.total,
             "per_station": est.per_station,
             "stations": est.stations,

@@ -164,3 +164,24 @@ def test_writer_fills_calculator(tmp_path, catalog):
 
     est = estimate(catalog, res.quantities, 1, 1000, 10)
     assert est.total == pytest.approx(est.product_net * 1.09 + 1000)
+
+
+def test_delivery_estimate_from_weight():
+    from devon_quote.pricing import estimate_delivery
+
+    # $445 + $0.27/lb, rounded to $5: fitted to Devon's freight on 25 quotes to OF4S
+    assert estimate_delivery(0) == 0
+    assert estimate_delivery(313.5) == 530  # Devon quoted $426.85
+    assert estimate_delivery(2238.24) == 1050  # Devon quoted $823.17
+    assert estimate_delivery(14823.645) == 4445  # Devon quoted $4,500
+
+
+def test_blank_delivery_is_estimated(catalog):
+    from devon_quote.pricing import estimate, estimate_delivery
+
+    q = {"HMA130.53": 4}
+    auto = estimate(catalog, q, 0, None, None)
+    assert auto.delivery_auto and auto.delivery == estimate_delivery(auto.weight)
+    assert auto.total == pytest.approx(auto.product_net + auto.surcharge + auto.delivery)
+    typed = estimate(catalog, q, 0, 0, None)
+    assert not typed.delivery_auto and typed.delivery == 0  # an explicit $0 (pickup) stays $0

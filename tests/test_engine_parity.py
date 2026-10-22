@@ -1,3 +1,4 @@
+import zipfile
 """The hosted page runs a JavaScript port of the engine. This checks that it produces
 exactly the same quote as the Python package (needs Node and the jszip npm package;
 set NODE_PATH to where jszip is installed)."""
@@ -107,3 +108,22 @@ def test_xlsx_output_is_clean(tmp_path):
     z = zipfile.ZipFile(out)
     assert "xl/vbaProject.bin" not in z.namelist()
     assert b"macroEnabled" not in z.read("[Content_Types].xml")
+
+
+def test_delivery_estimated_from_weight_matches_python(tmp_path):
+    js, out = run_js(tmp_path, SAMPLE, stations=30, project="Auto")  # no delivery: estimated
+    cat = load_catalog(TEMPLATE)
+    lines = load_bom(SAMPLE)
+    res = Mapper(cat).map(lines)
+    est = estimate(cat, res.quantities, 0, None, 30)
+    assert est.delivery_auto and est.delivery > 0
+    assert js["total"] == pytest.approx(est.total)
+    rp = tmp_path / "r.md"
+    write_report(rp, project="Auto", bom_file=SAMPLE.name, quote_file="q.xlsx", catalog=cat, grade=0,
+                 lines=lines, result=res, est=est)
+    strip = lambda t: [l for l in t.splitlines() if "overrides.csv" not in l and "save a correction" not in l]
+    assert strip(js["report"]) == strip(rp.read_text(encoding="utf-8"))
+    assert any(l.startswith("| Delivery (estimated from ") for l in strip(js["report"]))
+    # the estimate goes into the calculator's delivery cell
+    sheet = zipfile.ZipFile(out).read("xl/worksheets/sheet1.xml").decode()
+    assert f'r="G444"' in sheet and f">{est.delivery:g}<" in sheet.split('r="G444"', 1)[1][:80]

@@ -70,7 +70,10 @@ def write_report(
     w(f"| List | {_money(est.list_total)} |")
     w(f"| Product net | {_money(est.product_net)} |")
     w(f"| Surcharge ({catalog.surcharge_rate:.0%}) | {_money(est.surcharge)} |")
-    w(f"| Delivery (estimate) | {_money(est.delivery)} |")
+    if est.delivery_auto:
+        w(f"| Delivery (estimated from {est.weight:,.0f} lbs: $445 + $0.27/lb; Devon confirms) | {_money(est.delivery)} |")
+    else:
+        w(f"| Delivery (estimate) | {_money(est.delivery)} |")
     w(f"| **Total** | **{_money(est.total)}** |")
     if est.per_station:
         w(f"| Per station ({est.stations}) | {_money(est.per_station)} |")

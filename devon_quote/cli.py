@@ -30,7 +30,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--ship-to", default="", help="ship-to zip code")
     ap.add_argument("--grade", default="keystone", choices=[g.lower() for g in GRADES], help="Devon fabric grade")
     ap.add_argument("--trim", help="Devon trim color code (leave out to keep the template's)")
-    ap.add_argument("--delivery", type=float, default=0.0, help="delivery estimate in dollars (default 0; Devon confirms)")
+    ap.add_argument("--delivery", type=float, default=None,
+                    help="delivery in dollars (default: estimated from the order weight, $445 + $0.27/lb; Devon confirms)")
     ap.add_argument("--stations", type=int, help="number of workstations, for cost per station")
     ap.add_argument("--notes", help="text file with design notes or a dictation transcript")
     ap.add_argument("--drawing", action="append", default=[],

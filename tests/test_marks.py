@@ -124,6 +124,6 @@ def test_js_quote_with_image_marks_matches_python(tmp_path):
     assert js["warnings"] == res.warnings
     rp = tmp_path / "r.md"
     write_report(rp, project="Marks", bom_file=SAMPLE.name, quote_file="q.xlsx", catalog=cat, grade=0,
-                 lines=lines, result=res, est=estimate(cat, res.quantities, 0, 0, None))
+                 lines=lines, result=res, est=estimate(cat, res.quantities, 0, None, None))
     strip = lambda t: [l for l in t.splitlines() if "overrides.csv" not in l and "save a correction" not in l]
     assert strip(js["report"]) == strip(rp.read_text(encoding="utf-8"))

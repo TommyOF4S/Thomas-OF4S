@@ -34,7 +34,7 @@ class QuoteOptions:
     ship_to: str = ""
     grade: str = "keystone"
     trim: str | None = None
-    delivery: float = 0.0
+    delivery: float | None = None  # None: estimated from the order weight
     stations: int | None = None
     notes: str = ""
     drawings: list[str] = field(default_factory=list)
@@ -110,6 +110,7 @@ def build_quote(
     out_dir = Path(out_dir)
     stem = safe_stem(opts.project or Path(bom_path).stem)
     today = dt.date.today()
+    est = estimate(catalog, result.quantities, grade, opts.delivery, opts.stations)
     header = QuoteHeader(
         project=opts.project,
         description=opts.description,
@@ -117,12 +118,11 @@ def build_quote(
         ship_to=opts.ship_to,
         grade=grade,
         trim=opts.trim,
-        delivery=opts.delivery,
+        delivery=est.delivery,
         stations=opts.stations,
     )
     quote_path = write_quote(template, out_dir / f"{stem}_Devon_Quote.xlsm", catalog, result.quantities, header)
 
-    est = estimate(catalog, result.quantities, grade, opts.delivery, opts.stations)
     report_path = out_dir / f"{stem}_review.md"
     write_report(
         report_path,

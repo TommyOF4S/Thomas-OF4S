@@ -253,7 +253,7 @@ footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
           <select id="grade"><option value="0">Keystone (grade 1)</option><option value="1">Summit (grade 2)</option><option value="2">Aspen (grade 3)</option></select>
         </label>
         <label class="f"><span>Workstations</span><input id="stations" inputmode="numeric" placeholder="24"></label>
-        <label class="f"><span>Delivery estimate ($)</span><input id="delivery" inputmode="decimal" placeholder="0"></label>
+        <label class="f"><span>Delivery ($)</span><input id="delivery" inputmode="decimal" placeholder="Auto from weight"></label>
         <label class="f"><span>Trim code</span><input id="trim" placeholder="Keep Devon's default"></label>
         <label class="f"><span>Description</span><input id="description" value="WORKSTATIONS"></label>
       </div>
@@ -735,15 +735,16 @@ async function build() {
     const result = E.makeMapper(c.catalog, allOverrides()).map(lines, combinedPlan(), combinedMarks());
     const grade = +$("grade").value;
     const num = (v) => { const n = Number(String(v || "").replace(/[$,\s]/g, "")); return v && !Number.isNaN(n) ? n : null; };
-    const delivery = num($("delivery").value) || 0;
+    const delivery = num($("delivery").value); // blank: estimated from the weight
     const stations = num($("stations").value) ? Math.round(num($("stations").value)) : null;
     const project = $("project").value.trim();
     const est = E.estimate(c.catalog, result.quantities, grade, delivery, stations);
+    $("delivery").placeholder = est.deliveryAuto ? `Auto: ${money(est.delivery)}` : "Auto from weight";
     const today = new Date();
     const header = {
       project, description: $("description").value.trim(), shipTo: $("ship_to").value.trim(),
       date: `${today.getMonth() + 1}.${today.getDate()}.${String(today.getFullYear()).slice(2)}`,
-      grade, trim: $("trim").value.trim() || null, delivery, stations,
+      grade, trim: $("trim").value.trim() || null, delivery: est.delivery, stations,
     };
     const stem = E.safeStem(project || state.bom.name.replace(/\.[^.]+$/, ""));
     const quoteName = `${stem}_Devon_Quote.xlsx`;
@@ -781,7 +782,7 @@ function renderResults() {
   $("totalSub").textContent = `Devon price list ${priceListName(cat)} · ${E.GRADES[grade]}` + (e.perStation ? ` · ${money(e.perStation)} per station` : "");
   $("breakdown").innerHTML = [
     ["List", money(e.listTotal)], ["Product net", money(e.product)],
-    [`Surcharge (${Math.round(cat.surchargeRate * 100)}%)`, money(e.surcharge)], ["Delivery estimate", money(e.delivery)],
+    [`Surcharge (${Math.round(cat.surchargeRate * 100)}%)`, money(e.surcharge)], [e.deliveryAuto ? `Delivery (est. from ${Math.round(e.weight).toLocaleString("en-US")} lbs)` : "Delivery", money(e.delivery)],
     ["Weight (approx.)", Math.round(e.weight).toLocaleString("en-US") + " lbs"],
   ].map(([k, v]) => `<tr><td>${k}</td><td class="n">${v}</td></tr>`).join("");
 
