@@ -70,7 +70,9 @@ asks why a number came out as it did, or before suggesting a change.
 
 ## Corrections
 
-When the user says an AIS part should map to a different Devon part, don't edit the skill. Copy
+OF4S's standing corrections are already built in (`scripts/mappings/overrides.csv`, e.g. AIS `A-PPDV` power
+pole → `BE-PP12`, `E-MW8W4PJ36E` jumper → `BE-36JU`, BBF pedestals → `ECO-BBF-MT`) and apply to every quote
+automatically. When the user says an AIS part should map to a different Devon part, don't edit the skill. Copy
 `scripts/mappings/overrides.csv` to the output folder, add a row (`ais_part,devon_part,ratio,note`;
 wildcards like `E-MW8W4*` work; a blank `devon_part` means "nothing on the Devon side"), and rerun with
 `--overrides <that copy>`. Suggest they send lasting corrections to Thomas so the shared skill gets them.

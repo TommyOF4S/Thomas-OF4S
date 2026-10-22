@@ -2,3 +2,14 @@ ais_part,devon_part,ratio,note
 # One row per AIS part (wildcards like P-DLXYZ* allowed). Leave devon_part blank when the AIS part needs nothing on the Devon side.
 # Several rows for the same AIS part add several Devon parts. ratio = Devon quantity per AIS piece (0.5 = one Devon item per two AIS).
 # Rows here always win over the built-in rules.
+A-PPDV,BE-PP12,1,power pole (saved on the hosted page)
+E-MW8W4PJ30E,BE-30JU,1,30in pass-thru jumper (saved on the hosted page)
+E-MW8W4PJ36E,BE-36JU,1,36in pass-thru jumper (saved on the hosted page)
+E-UN8W4BIFL,BE-ENDFD,1,base infeed at the end of a run (saved on the hosted page)
+P-DLPF266,HMA130.67,1,(saved on the hosted page)
+P-DLPFPP242,HMA130.39,1,(saved on the hosted page)
+P-DLPFPP342,HMA137.39,1,(saved on the hosted page)
+S-GPEDBBFS24,ECO-BBF-MT,1,BBF pedestal (saved on the hosted page)
+S-PEDBBFJ24,ECO-BBF-MT,1,BBF pedestal (saved on the hosted page)
+W-WSCC2436,WSC2436,1,(saved on the hosted page)
+WPS-SSSAR,,1,no Devon equivalent needed (saved on the hosted page)

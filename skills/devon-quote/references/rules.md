@@ -54,6 +54,14 @@ otherwise it's flagged. Colored dots drawn on the 2D (red 3953, blue 3967, yello
 - Cantilevers: AIS sells lefts and rights, Devon sells pairs: pairs = (lefts + rights) / 2, rounded up.
 - Devon's no-charge hardware kits (ACC-106/107/108/110) are added automatically.
 
+## Standing corrections
+
+`scripts/mappings/overrides.csv` holds OF4S's saved part mappings; they win over the built-in rules (except
+that posts and shrouds come from the 2D plan when there is one). Current ones: `A-PPDV` → `BE-PP12`,
+`E-MW8W4PJ30E` → `BE-30JU`, `E-MW8W4PJ36E` → `BE-36JU`, `E-UN8W4BIFL` → `BE-ENDFD`, `S-GPEDBBFS24` and
+`S-PEDBBFJ24` → `ECO-BBF-MT`, `W-WSCC2436` → `WSC2436`, `WPS-SSSAR` → nothing, and three post fillers that
+match the built-in rule (`P-DLPF266` → `HMA130.67`, `P-DLPFPP242` → `HMA130.39`, `P-DLPFPP342` → `HMA137.39`).
+
 ## Delivery
 
 Left blank, delivery = **$445 + $0.27 per pound** of the order weight, rounded to $5. Fitted to 25 Devon
