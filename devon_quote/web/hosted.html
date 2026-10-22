@@ -3,38 +3,38 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: OF4S workbench. Inputs left, quote details right, results stacked below with the plan beside the flags. */
+/* Earth-tone theme: sand, walnut, terracotta, moss. Layout: OF4S workbench. Inputs left, quote details right, results stacked below with the plan beside the flags. */
 :root {
-  --bg: #faf8f4; --surface: #ffffff; --surface-2: #f3efe7; --sunken: #faf8f4;
-  --fg: #1a1814; --fg-2: #555047; --fg-3: #7a7468;
-  --accent: #2d4a6e; --accent-2: #466489; --accent-tint: #dde5ee; --accent-ink: #1e3554;
-  --primary: #15273f; --primary-hover: #1e3554; --on-primary: #faf8f4;
-  --panel: #15273f; --panel-fg: #faf8f4; --panel-fg-2: #dde5ee; --panel-accent: #8fa9c7; --panel-line: rgba(255,255,255,0.12);
-  --line: rgba(15, 29, 51, 0.1); --line-2: rgba(15, 29, 51, 0.2); --dash: #d6cfbe;
-  --success: #5a7a4f; --warn: #b8895a; --danger: #9c3a30; --danger-tint: #f6e9e4;
-  --shadow: 0 4px 12px rgba(15, 29, 51, 0.08), 0 2px 4px rgba(15, 29, 51, 0.04);
+  --bg: #f3ede2; --surface: #fbf8f2; --surface-2: #ebe3d4; --sunken: #f3ede2;
+  --fg: #2a241d; --fg-2: #5a4f42; --fg-3: #7a6e5c;
+  --accent: #a0522d; --accent-2: #b5653d; --accent-tint: #f0dccd; --accent-ink: #6b3418;
+  --primary: #4b3a2b; --primary-hover: #5e4836; --on-primary: #f8f3ea;
+  --panel: #3f3226; --panel-fg: #f6efe4; --panel-fg-2: #e6d6c2; --panel-accent: #d8a47f; --panel-line: rgba(255,255,255,0.14);
+  --line: rgba(70, 50, 30, 0.12); --line-2: rgba(70, 50, 30, 0.24); --dash: #cdbb9c;
+  --success: #5f7340; --warn: #b07a2a; --danger: #9c3a30; --danger-tint: #f5e4dc;
+  --shadow: 0 4px 12px rgba(60, 40, 20, 0.08), 0 2px 4px rgba(60, 40, 20, 0.04);
   --display: 'Schibsted Grotesk', 'Geist', system-ui, sans-serif;
   --sans: 'Geist', -apple-system, system-ui, sans-serif;
   --mono: 'Geist Mono', 'SF Mono', Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #0a1628; --surface: #0f1d33; --surface-2: #15273f; --sunken: #0a1628;
-  --fg: #faf8f4; --fg-2: #d6cfbe; --fg-3: #a8a094;
-  --accent: #8fa9c7; --accent-2: #8fa9c7; --accent-tint: #1e3554; --accent-ink: #dde5ee;
-  --primary: #dde5ee; --primary-hover: #ffffff; --on-primary: #0f1d33;
-  --panel: #15273f; --panel-fg: #faf8f4; --panel-fg-2: #d6cfbe; --panel-accent: #8fa9c7; --panel-line: rgba(255,255,255,0.12);
-  --line: rgba(221, 229, 238, 0.12); --line-2: rgba(221, 229, 238, 0.22); --dash: #2d4a6e;
-  --success: #8fb07f; --warn: #c9a474; --danger: #e08a7e; --danger-tint: #3a1f1c;
+  --bg: #1b1713; --surface: #241e18; --surface-2: #2e261e; --sunken: #1b1713;
+  --fg: #f1e8da; --fg-2: #cdbfa9; --fg-3: #a39580;
+  --accent: #d9935f; --accent-2: #e0a477; --accent-tint: #3d2a1c; --accent-ink: #f3dcc8;
+  --primary: #e8d5bd; --primary-hover: #f6e8d6; --on-primary: #2a2119;
+  --panel: #2e261e; --panel-fg: #f1e8da; --panel-fg-2: #cdbfa9; --panel-accent: #d9935f; --panel-line: rgba(255,255,255,0.12);
+  --line: rgba(241, 232, 218, 0.12); --line-2: rgba(241, 232, 218, 0.22); --dash: #5a4a38;
+  --success: #a3b77f; --warn: #d6a95e; --danger: #e08a7e; --danger-tint: #3a1f1c;
   --shadow: none; color-scheme: dark;
 } }
 :root[data-theme="dark"] {
-  --bg: #0a1628; --surface: #0f1d33; --surface-2: #15273f; --sunken: #0a1628;
-  --fg: #faf8f4; --fg-2: #d6cfbe; --fg-3: #a8a094;
-  --accent: #8fa9c7; --accent-2: #8fa9c7; --accent-tint: #1e3554; --accent-ink: #dde5ee;
-  --primary: #dde5ee; --primary-hover: #ffffff; --on-primary: #0f1d33;
-  --panel: #15273f; --panel-fg: #faf8f4; --panel-fg-2: #d6cfbe; --panel-accent: #8fa9c7; --panel-line: rgba(255,255,255,0.12);
-  --line: rgba(221, 229, 238, 0.12); --line-2: rgba(221, 229, 238, 0.22); --dash: #2d4a6e;
-  --success: #8fb07f; --warn: #c9a474; --danger: #e08a7e; --danger-tint: #3a1f1c;
+  --bg: #1b1713; --surface: #241e18; --surface-2: #2e261e; --sunken: #1b1713;
+  --fg: #f1e8da; --fg-2: #cdbfa9; --fg-3: #a39580;
+  --accent: #d9935f; --accent-2: #e0a477; --accent-tint: #3d2a1c; --accent-ink: #f3dcc8;
+  --primary: #e8d5bd; --primary-hover: #f6e8d6; --on-primary: #2a2119;
+  --panel: #2e261e; --panel-fg: #f1e8da; --panel-fg-2: #cdbfa9; --panel-accent: #d9935f; --panel-line: rgba(255,255,255,0.12);
+  --line: rgba(241, 232, 218, 0.12); --line-2: rgba(241, 232, 218, 0.22); --dash: #5a4a38;
+  --success: #a3b77f; --warn: #d6a95e; --danger: #e08a7e; --danger-tint: #3a1f1c;
   --shadow: none; color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -88,9 +88,7 @@ section.hero { padding-block: 36px 24px; }
 .icon { width: 22px; height: 22px; flex: none; stroke: var(--accent); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .linkish { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-size: 13.5px; }
 
-textarea { width: 100%; min-height: 110px; resize: vertical; border: 1px solid var(--line-2); border-radius: 8px; padding: 10px 12px; background: var(--surface); }
 .hint { color: var(--fg-3); font-size: 13px; margin: 8px 0 0; }
-.kbd { font-family: var(--mono); font-size: 12px; border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
 
 .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
 .fields .full { grid-column: 1 / -1; }
@@ -174,7 +172,7 @@ table.data tfoot td { font-weight: 600; background: var(--surface-2); }
 .busy .spinner { display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } * { scroll-behavior: auto !important; } }
-.page-drop { position: fixed; inset: 0; background: rgba(21, 39, 63, 0.86); color: #faf8f4; display: flex; align-items: center; justify-content: center; z-index: 50; font-family: var(--display); font-size: 28px; font-weight: 600; padding: 24px; text-align: center; }
+.page-drop { position: fixed; inset: 0; background: rgba(63, 50, 38, 0.88); color: #f8f3ea; display: flex; align-items: center; justify-content: center; z-index: 50; font-family: var(--display); font-size: 28px; font-weight: 600; padding: 24px; text-align: center; }
 .page-drop[hidden] { display: none; }
 footer { border-top: 1px solid var(--line); margin-top: 40px; }
 footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
@@ -208,7 +206,7 @@ footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
   <section class="hero">
     <p class="eyebrow">AIS Divi to Devon</p>
     <h1>Drop the CET file. Get the <span class="accent">Devon quote.</span></h1>
-    <p class="lede">Export the bill of materials from CET, drop it here with the 2D plan, and note anything the drawing doesn't show. You get Devon's own calculator, filled in and ready to send.</p>
+    <p class="lede">Export the bill of materials from CET, drop it here with the 2D plan as a PDF. You get Devon's own calculator, filled in and ready to send.</p>
   </section>
 
   <div id="tplPanel" class="card" style="margin-bottom:16px" hidden></div>
@@ -237,12 +235,6 @@ footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
         <input id="planInput" type="file" accept=".pdf,image/*" multiple hidden>
         <div id="planList"></div>
         <p class="hint"><b>Height changes:</b> nothing to draw when the 2D is a PDF with CET's panel labels (A6660 = 66"H × 60"W). Where panels of different heights meet, the connector is quoted at the taller height and a high/low filler strip covers the step, such as HMHL3967 where a 42" (Devon 39") panel meets a 66" (Devon 67").</p>
-      </div>
-
-      <div class="card">
-        <div class="step"><span>Notes or dictation</span><span>Optional</span></div>
-        <textarea id="notes" placeholder="Anything the drawing doesn't show. Example: straight runs along the window wall, power comes from the east wall, all ends finished."></textarea>
-        <p class="hint">To dictate, click in the box and press <span class="kbd">Win</span> + <span class="kbd">H</span> on Windows, or press <span class="kbd">Fn</span> twice on a Mac. The notes go into the review report.</p>
       </div>
     </div>
 
@@ -279,7 +271,7 @@ footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
       <div class="card downloads">
         <div class="step"><span>Downloads</span></div>
         <button id="dlQuote" class="btn" type="button"><svg class="icon"><use href="#i-sheet"/></svg><span>Devon calculator, filled in<small>.xlsx · opens in Excel or Google Sheets and prices itself</small></span></button>
-        <button id="dlReport" class="btn" type="button"><svg class="icon"><use href="#i-doc"/></svg><span>Review report<small>.md · flags, finishes, notes, line items</small></span></button>
+        <button id="dlReport" class="btn" type="button"><svg class="icon"><use href="#i-doc"/></svg><span>Review report<small>.md · flags, finishes, line items</small></span></button>
         <button id="dlCross" class="btn" type="button"><svg class="icon"><use href="#i-down"/></svg><span>AIS to Devon crosswalk<small>.csv · every AIS line and what it became</small></span></button>
         <span id="dlMsg" class="msg"></span>
       </div>
@@ -760,7 +752,7 @@ async function build() {
     const xlsx = await E.writeQuote(JSZip, c.bytes, c.catalog, result.quantities, header, "xlsx");
     const report = E.reportMd({
       project, bomFile: state.bom.name, quoteFile: quoteName, catalog: c.catalog, grade, lines, result, est,
-      notes: $("notes").value, drawings: state.plans.map((p) => p.file.name),
+      notes: "", drawings: state.plans.map((p) => p.file.name),
     });
     state.out = {
       lines, result, est, grade,
