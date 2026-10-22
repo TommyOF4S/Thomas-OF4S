@@ -130,7 +130,7 @@ def load_overrides(path: str | Path | None) -> list[Override]:
 # --- built-in rules ---------------------------------------------------------------
 
 _PANEL = re.compile(r"^P-DL([A-Z]+?)(\d{2})(\d{2})$")
-_POST = re.compile(r"^P-DLPF([234])(\d{2})$")
+_POST = re.compile(r"^P-DLPF(?:PP(?=[23]))?([234])(\d{2})$")  # P-DLPFPP2/PP3 are 2-way/3-way posts too
 _WS = re.compile(r"^W-WS(\d{2})(\d{2})$")
 _CANT = re.compile(r"^WPS-UNCT(\d{2})([LRS])$")
 _CANT_DEPTH = re.compile(r"(\d{2})\s*(?:D\b|\"|in\b)", re.I)

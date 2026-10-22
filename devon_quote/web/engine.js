@@ -275,7 +275,7 @@
   }
 
   const PANEL = /^P-DL([A-Z]+?)(\d{2})(\d{2})$/;
-  const POST = /^P-DLPF([234])(\d{2})$/;
+  const POST = /^P-DLPF(?:PP(?=[23]))?([234])(\d{2})$/; // P-DLPFPP2/PP3 are 2-way/3-way posts too
   const WS = /^W-WS(\d{2})(\d{2})$/;
   const CANT = /^WPS-UNCT(\d{2})([LRS])$/;
   const CANT_DEPTH = /(\d{2})\s*(?:D\b|"|in\b)/i;

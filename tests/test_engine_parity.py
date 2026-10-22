@@ -127,3 +127,14 @@ def test_delivery_estimated_from_weight_matches_python(tmp_path):
     # the estimate goes into the calculator's delivery cell
     sheet = zipfile.ZipFile(out).read("xl/worksheets/sheet1.xml").decode()
     assert f'r="G444"' in sheet and f">{est.delivery:g}<" in sheet.split('r="G444"', 1)[1][:80]
+
+
+def test_pp_post_fillers_match_python(tmp_path):
+    bom = tmp_path / "pp.csv"
+    bom.write_text("Part Number,Description,Qty\nP-DLFRPM5024,Divi Linear Panel - NPWR - 50H x 24W,4\n"
+                   "P-DLPFPP250,Divi Linear Post Filler PP - 2 Way - 50H,3\nP-DLPFPP350,Divi Linear Post Filler PP - 3 Way - 50H,2\n"
+                   "P-DLPF250,Divi Linear Post Filler - 2 Way - 50H,1\n", encoding="utf-8")
+    js, _ = run_js(tmp_path, bom, delivery=0)
+    res = Mapper(load_catalog(TEMPLATE)).map(load_bom(bom))
+    assert js["quantities"] == res.quantities
+    assert res.quantities["HMA130.53"] == 4 and res.quantities["HMA137.53"] == 2

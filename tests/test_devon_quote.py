@@ -185,3 +185,10 @@ def test_blank_delivery_is_estimated(catalog):
     assert auto.total == pytest.approx(auto.product_net + auto.surcharge + auto.delivery)
     typed = estimate(catalog, q, 0, 0, None)
     assert not typed.delivery_auto and typed.delivery == 0  # an explicit $0 (pickup) stays $0
+
+
+@pytest.mark.parametrize("part,devon", [("P-DLPFPP250", "HMA130.53"), ("P-DLPFPP366", "HMA137.67"),
+                                        ("P-DLPF250", "HMA130.53"), ("P-DLPF366", "HMA137.67")])
+def test_pp_post_fillers_map_like_plain_ones(catalog, part, devon):
+    m = Mapper(catalog).map_line(line(part, "Divi Linear Post Filler"))
+    assert m.targets == [(devon, 1)] and m.status == "ok"
