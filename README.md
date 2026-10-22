@@ -192,5 +192,7 @@ The tests need the Devon calculator in `templates/`. Without it, most of them sk
 
 `skills/devon-quote/` is a Claude skill that runs this same engine, so teammates can ask Claude for a
 Devon quote with the SIF, the 2D PDF and Devon's calculator attached. Build the shareable file with
-`python skills/build_skill.py` (writes `build/devon-quote.skill`, with the current code copied in). The
-Devon calculator is never bundled; each teammate attaches their own copy.
+`python skills/build_skill.py` (writes `build/devon-quote.skill` with the current code, the standing
+corrections in `mappings/overrides.csv`, and the newest `templates/DEVON*.xlsm` as the default calculator).
+When Devon sends a new calculator (about every 6 months), drop it in `templates/`, rebuild, and share the new
+`.skill` file. The calculator is never committed to git.

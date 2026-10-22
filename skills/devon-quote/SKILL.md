@@ -13,9 +13,11 @@ Devon's own formulas price it. The bundled code is the same engine as the OF4S h
 ## What to collect
 
 1. **The SIF** (`.sif` export from CET; a `.csv`/`.xlsx` with part numbers and quantities also works). Required.
-2. **Devon's calculator**, the `.xlsm` Devon sends (named like `DEVON_OFFICIAL_CALC_10.21.26.xlsm`). Required:
-   all pricing comes from it, and it is not bundled with this skill because it holds Devon's dealer pricing.
-   If the user hasn't attached it, ask for it. Don't price from memory or from an old quote.
+2. **Devon's calculator** is bundled: `scripts/templates/DEVON_*.xlsm`, the official one OF4S keeps current
+   (refreshed about every 6 months). Use it by default without asking. If the user attaches a Devon calculator
+   of their own (a newer price list, or a job-specific one Devon sent), use theirs with `--template`. Always
+   say which price list the quote used (the review shows its title, e.g. "March 2026"). Don't price from
+   memory or from an old quote.
 3. **The 2D plan exported from CET as a PDF, with panel labels on** (labels like `A6660` = 66"H x 60"W).
    Strongly recommended. The AIS SIF never lists straight panel-to-panel joints, so without the 2D the quote
    has no Devon panel-to-panel connectors (HMP213); the PDF also gives each joint's panel heights, which
@@ -36,13 +38,13 @@ missing.
 ```bash
 cd <this skill's folder>/scripts
 python3 -m devon_quote "<path to SIF>" \
-  --template "<path to Devon calculator .xlsm>" \
   --drawing "<path to 2D plan .pdf>"   \
   --project "Acme HQ" --ship-to 33010 --grade keystone --stations 24 \
   --divi50 53 \
   -o "<output folder>"
 ```
 
+- The bundled calculator is used automatically; add `--template "<their .xlsm>"` only when the user gave one.
 - Repeat `--drawing` for several plan files. Leave it out only if there's no 2D at all.
 - Leave out `--delivery` to have delivery estimated from the order weight ($445 + $0.27/lb, fitted to past
   Devon quotes to OF4S); pass `--delivery 1200` to use Devon's number, or `--delivery 0` for a pickup.
