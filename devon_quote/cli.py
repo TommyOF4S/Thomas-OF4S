@@ -32,6 +32,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--trim", help="Devon trim color code (leave out to keep the template's)")
     ap.add_argument("--delivery", type=float, default=None,
                     help="delivery in dollars (default: estimated from the order weight, $445 + $0.27/lb; Devon confirms)")
+    ap.add_argument("--divi50", type=int, choices=(53, 47), default=53,
+                    help='Devon height for 50"H AIS panels: 53 (default) or 47')
     ap.add_argument("--stations", type=int, help="number of workstations, for cost per station")
     ap.add_argument("--notes", help="text file with design notes or a dictation transcript")
     ap.add_argument("--drawing", action="append", default=[],
@@ -49,6 +51,7 @@ def main(argv: list[str] | None = None) -> int:
         grade=args.grade,
         trim=args.trim,
         delivery=args.delivery,
+        divi50=args.divi50,
         stations=args.stations,
         notes=Path(args.notes).read_text(encoding="utf-8") if args.notes else "",
         drawings=[Path(d).name for d in args.drawing],

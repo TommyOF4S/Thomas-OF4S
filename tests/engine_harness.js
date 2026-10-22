@@ -16,7 +16,7 @@ const E = require(path.join(__dirname, "..", "devon_quote", "web", "engine.js"))
     const pdfjs = require("pdfjs-dist/legacy/build/pdf.js");
     plan = (await E.analyzePdf(pdfjs, new Uint8Array(fs.readFileSync(opts.plan)))).result;
   }
-  const result = E.makeMapper(catalog, opts.overrides || []).map(lines, plan, opts.marks || null);
+  const result = E.makeMapper(catalog, opts.overrides || [], { divi50: opts.divi50 || 53 }).map(lines, plan, opts.marks || null);
   const grade = opts.grade || 0;
   const delivery = "delivery" in opts ? opts.delivery : null; // no delivery given: estimated from the weight
   const est = E.estimate(catalog, result.quantities, grade, delivery, opts.stations || null);

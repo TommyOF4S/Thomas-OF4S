@@ -138,3 +138,20 @@ def test_pp_post_fillers_match_python(tmp_path):
     res = Mapper(load_catalog(TEMPLATE)).map(load_bom(bom))
     assert js["quantities"] == res.quantities
     assert res.quantities["HMA130.53"] == 4 and res.quantities["HMA137.53"] == 2
+
+
+@pytest.mark.parametrize("divi50", [53, 47])
+def test_divi50_choice_matches_python(tmp_path, divi50):
+    js, _ = run_js(tmp_path, SAMPLE, delivery=0, divi50=divi50, project="Heights")
+    cat = load_catalog(TEMPLATE)
+    lines = load_bom(SAMPLE)
+    res = Mapper(cat, divi50=divi50).map(lines)
+    assert js["quantities"] == res.quantities
+    assert any(p.startswith(f"HM01.{divi50}") for p in res.quantities)  # 50"H panels at the chosen height
+    assert not any(p.startswith(f"HM01.{100 - divi50}") for p in res.quantities)  # 53 <-> 47
+    rp = tmp_path / "r.md"
+    write_report(rp, project="Heights", bom_file=SAMPLE.name, quote_file="q.xlsx", catalog=cat, grade=0,
+                 lines=lines, result=res, est=estimate(cat, res.quantities, 0, 0, None))
+    strip = lambda t: [l for l in t.splitlines() if "overrides.csv" not in l and "save a correction" not in l]
+    assert strip(js["report"]) == strip(rp.read_text(encoding="utf-8"))
+    assert f'- AIS 50"H panels quoted as Devon {divi50}"H' in js["report"]

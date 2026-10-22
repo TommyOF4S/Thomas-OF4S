@@ -102,6 +102,7 @@ def _build(body: dict) -> dict:
         grade=grade,
         trim=(body.get("trim") or "").strip() or None,
         delivery=_num(body.get("delivery"), float),  # blank: estimated from the weight
+        divi50=_num(body.get("divi50"), int) or 53,
         stations=_num(body.get("stations"), int),
         notes=body.get("notes") or "",
         drawings=[Path(d).name for d in body.get("drawings") or []],

@@ -40,6 +40,7 @@ JOINT_WORDS = {"l": "corner", "tee": "3-way joint", "cross": "4-way joint", "end
                "angled": "angled joint", "other": "joint of 5+ panels"}
 # Divi heights with a set Devon equivalent (from OF4S); any other height rounds up.
 DIVI_TO_DEVON_HEIGHT = {42: 39, 50: 53, 82: 85}
+DIVI_50_CHOICES = (53, 47)  # a 50" Divi panel can be quoted as either; picked per quote
 # A Divi height more than this many inches below the Devon height it rounds up to is flagged.
 HEIGHT_TOLERANCE = 6
 
@@ -56,8 +57,11 @@ def connector(kind: str, height: int) -> str:
     }[kind]
 
 
-def devon_height(divi_height: int) -> tuple[int, str]:
-    """The Devon equivalent of a Divi panel height; unknown heights round up (never lose privacy)."""
+def devon_height(divi_height: int, divi50: int = 53) -> tuple[int, str]:
+    """The Devon equivalent of a Divi panel height; unknown heights round up (never lose privacy).
+    divi50: the Devon height chosen for 50" Divi panels (53 or 47)."""
+    if divi_height == 50:
+        return divi50, ""
     if divi_height in DIVI_TO_DEVON_HEIGHT:
         return DIVI_TO_DEVON_HEIGHT[divi_height], ""
     for h in DEVON_HEIGHTS:
@@ -97,6 +101,7 @@ class MapResult:
     plan_parts: list[tuple[str, str, int]] = field(default_factory=list)  # (joint kind, Devon part, qty)
     marks: MarksSummary | None = None  # marks read from 2D images
     height_points: list[tuple[int, float, float, str]] = field(default_factory=list)  # (page, x, y, filler) from panel labels
+    divi50: int = 53  # Devon height used for 50" AIS panels
 
     @property
     def review(self) -> list[Mapping]:
@@ -148,8 +153,11 @@ def _powered(desc: str) -> bool | None:
 
 
 class Mapper:
-    def __init__(self, catalog: Catalog, overrides: list[Override] | None = None):
+    def __init__(self, catalog: Catalog, overrides: list[Override] | None = None, divi50: int = 53):
+        if divi50 not in DIVI_50_CHOICES:
+            raise ValueError(f'50" Divi panels can be quoted as 53" or 47" Devon panels, not {divi50}"')
         self.catalog = catalog
+        self.divi50 = divi50
         self.overrides = overrides or []
         self.run_height: int | None = None  # dominant Devon panel height, for height-less parts
         self.plan: PlanResult | None = None  # joints read from the 2D plan, when one was given
@@ -178,7 +186,7 @@ class Mapper:
             return None
         kind, h, w = m.group(1), int(m.group(2)), int(m.group(3))
         desc = line.description
-        height, hnote = devon_height(h)
+        height, hnote = devon_height(h, self.divi50)
         notes = [hnote] if hnote else []
         powered = _powered(desc)
         if powered is None:
@@ -222,7 +230,7 @@ class Mapper:
         is_end = pn == "P-DLSEOR" or "END OF RUN" in line.description.upper()
         if m:
             ways, h = int(m.group(1)), int(m.group(2))
-            height, hnote = devon_height(h)
+            height, hnote = devon_height(h, self.divi50)
             part = connector({2: "2way", 3: "3way"}.get(ways, "4way"), height)  # an AIS 2-way post is a corner
             return Mapping(line, [(part, 1)], "review" if hnote else "ok", hnote, "post")
         if is_end:
@@ -348,7 +356,7 @@ class Mapper:
         for ln in lines:
             m = _PANEL.match(ln.part.upper())
             if m and not ln.part.upper().startswith(("P-DLPF", "P-DLSEOR")):
-                heights[devon_height(int(m.group(2)))[0]] += ln.qty
+                heights[devon_height(int(m.group(2)), self.divi50)[0]] += ln.qty
         self.run_height = heights.most_common(1)[0][0] if heights else None
         self.plan = plan if plan is not None and plan.panels else None
         self.marks = marks if marks is not None and marks.any else None
@@ -392,7 +400,7 @@ class Mapper:
 
         auto_added = self._auto_add(quantities)
         return MapResult(mappings, quantities, dict(sources), auto_added, warnings, self.plan, plan_parts, self.marks,
-                         self.height_points)
+                         self.height_points, self.divi50)
 
     def _mark_fillers(self, warnings: list[str]) -> Counter:
         """High/low filler strips from the colored dots found in 2D images."""
@@ -467,7 +475,7 @@ class Mapper:
         """Devon height of a plan panel: its label, else the BOM's only height in that width."""
         if height is None and len(self.width_heights.get(width, ())) == 1:
             height = next(iter(self.width_heights[width]))
-        return None if height is None else devon_height(height)[0]
+        return None if height is None else devon_height(height, self.divi50)[0]
 
     def _joint_heights(self, panels: tuple) -> list[int]:
         return sorted({h for h in (self._panel_height(w, ht) for w, ht in panels) if h is not None})

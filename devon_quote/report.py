@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -63,6 +64,8 @@ def write_report(
     w(f"- Price list: {catalog.title} · fabric grade {GRADES[grade]} · net = list × {catalog.net_multiplier:g}")
     if drawings:
         w(f"- 2D plan(s) for checking: " + ", ".join(f"`{d}`" for d in drawings))
+    if any(re.match(r"^P-DL(?!PF|SEOR)[A-Z]+50\d{2}$", l.part.upper()) for l in lines):
+        w(f'- AIS 50"H panels quoted as Devon {result.divi50}"H')
     w("")
 
     w("## Estimated Devon cost\n")

@@ -206,6 +206,9 @@ footer { border-top: 1px solid var(--line); padding: 18px 0 30px; color: var(--s
         <label class="f"><span>Fabric grade</span>
           <select id="grade"><option value="keystone">Keystone (grade 1)</option><option value="summit">Summit (grade 2)</option><option value="aspen">Aspen (grade 3)</option></select>
         </label>
+        <label class="f"><span>AIS 50"H panels as Devon</span>
+          <select id="divi50"><option value="53">53"H</option><option value="47">47"H</option></select>
+        </label>
         <label class="f"><span>Workstations</span><input id="stations" inputmode="numeric" placeholder="24"></label>
         <label class="f"><span>Delivery ($)</span><input id="delivery" inputmode="decimal" placeholder="Auto from weight"></label>
         <label class="f"><span>Trim code</span><input id="trim" placeholder="Keep Devon's default"></label>
@@ -430,7 +433,7 @@ $("buildBtn").onclick = async () => {
   try {
     const body = {
       bom: { name: state.bom.name, data: await readB64(state.bom) },
-      project: $("project").value, ship_to: $("ship_to").value, grade: $("grade").value,
+      project: $("project").value, ship_to: $("ship_to").value, grade: $("grade").value, divi50: $("divi50").value,
       stations: $("stations").value, delivery: $("delivery").value, trim: $("trim").value,
       description: $("description").value, notes: $("notes").value,
       drawings: state.plans.map((p) => p.file.name),

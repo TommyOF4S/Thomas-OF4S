@@ -266,7 +266,9 @@
     }[kind];
   }
 
-  function devonHeight(h) {
+  /** divi50: the Devon height chosen for 50" Divi panels (53 or 47). */
+  function devonHeight(h, divi50 = 53) {
+    if (h === 50) return [divi50, ""];
     if (DIVI_TO_DEVON_HEIGHT[h]) return [DIVI_TO_DEVON_HEIGHT[h], ""];
     for (const d of DEVON_HEIGHTS) {
       if (h <= d) return [d, d - h > HEIGHT_TOLERANCE ? `AIS ${h}"H rounds up to Devon ${d}"H` : ""];
@@ -306,7 +308,8 @@
 
   const M = (source, targets, status, note = "", rule = "") => ({ source, targets, status, note, rule });
 
-  function makeMapper(catalog, overrides = []) {
+  function makeMapper(catalog, overrides = [], { divi50 = 53 } = {}) {
+    if (divi50 !== 53 && divi50 !== 47) throw new Error(`50" Divi panels can be quoted as 53" or 47" Devon panels, not ${divi50}"`);
     const ovs = overrides
       .filter((o) => o.ais_part && String(o.ais_part).trim())
       .map((o) => ({
@@ -357,7 +360,7 @@
         if (!m || pn.startsWith("P-DLPF") || pn.startsWith("P-DLSEOR")) return null;
         const kind = m[1], h = +m[2], w = +m[3];
         const desc = line.description;
-        let [height, hnote] = devonHeight(h);
+        let [height, hnote] = devonHeight(h, divi50);
         const notes = hnote ? [hnote] : [];
         let pw = powered(desc);
         if (pw === null) { pw = false; notes.push("could not tell if this panel is powered; quoted non-powered"); }
@@ -379,7 +382,7 @@
         const isEnd = pn === "P-DLSEOR" || line.description.toUpperCase().includes("END OF RUN");
         if (m) {
           const ways = +m[1];
-          const [height, hnote] = devonHeight(+m[2]);
+          const [height, hnote] = devonHeight(+m[2], divi50);
           // an AIS 2-way post is a corner
           return M(line, [[connector(ways === 2 ? "2way" : ways === 3 ? "3way" : "4way", height), 1]], hnote ? "review" : "ok", hnote, "post");
         }
@@ -568,7 +571,7 @@
     function panelHeight(width, height) {
       const known = widthHeights.get(width);
       if (height === null && known && known.size === 1) height = [...known][0];
-      return height === null ? null : devonHeight(height)[0];
+      return height === null ? null : devonHeight(height, divi50)[0];
     }
     const jointHeights = (panels) => [...new Set(panels.map(([w, h]) => panelHeight(w, h)).filter((h) => h !== null))].sort((a, b) => a - b);
 
@@ -699,7 +702,7 @@
         const pn = ln.part.toUpperCase();
         const m = pn.match(PANEL);
         if (m && !pn.startsWith("P-DLPF") && !pn.startsWith("P-DLSEOR")) {
-          const h = devonHeight(+m[2])[0];
+          const h = devonHeight(+m[2], divi50)[0];
           heights.set(h, (heights.get(h) || 0) + ln.qty);
         }
       }
@@ -750,7 +753,7 @@
 
       const autoAdded = autoAdd(quantities);
       return {
-        mappings, quantities, sources, autoAdded, warnings, plan, planParts, marks, heightPoints,
+        mappings, quantities, sources, autoAdded, warnings, plan, planParts, marks, heightPoints, divi50,
         review: mappings.filter((m) => m.status === "review"),
         unmapped: mappings.filter((m) => m.status === "unmapped"),
       };
@@ -1333,6 +1336,7 @@
     w(`- Devon calculator filled in: \`${quoteFile}\``);
     w(`- Price list: ${catalog.title} · fabric grade ${GRADES[grade]} · net = list × ${catalog.netMultiplier}`);
     if (drawings.length) w(`- 2D plan(s) for checking: ` + drawings.map((d) => `\`${d}\``).join(", "));
+    if (lines.some((l) => /^P-DL(?!PF|SEOR)[A-Z]+50\d{2}$/.test(l.part.toUpperCase()))) w(`- AIS 50"H panels quoted as Devon ${result.divi50 || 53}"H`);
     w("");
     w("## Estimated Devon cost\n");
     w("| | |\n|---|---:|");

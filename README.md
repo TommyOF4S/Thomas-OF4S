@@ -156,7 +156,7 @@ plan, with a checkbox to untick anything that isn't a designer mark (such as a C
 
 | AIS Divi | Devon |
 |---|---|
-| Panels `P-DL…HHWW` | `HM01.HHWW` at the Devon equivalent height: Divi 42H → 39H, 50H → 53H, 82H → 85H; any other height rounds **up** to Devon's 39/47/53/67/85. Powered panels become `.P4`. Glass panels become `HM51` (panel + 14" glass stacker). |
+| Panels `P-DL…HHWW` | `HM01.HHWW` at the Devon equivalent height: Divi 42H → 39H, 50H → 53H **or 47H** (a toggle above the SIF drop on the page, `--divi50 47` on the command line; 53 by default), 82H → 85H; any other height rounds **up** to Devon's 39/47/53/67/85. Posts, connectors and finished ends follow the chosen height. Powered panels become `.P4`. Glass panels become `HM51` (panel + 14" glass stacker). |
 | Posts 2/3/4-way `P-DLPF*` (and `P-DLPFPP2`/`PP3`, treated the same as `P-DLPF2`/`P-DLPF3`) | `HMA130` / `HMA137` / `HMC132` at that height. An AIS 2-way post is always a corner. |
 | Straight joints | AIS lists nothing for them; Devon needs a panel-to-panel connector `HMP213` at each. Only the 2D shows them, so without one the review warns that none are quoted. |
 | End-of-run shroud | `HMA128` finished end kit |

@@ -66,6 +66,14 @@ section.hero { padding-block: 36px 24px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; box-shadow: var(--shadow); min-width: 0; }
 .step { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--fg-3); margin-bottom: 10px; display: flex; justify-content: space-between; gap: 4px 12px; flex-wrap: wrap; }
 
+.seg { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 0 0 12px; font-size: 14px; color: var(--fg-2); }
+.seg .opts { display: inline-flex; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; }
+.seg label { position: relative; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg label span { display: block; padding: 7px 14px; font-weight: 500; color: var(--fg-2); background: var(--surface); }
+.seg label + label span { border-left: 1px solid var(--line-2); }
+.seg input:checked + span { background: var(--primary); color: var(--on-primary); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -2px; }
 .drop { display: block; width: 100%; border: 1.5px dashed var(--dash); border-radius: 10px; background: var(--sunken); padding: 22px; text-align: center; cursor: pointer; transition: border-color 150ms, background 150ms; }
 .drop:hover, .drop.over { border-color: var(--accent-2); background: var(--accent-tint); }
 .drop .big { font-family: var(--display); font-weight: 600; font-size: 17px; }
@@ -209,6 +217,13 @@ footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
     <div class="stack">
       <div class="card">
         <div class="step"><span>CET bill of materials</span><span>Required</span></div>
+        <div class="seg" role="radiogroup" aria-label="Devon height for 50-inch AIS panels">
+          <span>AIS 50"H panels quote as Devon</span>
+          <span class="opts">
+            <label><input type="radio" name="divi50" value="53" checked><span>53"H</span></label>
+            <label><input type="radio" name="divi50" value="47"><span>47"H</span></label>
+          </span>
+        </div>
         <div id="bomDrop" class="drop" tabindex="0" role="button" aria-label="Add the CET bill of materials"></div>
         <input id="bomInput" type="file" accept=".sif,.csv,.txt,.xlsx" hidden>
       </div>
@@ -690,6 +705,12 @@ function wireDrop(zone, input, onFiles) {
   });
 }
 wireDrop($("bomDrop"), $("bomInput"), routeFiles);
+// 50"H AIS panels: 53" or 47" Devon. Remembered in this browser; changing it rebuilds a quote already on screen.
+try { const saved = localStorage.getItem("divi50"); if (saved === "47" || saved === "53") document.querySelector(`input[name="divi50"][value="${saved}"]`).checked = true; } catch (e) {}
+document.querySelectorAll('input[name="divi50"]').forEach((r) => (r.onchange = () => {
+  try { localStorage.setItem("divi50", r.value); } catch (e) {}
+  if (state.out) build();
+}));
 wireDrop($("planDrop"), $("planInput"), (fs) => addPlans(fs.filter(isPlan)));
 
 let dragDepth = 0;
@@ -719,7 +740,8 @@ async function build() {
     const bomBytes = new Uint8Array(await state.bom.arrayBuffer());
     const lines = await E.parseBom(JSZip, state.bom.name, bomBytes);
     if (!lines.length) throw new Error(`No parts found in ${state.bom.name}.`);
-    const result = E.makeMapper(c.catalog, allOverrides()).map(lines, combinedPlan(), combinedMarks());
+    const divi50 = +document.querySelector('input[name="divi50"]:checked').value;
+    const result = E.makeMapper(c.catalog, allOverrides(), { divi50 }).map(lines, combinedPlan(), combinedMarks());
     const grade = +$("grade").value;
     const num = (v) => { const n = Number(String(v || "").replace(/[$,\s]/g, "")); return v && !Number.isNaN(n) ? n : null; };
     const delivery = num($("delivery").value); // blank: estimated from the weight

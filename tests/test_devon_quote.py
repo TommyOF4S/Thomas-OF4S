@@ -192,3 +192,14 @@ def test_blank_delivery_is_estimated(catalog):
 def test_pp_post_fillers_map_like_plain_ones(catalog, part, devon):
     m = Mapper(catalog).map_line(line(part, "Divi Linear Post Filler"))
     assert m.targets == [(devon, 1)] and m.status == "ok"
+
+
+def test_divi50_choice(catalog):
+    panel = line("P-DLFRPM5024", "Divi Linear Panel - NPWR - 50H x 24W")
+    post = line("P-DLPF250", "Divi Linear Post Filler - 2 -Way 50H")
+    assert Mapper(catalog).map_line(panel).targets == [("HM01.5324", 1)]  # default 53"
+    m47 = Mapper(catalog, divi50=47)
+    assert m47.map_line(panel).targets == [("HM01.4724", 1)]
+    assert m47.map_line(post).targets == [("HMA130.47", 1)]  # connectors follow the panel height
+    with pytest.raises(ValueError):
+        Mapper(catalog, divi50=50)

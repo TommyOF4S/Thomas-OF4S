@@ -35,6 +35,7 @@ class QuoteOptions:
     grade: str = "keystone"
     trim: str | None = None
     delivery: float | None = None  # None: estimated from the order weight
+    divi50: int = 53  # Devon height for 50" AIS panels: 53 or 47
     stations: int | None = None
     notes: str = ""
     drawings: list[str] = field(default_factory=list)
@@ -104,7 +105,7 @@ def build_quote(
 
     plan = read_plans(opts.plan_pdfs)
     marks = read_image_marks(opts.plan_images, opts.plan_pdfs, plan)
-    result = Mapper(catalog, load_overrides(overrides)).map(lines, plan, marks)
+    result = Mapper(catalog, load_overrides(overrides), divi50=opts.divi50).map(lines, plan, marks)
     grade = [g.lower() for g in GRADES].index(opts.grade.lower())
 
     out_dir = Path(out_dir)
