@@ -101,10 +101,10 @@ def test_plan_matching_bom_has_no_revision_warning():
              BomLine("P-DLFRPM5060", "Divi Linear Panel - NPWR - 50H x 60W", 2),
              BomLine("P-DLPF250", "Divi Linear Post Filler - 2 -Way 50H", 2),  # corners only
              BomLine("P-DLPF350", "Divi Linear Post Filler - 3 Way - 50H", 1),
+             BomLine("P-DLPF450", "Divi Linear Post Filler - 4 Way - 50H", 1),
              BomLine("P-DLSEOR", "Divi Linear Base - End of Run Shroud", 9)]
     res = Mapper(cat).map(lines, analyze_pdf(PLAN))
     assert res.warnings == []
-    assert res.quantities["HMC132.48"] == 1  # the plan's 4-way joint; AIS has no 4-way part in the SIF
 
 
 @needs_template

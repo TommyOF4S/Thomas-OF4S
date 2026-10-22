@@ -383,7 +383,7 @@ class Mapper:
                 if label not in sources[part]:
                     sources[part].append(label)
         elif heights:
-            warnings.append("The AIS SIF doesn't list straight panel-to-panel joints or 4-way joints (AIS has no 4-way connection), and Devon quotes a panel-to-panel connector (HMP213) or a 4-way connector (HMC132) at each one. Add the 2D (a CET PDF) so they're counted; none are quoted now.")
+            warnings.append("The AIS SIF doesn't list straight panel-to-panel joints, and Devon quotes a panel-to-panel connector (HMP213) at each one. Add the 2D (a CET PDF) so they're counted; none are quoted now.")
         if marks is not None and marks.off_panel:
             one = marks.off_panel == 1
             warnings.append(f"{marks.off_panel} colored mark{'' if one else 's'} on the 2D {'is' if one else 'are'}n't on "
@@ -412,15 +412,13 @@ class Mapper:
         """Pink dashes and colored dots read from 2D images, when there's no vector plan to measure.
 
         The AIS SIF doesn't list straight joints (its 2-way posts are corners), so each pink dash adds a
-        panel-to-panel connector, at the BOM's main panel height. It doesn't list 4-way joints either (AIS has
-        none), and an image can't show them, so the review asks for a PDF or a hand count.
+        panel-to-panel connector, at the BOM's main panel height.
         """
         warnings = []
         height = self.run_height or 53
         parts = []
         if self.marks.pink:
             parts.append(("pink", connector("inline", height), self.marks.pink))
-        warnings.append("A PNG/JPG 2D can't show where four panels meet, and the AIS SIF doesn't list 4-way joints, so no 4-way connectors (HMC132) are quoted. Export the 2D as a CET PDF to count them, or add them by hand.")
         parts += [("filler", p, q) for p, q in self._mark_fillers(warnings).items()]
         if len(bom_heights) > 1 and not self.marks.dots:
             warnings.append(f'The BOM has panels at more than one height; panel-to-panel connectors are quoted at {height}"H '
@@ -599,6 +597,7 @@ class Mapper:
             ("panels", plan.panels, n(plan.panels, "panel"), "panels"),
             ("pf2", c["l"], n(c["l"], "corner"), "2-way (corner) posts"),
             ("pf3", c["tee"], n(c["tee"], "three-way joint"), "3-way posts"),
+            ("pf4", c["cross"], n(c["cross"], "four-way joint"), "4-way posts"),
             ("seor", c["ends"], n(c["ends"], "free end"), "end-of-run shrouds"),
         ]
         for key, plan_n, plan_text, bom_text in checks:

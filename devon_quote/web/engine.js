@@ -546,7 +546,6 @@
       const height = runHeight || 53;
       const parts = [];
       if (marks.pink) parts.push(["pink", connector("inline", height), marks.pink]);
-      warnings.push("A PNG/JPG 2D can't show where four panels meet, and the AIS SIF doesn't list 4-way joints, so no 4-way connectors (HMC132) are quoted. Export the 2D as a CET PDF to count them, or add them by hand.");
       for (const [p, q] of markFillers(warnings)) parts.push(["filler", p, q]);
       if (bomHeights.length > 1 && !Object.keys(marks.dots || {}).length) {
         warnings.push(`The BOM has panels at more than one height; panel-to-panel connectors are quoted at ${height}"H and the 2D has no colored dots. Mark each height change with a colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, purple 53/67) to add its high/low filler strip.`);
@@ -667,6 +666,7 @@
         ["panels", plan.panels, n(plan.panels, "panel"), "panels"],
         ["pf2", c.l, n(c.l, "corner"), "2-way (corner) posts"],
         ["pf3", c.tee, n(c.tee, "three-way joint"), "3-way posts"],
+        ["pf4", c.cross, n(c.cross, "four-way joint"), "4-way posts"],
         ["seor", c.ends, n(c.ends, "free end"), "end-of-run shrouds"],
       ];
       for (const [key, planN, planText, bomText] of checks) {
@@ -739,7 +739,7 @@
           if (!sources[part].includes(label)) sources[part].push(label);
         }
       } else if (heights.size) {
-        warnings.push("The AIS SIF doesn't list straight panel-to-panel joints or 4-way joints (AIS has no 4-way connection), and Devon quotes a panel-to-panel connector (HMP213) or a 4-way connector (HMC132) at each one. Add the 2D (a CET PDF) so they're counted; none are quoted now.");
+        warnings.push("The AIS SIF doesn't list straight panel-to-panel joints, and Devon quotes a panel-to-panel connector (HMP213) at each one. Add the 2D (a CET PDF) so they're counted; none are quoted now.");
       }
       if (marksSummary && marksSummary.offPanel) {
         const one = marksSummary.offPanel === 1;

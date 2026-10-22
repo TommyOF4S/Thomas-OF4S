@@ -89,8 +89,7 @@ It writes three files to `out/`:
 The 2D and the SIF are matched up, never added together. The SIF has no part for straight
 panel-to-panel joints, so the 2D is the only source for Devon's panel-to-panel connectors. With a
 2D plan, every connector and finished end comes from the plan, and the SIF's posts become a
-cross-check (2-way posts = corners, 3-way = 3-way joints, end-of-run shrouds = free ends; 4-way
-joints and straight joints have no AIS part, so they come only from the plan); any
+cross-check (2-way posts = corners, 3-way = 3-way joints, end-of-run shrouds = free ends); any
 mismatch is flagged in the review, not added. Saved corrections for posts and shrouds apply only to
 quotes without a 2D.
 
@@ -146,8 +145,7 @@ pixels into the mark colors, groups touching pixels, and keeps long thin pink sh
 round solid dot-sized shapes (dots) that sit on panel lines. It ignores letter holes in colored
 callout boxes, dotted dimension lines, and the pinkish blurred edges of red lines. With marks but
 no vector plan, each pink dash adds a panel-to-panel connector; colored dots add their filler
-strips; AIS 2-way posts (corners), 3-way posts and end-of-run shrouds come from the SIF. An image can't
-show 4-way joints and the SIF has none, so the review asks for a PDF or a hand count of `HMC132`. The hosted page lists every mark it found, numbered on the
+strips; every other connector (AIS 2-way posts as corners, 3-way, 4-way, ends) comes from the SIF. The hosted page lists every mark it found, numbered on the
 plan, with a checkbox to untick anything that isn't a designer mark (such as a CET symbol).
 `devon_quote/marks.py` and `imageMarks()` in `web/engine.js` are the same algorithm;
 `tests/test_marks.py` checks they agree pixel for pixel.
@@ -159,8 +157,7 @@ plan, with a checkbox to untick anything that isn't a designer mark (such as a C
 | AIS Divi | Devon |
 |---|---|
 | Panels `P-DL…HHWW` | `HM01.HHWW` at the Devon equivalent height: Divi 42H → 39H, 50H → 53H, 82H → 85H; any other height rounds **up** to Devon's 39/47/53/67/85. Powered panels become `.P4`. Glass panels become `HM51` (panel + 14" glass stacker). |
-| Posts 2/3-way `P-DLPF*` | `HMA130` / `HMA137` at that height. An AIS 2-way post is always a corner. |
-| 4-way joints | AIS has no 4-way connection, so the SIF never lists one; Devon needs a 4-way connector `HMC132` at each. Only the 2D PDF shows them. |
+| Posts 2/3/4-way `P-DLPF*` | `HMA130` / `HMA137` / `HMC132` at that height. An AIS 2-way post is always a corner. |
 | Straight joints | AIS lists nothing for them; Devon needs a panel-to-panel connector `HMP213` at each. Only the 2D shows them, so without one the review warns that none are quoted. |
 | End-of-run shroud | `HMA128` finished end kit |
 | Infeeds, duplex outlets, data plates | `BE-SDFD1`/`BE-ENDFD`, `BE-REC1-4`, `BE01439-C` |
