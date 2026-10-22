@@ -5,3 +5,4 @@ out/
 __pycache__/
 .pytest_cache/
 build/
+skills/devon-quote/scripts/

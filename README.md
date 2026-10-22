@@ -187,3 +187,10 @@ The tests need the Devon calculator in `templates/`. Without it, most of them sk
   flagged items (straight vs. corner joints, wall starts, finished ends, pass-thrus).
 - Load the full AIS Divi price list / catalog so every Divi part number is recognized.
 - Check the output against past jobs that have both a CET file and Devon's actual quote.
+
+## Sharing as a Claude skill
+
+`skills/devon-quote/` is a Claude skill that runs this same engine, so teammates can ask Claude for a
+Devon quote with the SIF, the 2D PDF and Devon's calculator attached. Build the shareable file with
+`python skills/build_skill.py` (writes `build/devon-quote.skill`, with the current code copied in). The
+Devon calculator is never bundled; each teammate attaches their own copy.
