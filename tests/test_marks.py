@@ -97,7 +97,8 @@ def test_pink_dashes_add_panel_to_panel_connectors():
     assert q["HMP213.48"] == 5 and q["HMA130.53"] == 7
     assert q["HMA137.53"] == 1
     assert q["HMHL3953"] == 2 and q["HMHL5367"] == 1
-    assert res.warnings == []
+    assert "HMC132.48" not in q  # an image can't show 4-way joints and AIS has none: flagged, not guessed
+    assert len(res.warnings) == 1 and "can't show where four panels meet" in res.warnings[0]
 
 
 @needs_template
