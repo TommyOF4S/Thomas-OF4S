@@ -122,15 +122,12 @@ label.f input, label.f select, .fixform input { width: 100%; border: 1px solid v
 .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
 .planread { margin-top: 4px; font-size: 13px; color: var(--fg-2); }
 .planread b { color: var(--fg); font-weight: 600; }
-.dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 7px; vertical-align: -1px; box-shadow: 0 0 0 1px rgba(0,0,0,0.35); }
-.dash { display: inline-block; width: 16px; height: 4px; border-radius: 2px; background: #ff66b3; margin-right: 7px; vertical-align: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,0.3); }
 .marklist { margin-top: 8px; font-size: 13.5px; }
 .marklist summary { cursor: pointer; color: var(--fg-2); font-size: 13px; }
 .markrow { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
 .markrow.off { color: var(--fg-3); }
 .markrow i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,0.35); flex: none; }
 .markrow .num { font-family: var(--mono); font-size: 12px; min-width: 1.6em; text-align: right; color: var(--fg-2); }
-.dotkey { list-style: none; padding: 0; margin: 6px 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 3px 14px; color: var(--fg-2); font-family: var(--mono); font-size: 12px; }
 .tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .tabs button { border: 1px solid var(--line-2); background: var(--surface); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tabs button.on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
@@ -225,16 +222,6 @@ footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
         <input id="planInput" type="file" accept=".pdf,image/*" multiple hidden>
         <div id="planList"></div>
         <p class="hint"><b>Height changes:</b> nothing to draw when the 2D is a PDF with CET's panel labels (A6660 = 66"H × 60"W). Where panels of different heights meet, the connector is quoted at the taller height and a high/low filler strip covers the step, such as HMHL3967 where a 42" (Devon 39") panel meets a 66" (Devon 67").</p>
-        <div class="hint">For a PNG or JPG, or to override the labels, put a colored dot on each joint where the height changes. The color picks the filler strip:
-          <ul class="dotkey">
-            <li><span class="dot" style="background:#e00000"></span>Red · 39" to 53" · HMHL3953</li>
-            <li><span class="dot" style="background:#0040ff"></span>Blue · 39" to 67" · HMHL3967</li>
-            <li><span class="dot" style="background:#ffe000"></span>Yellow · 47" to 53" · HMHL4753</li>
-            <li><span class="dot" style="background:#00a000"></span>Green · 47" to 67" · HMHL4767</li>
-            <li><span class="dot" style="background:#8000c0"></span>Purple · 53" to 67" · HMHL5367</li>
-          </ul>
-          Dots win over labels. 39" to 47" (HMHL3947) has no color, but the labels find it.</div>
-        <p class="hint"><span class="dash" aria-hidden="true"></span><b>Panel-to-panel connectors:</b> draw a pink dash on each panel-to-panel joint. When the plan has pink dashes, each marked joint is quoted as one panel-to-panel connector (HMP213), and any straight joint without a dash is flagged. Without pink dashes, the straight joints the page measures are used.</p>
       </div>
 
       <div class="card">
