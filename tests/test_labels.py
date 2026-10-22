@@ -164,12 +164,12 @@ def test_saved_corrections_dont_double_the_plan_connectors(tmp_path):
 
     cat = load_catalog(TEMPLATE)
     res = Mapper(cat, [Override(a, d, 1.0, "") for a, d in SAVED]).map(load_bom(BOM), analyze_pdf(PLAN))
-    assert res.quantities["HMA130.67"] == 4  # 4 corners on the plan, 4 AIS 2-way corner posts: 4, not 8
+    assert res.quantities["HMA130.67"] == 4  # 4 corners on the plan, 4 AIS 2-way (corner) posts: 4, not 8
     assert res.quantities["HMA128.67"] == 3
     post = [m for m in res.mappings if m.source.part == "P-DLPF266"][0]
     assert post.targets == [] and "saved correction to HMA130.67 is used only without a 2D" in post.note
     # without a plan the corrections still apply
-    assert Mapper(cat, [Override(a, d, 1.0, "") for a, d in SAVED]).map(load_bom(BOM)).quantities["HMA130.67"] == 6
+    assert Mapper(cat, [Override(a, d, 1.0, "") for a, d in SAVED]).map(load_bom(BOM)).quantities["HMA130.67"] == 4
 
     if _node_has("pdfjs-dist/legacy/build/pdf.js") and _node_has("jszip"):
         overrides = [{"ais_part": a, "devon_part": d, "ratio": 1, "note": ""} for a, d in SAVED]

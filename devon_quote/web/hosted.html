@@ -793,9 +793,9 @@ function renderResults() {
     const parts = r.planParts.map((x) => x[1] + " × " + x[2]).join(", ");
     items.unshift(`<div class="item" style="border-left-color:var(--accent-2)"><div class="note"><b>Read from the 2D:</b> ${r.marks.pink} pink dash${r.marks.pink === 1 ? "" : "es"}` +
       `${Object.keys(r.marks.dots).length ? " · dots: " + esc(Object.entries(r.marks.dots).map(([c, n]) => `${n} ${c}`).join(", ")) : ""}. ` +
-      `Quoted from the marks: ${esc(parts || "nothing")}. AIS 2-way posts cover straight joints and corners, so the pink dashes are the panel-to-panel connectors and the rest of the 2-way posts are corners.</div></div>`);
+      `Quoted from the marks: ${esc(parts || "nothing")}. The AIS SIF doesn't list straight joints, so each pink dash adds a panel-to-panel connector; AIS 2-way posts are quoted as corners.</div></div>`);
   } else if (!r.plan && state.plans.length) {
-    items.unshift(`<div class="item warnline"><div class="note"><b>No marks found on the 2D.</b> Connectors come from the AIS SIF only, so straight panel-to-panel joints are quoted as 2-way corners. Export the CET 2D as a PDF with panel labels on, or draw a pink dash on each panel-to-panel joint and colored dots at height changes, then export again.</div></div>`);
+    items.unshift(`<div class="item warnline"><div class="note"><b>No marks found on the 2D.</b> The AIS SIF doesn't list straight joints, so no panel-to-panel connectors are quoted. Export the CET 2D as a PDF with panel labels on, or draw a pink dash on each panel-to-panel joint and colored dots at height changes, then export again.</div></div>`);
   }
   if (r.plan) {
     items.unshift(`<div class="item" style="border-left-color:var(--accent-2)"><div class="note">${planSummaryText(r.plan)}. Connectors are quoted from the plan: ${esc(r.planParts.map((x) => x[1] + " × " + x[2]).join(", "))}. Free ends are quoted as finished ends; swap any at a wall to a wall start (HMA199).</div></div>`);

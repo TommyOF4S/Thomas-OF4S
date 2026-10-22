@@ -202,21 +202,19 @@ class Mapper:
         return Mapping(line, [(part, 1)], "review" if notes else "ok", "; ".join(notes), "panel")
 
     def _rule_drawing(self, line: BomLine) -> Mapping | None:
-        """Posts and end-of-run shrouds the 2D counts. Runs before saved corrections, so a correction made for a
+        """Posts and end-of-run shrouds the 2D plan counts. Runs before saved corrections, so a correction made for a
         quote without a 2D doesn't add the same connectors a second time."""
         pn = line.part.upper()
         m = _POST.match(pn)
         is_end = pn == "P-DLSEOR" or "END OF RUN" in line.description.upper()
         if self.plan is not None and (m or is_end):
             note = "connectors and finished ends are counted from the 2D plan"
-        elif self.marks is not None and m and m.group(1) == "2" and self.marks.pink:
-            note = "2-way posts are split into panel-to-panel connectors (pink dashes on the 2D) and 2-way corners"
         else:
             return None
         saved = self._rule_override(line)
         if saved is not None and saved.targets:
             note += f"; the saved correction to {', '.join(p for p, _ in saved.targets)} is used only without a 2D"
-        return Mapping(line, [], "ok", note, "plan" if self.plan is not None else "marks")
+        return Mapping(line, [], "ok", note, "plan")
 
     def _rule_post(self, line: BomLine) -> Mapping | None:
         pn = line.part.upper()
@@ -225,14 +223,7 @@ class Mapper:
         if m:
             ways, h = int(m.group(1)), int(m.group(2))
             height, hnote = devon_height(h)
-            if ways == 2:
-                part = connector("2way", height)
-                note = (
-                    "AIS 2-way post covers both straight runs and L-corners; Devon uses "
-                    f"{connector('inline', height)} for straight panel-to-panel joints. Check the plan."
-                )
-                return Mapping(line, [(part, 1)], "review", "; ".join(filter(None, [hnote, note])), "post")
-            part = connector("3way" if ways == 3 else "4way", height)
+            part = connector({2: "2way", 3: "3way"}.get(ways, "4way"), height)  # an AIS 2-way post is a corner
             return Mapping(line, [(part, 1)], "review" if hnote else "ok", hnote, "post")
         if is_end:
             height = self.run_height or 53
@@ -391,6 +382,8 @@ class Mapper:
                 raw[part] += qty
                 if label not in sources[part]:
                     sources[part].append(label)
+        elif heights:
+            warnings.append("The AIS SIF doesn't list straight panel-to-panel joints, and Devon quotes a panel-to-panel connector (HMP213) at each one. Add the 2D (a CET PDF) so they're counted; none are quoted now.")
         if marks is not None and marks.off_panel:
             one = marks.off_panel == 1
             warnings.append(f"{marks.off_panel} colored mark{'' if one else 's'} on the 2D {'is' if one else 'are'}n't on "
@@ -418,32 +411,19 @@ class Mapper:
     def _image_connectors(self, lines: list[BomLine], bom_heights: list[int]) -> tuple[list[tuple[str, str, int]], list[str]]:
         """Pink dashes and colored dots read from 2D images, when there's no vector plan to measure.
 
-        AIS 2-way posts cover both straight panel-to-panel joints and 90-degree corners, so the
-        pink dashes are the panel-to-panel connectors and the remaining 2-way posts are corners.
+        The AIS SIF doesn't list straight joints (its 2-way posts are corners), so each pink dash adds a
+        panel-to-panel connector, at the BOM's main panel height.
         """
         warnings = []
-        two_way = Counter()
-        for ln in lines:
-            m = _POST.match(ln.part.upper())
-            if m and m.group(1) == "2":
-                two_way[devon_height(int(m.group(2)))[0]] += ln.qty
-        height = two_way.most_common(1)[0][0] if two_way else (self.run_height or 53)
-        total = sum(two_way.values())
-        pink = self.marks.pink
+        height = self.run_height or 53
         parts = []
-        if pink:
-            parts.append(("pink", connector("inline", height), pink))
-            corners = total - pink
-            if corners > 0:
-                parts.append(("l", connector("2way", height), int(math.ceil(corners - 1e-9))))
-            if total and pink > total:
-                warnings.append(f"The 2D shows {pink} pink dashes but the AIS BOM has only {total:g} 2-way posts; "
-                                f"quoted {pink} panel-to-panel connectors and no 2-way corners. Check the marks.")
+        if self.marks.pink:
+            parts.append(("pink", connector("inline", height), self.marks.pink))
         parts += [("filler", p, q) for p, q in self._mark_fillers(warnings).items()]
         if len(bom_heights) > 1 and not self.marks.dots:
-            warnings.append("The BOM has panels at more than one height but the 2D has no colored dots. "
-                            "Mark each height change with a colored dot (red 39/53, blue 39/67, yellow 47/53, "
-                            "green 47/67, purple 53/67) to add its high/low filler strip.")
+            warnings.append(f'The BOM has panels at more than one height; panel-to-panel connectors are quoted at {height}"H '
+                            "and the 2D has no colored dots. Mark each height change with a colored dot (red 39/53, "
+                            "blue 39/67, yellow 47/53, green 47/67, purple 53/67) to add its high/low filler strip.")
         return parts, warnings
 
     def _height_changes(self, warnings: list[str]) -> Counter:
@@ -615,7 +595,7 @@ class Mapper:
         n = lambda k, word: f"{k} {word}" + ("" if k == 1 else "s")
         checks = [
             ("panels", plan.panels, n(plan.panels, "panel"), "panels"),
-            ("pf2", c["straight"] + c["l"], f"{n(c['straight'], 'straight joint')} + {n(c['l'], 'corner')}", "2-way posts"),
+            ("pf2", c["l"], n(c["l"], "corner"), "2-way (corner) posts"),
             ("pf3", c["tee"], n(c["tee"], "three-way joint"), "3-way posts"),
             ("pf4", c["cross"], n(c["cross"], "four-way joint"), "4-way posts"),
             ("seor", c["ends"], n(c["ends"], "free end"), "end-of-run shrouds"),

@@ -82,9 +82,15 @@ def test_rules(catalog, part, desc, expected):
     assert m.status in ("ok", "review")
 
 
-def test_two_way_post_is_flagged(catalog):
+def test_two_way_post_is_a_corner(catalog):
+    # AIS lists no part for straight joints, so a 2-way post is always a corner
     m = Mapper(catalog).map_line(line("P-DLPF250", "Divi Linear Post Filler - 2 -Way 50H"))
-    assert m.targets == [("HMA130.53", 1)] and m.status == "review"
+    assert m.targets == [("HMA130.53", 1)] and m.status == "ok"
+
+
+def test_no_2d_warns_that_panel_to_panel_joints_are_missing(catalog):
+    res = Mapper(catalog).map([line("P-DLFRPM5024", "Divi Linear Panel - NPWR - 50H x 24W", 2)])
+    assert any("doesn't list straight panel-to-panel joints" in w for w in res.warnings)
 
 
 def test_cantilevers_become_pairs(catalog):

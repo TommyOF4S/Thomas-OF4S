@@ -99,7 +99,7 @@ def test_plan_matching_bom_has_no_revision_warning():
     lines = [BomLine("P-DLFRPM5024", "Divi Linear Panel - NPWR - 50H x 24W", 10),
              BomLine("P-DLFRPM5042", "Divi Linear Panel - NPWR - 50H x 42W", 1),
              BomLine("P-DLFRPM5060", "Divi Linear Panel - NPWR - 50H x 60W", 2),
-             BomLine("P-DLPF250", "Divi Linear Post Filler - 2 -Way 50H", 5),
+             BomLine("P-DLPF250", "Divi Linear Post Filler - 2 -Way 50H", 2),  # corners only
              BomLine("P-DLPF350", "Divi Linear Post Filler - 3 Way - 50H", 1),
              BomLine("P-DLPF450", "Divi Linear Post Filler - 4 Way - 50H", 1),
              BomLine("P-DLSEOR", "Divi Linear Base - End of Run Shroud", 9)]

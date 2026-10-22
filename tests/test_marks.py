@@ -88,32 +88,24 @@ def _two_way_lines(n):
 
 
 @needs_template
-def test_image_marks_split_two_way_posts():
+def test_pink_dashes_add_panel_to_panel_connectors():
+    # AIS lists no part for straight joints: 2-way posts stay corners and each pink dash adds an HMP213
     cat = load_catalog(TEMPLATE)
     marks = MarksSummary(pink=5, dots={"red": 2, "purple": 1})
     res = Mapper(cat).map(_two_way_lines(7), None, marks)
     q = res.quantities
-    assert q["HMP213.48"] == 5 and q["HMA130.53"] == 2  # 7 AIS 2-way posts = 5 straight + 2 corners
-    assert q["HMA137.53"] == 1  # other posts still come from the SIF
+    assert q["HMP213.48"] == 5 and q["HMA130.53"] == 7
+    assert q["HMA137.53"] == 1
     assert q["HMHL3953"] == 2 and q["HMHL5367"] == 1
     assert res.warnings == []
-    two_way = [m for m in res.mappings if m.source.part == "P-DLPF250"][0]
-    assert two_way.targets == [] and two_way.rule == "marks"
 
 
 @needs_template
-def test_more_dashes_than_two_way_posts_is_flagged():
-    cat = load_catalog(TEMPLATE)
-    res = Mapper(cat).map(_two_way_lines(3), None, MarksSummary(pink=5))
-    assert res.quantities["HMP213.48"] == 5 and "HMA130.53" not in res.quantities
-    assert any("only 3 2-way posts" in w for w in res.warnings)
-
-
-@needs_template
-def test_no_marks_keeps_old_behavior():
+def test_no_marks_quotes_no_panel_to_panel_connectors():
     cat = load_catalog(TEMPLATE)
     res = Mapper(cat).map(_two_way_lines(7), None, MarksSummary())
     assert res.quantities["HMA130.53"] == 7 and "HMP213.48" not in res.quantities
+    assert any("doesn't list straight panel-to-panel joints" in w for w in res.warnings)
 
 
 @needs_template

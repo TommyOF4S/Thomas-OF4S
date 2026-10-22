@@ -126,11 +126,10 @@ def write_report(
         w("## Marks read from the 2D\n")
         w(f"Pink dashes (panel-to-panel): {mk.pink} · colored dots (filler strips): {dots}\n")
         if result.plan is None:
-            w("AIS 2-way posts cover straight joints and corners: the pink dashes are the panel-to-panel "
-              "connectors and the remaining 2-way posts are quoted as corners.\n")
+            w("The AIS SIF doesn't list straight joints, so each pink dash adds a panel-to-panel connector. "
+              "AIS 2-way posts are quoted as corners.\n")
             w("| From the 2D | Qty | Devon part |\n|---|---:|---|")
-            labels = {"pink": "Pink dash: panel-to-panel connector", "l": "Remaining AIS 2-way posts: corner",
-                      "filler": "Colored dot: high/low filler strip"}
+            labels = {"pink": "Pink dash: panel-to-panel connector", "filler": "Colored dot: high/low filler strip"}
             for kind, part, qty in result.plan_parts:
                 w(f"| {labels[kind]} | {qty} | {part} |")
             w("")

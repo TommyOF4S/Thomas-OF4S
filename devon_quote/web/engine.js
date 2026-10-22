@@ -324,7 +324,7 @@
     const has = (p) => catalog.has(p);
 
     const rules = [
-      // Posts and end-of-run shrouds the 2D counts. Runs before saved corrections, so a correction made for a
+      // Posts and end-of-run shrouds the 2D plan counts. Runs before saved corrections, so a correction made for a
       // quote without a 2D doesn't add the same connectors a second time.
       function drawing(line) {
         const pn = line.part.toUpperCase();
@@ -332,11 +332,10 @@
         const isEnd = pn === "P-DLSEOR" || line.description.toUpperCase().includes("END OF RUN");
         let note;
         if (plan && (m || isEnd)) note = "connectors and finished ends are counted from the 2D plan";
-        else if (marks && m && m[1] === "2" && marks.pink) note = "2-way posts are split into panel-to-panel connectors (pink dashes on the 2D) and 2-way corners";
         else return null;
         const saved = rules[1](line);
         if (saved && saved.targets.length) note += `; the saved correction to ${saved.targets.map(([p]) => p).join(", ")} is used only without a 2D`;
-        return M(line, [], "ok", note, plan ? "plan" : "marks");
+        return M(line, [], "ok", note, "plan");
       },
       function override(line) {
         const pn = line.part.toUpperCase();
@@ -381,11 +380,8 @@
         if (m) {
           const ways = +m[1];
           const [height, hnote] = devonHeight(+m[2]);
-          if (ways === 2) {
-            const note = `AIS 2-way post covers both straight runs and L-corners; Devon uses ${connector("inline", height)} for straight panel-to-panel joints. Check the plan.`;
-            return M(line, [[connector("2way", height), 1]], "review", [hnote, note].filter(Boolean).join("; "), "post");
-          }
-          return M(line, [[connector(ways === 3 ? "3way" : "4way", height), 1]], hnote ? "review" : "ok", hnote, "post");
+          // an AIS 2-way post is a corner
+          return M(line, [[connector(ways === 2 ? "2way" : ways === 3 ? "3way" : "4way", height), 1]], hnote ? "review" : "ok", hnote, "post");
         }
         const d = line.description.toUpperCase();
         if (isEnd) {
@@ -543,28 +539,16 @@
       return fillers;
     }
 
-    // AIS 2-way posts cover both straight panel-to-panel joints and 90-degree corners: the pink dashes
-    // are the panel-to-panel connectors and the remaining 2-way posts are corners.
+    // The AIS SIF doesn't list straight joints (its 2-way posts are corners), so each pink dash on a 2D image
+    // adds a panel-to-panel connector, at the BOM's main panel height.
     function imageConnectors(lines, bomHeights) {
       const warnings = [];
-      const twoWay = new Map();
-      for (const ln of lines) {
-        const m = ln.part.toUpperCase().match(POST);
-        if (m && m[1] === "2") { const h = devonHeight(+m[2])[0]; twoWay.set(h, (twoWay.get(h) || 0) + ln.qty); }
-      }
-      let height = runHeight || 53, best = -1, total = 0;
-      for (const [h, q] of twoWay) { total += q; if (q > best) { best = q; height = h; } }
-      const pink = marks.pink;
+      const height = runHeight || 53;
       const parts = [];
-      if (pink) {
-        parts.push(["pink", connector("inline", height), pink]);
-        const corners = total - pink;
-        if (corners > 0) parts.push(["l", connector("2way", height), Math.ceil(corners - 1e-9)]);
-        if (total && pink > total) warnings.push(`The 2D shows ${pink} pink dashes but the AIS BOM has only ${fmtQty(total)} 2-way posts; quoted ${pink} panel-to-panel connectors and no 2-way corners. Check the marks.`);
-      }
+      if (marks.pink) parts.push(["pink", connector("inline", height), marks.pink]);
       for (const [p, q] of markFillers(warnings)) parts.push(["filler", p, q]);
       if (bomHeights.length > 1 && !Object.keys(marks.dots || {}).length) {
-        warnings.push("The BOM has panels at more than one height but the 2D has no colored dots. Mark each height change with a colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, purple 53/67) to add its high/low filler strip.");
+        warnings.push(`The BOM has panels at more than one height; panel-to-panel connectors are quoted at ${height}"H and the 2D has no colored dots. Mark each height change with a colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, purple 53/67) to add its high/low filler strip.`);
       }
       return [parts, warnings];
     }
@@ -680,7 +664,7 @@
       const n = (k, word) => `${k} ${word}` + (k === 1 ? "" : "s");
       const checks = [
         ["panels", plan.panels, n(plan.panels, "panel"), "panels"],
-        ["pf2", c.straight + c.l, `${n(c.straight, "straight joint")} + ${n(c.l, "corner")}`, "2-way posts"],
+        ["pf2", c.l, n(c.l, "corner"), "2-way (corner) posts"],
         ["pf3", c.tee, n(c.tee, "three-way joint"), "3-way posts"],
         ["pf4", c.cross, n(c.cross, "four-way joint"), "4-way posts"],
         ["seor", c.ends, n(c.ends, "free end"), "end-of-run shrouds"],
@@ -754,6 +738,8 @@
           (sources[part] ||= []);
           if (!sources[part].includes(label)) sources[part].push(label);
         }
+      } else if (heights.size) {
+        warnings.push("The AIS SIF doesn't list straight panel-to-panel joints, and Devon quotes a panel-to-panel connector (HMP213) at each one. Add the 2D (a CET PDF) so they're counted; none are quoted now.");
       }
       if (marksSummary && marksSummary.offPanel) {
         const one = marksSummary.offPanel === 1;
@@ -1390,9 +1376,9 @@
       w("## Marks read from the 2D\n");
       w(`Pink dashes (panel-to-panel): ${mk.pink} · colored dots (filler strips): ${dots}\n`);
       if (!result.plan) {
-        w("AIS 2-way posts cover straight joints and corners: the pink dashes are the panel-to-panel connectors and the remaining 2-way posts are quoted as corners.\n");
+        w("The AIS SIF doesn't list straight joints, so each pink dash adds a panel-to-panel connector. AIS 2-way posts are quoted as corners.\n");
         w("| From the 2D | Qty | Devon part |\n|---|---:|---|");
-        const labels = { pink: "Pink dash: panel-to-panel connector", l: "Remaining AIS 2-way posts: corner", filler: "Colored dot: high/low filler strip" };
+        const labels = { pink: "Pink dash: panel-to-panel connector", filler: "Colored dot: high/low filler strip" };
         for (const [k, p, q] of result.planParts) w(`| ${labels[k]} | ${q} | ${p} |`);
         w("");
       }
