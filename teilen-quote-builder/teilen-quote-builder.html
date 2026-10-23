@@ -1,0 +1,1530 @@
+<title>Teilen Quote Builder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky app bar, then one working view at a time. Builder is an
+   asymmetric 1.6fr / 1fr grid: wall cards on the left, a sticky cost-to-sell
+   summary on the right. Collapses to one column at 960px. OF4S v3 tokens. */
+:root {
+  --paper: #faf8f4;
+  --paper-2: #f3efe7;
+  --raised: #ffffff;
+  --line: rgba(15, 29, 51, 0.1);
+  --line-2: rgba(15, 29, 51, 0.18);
+  --ink: #1a1814;
+  --ink-body: #3a362f;
+  --ink-soft: #555047;
+  --muted: #7a7468;
+  --accent: #2d4a6e;
+  --accent-soft: #dde5ee;
+  --accent-ink: #15273f;
+  --btn: #15273f;
+  --btn-ink: #faf8f4;
+  --logo-four: #466489;
+  --garnish: #8e6a30;
+  --ok: #5a7a4f;
+  --ok-soft: #e4ebe0;
+  --warn: #8a6232;
+  --warn-dot: #b8895a;
+  --warn-soft: #f4ead9;
+  --bad: #9c3a30;
+  --bad-soft: #f4e0dc;
+  --mel: #e3dccd;
+  --mel-line: #a8a094;
+  --glass: #dde5ee;
+  --glass-line: #7f9bbd;
+  --wood: #c2b294;
+  --frame: #555047;
+  --overlay: rgba(26, 24, 20, 0.45);
+
+  --font-display: 'Schibsted Grotesk', 'Geist', 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: 'Geist', -apple-system, system-ui, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  --r-md: 4px;
+  --r-lg: 8px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --shadow-lg: 0 18px 40px rgba(15, 29, 51, 0.12), 0 4px 12px rgba(15, 29, 51, 0.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1a1814; --paper-2: #211f1a; --raised: #26231e;
+    --line: rgba(250, 248, 244, 0.1); --line-2: rgba(250, 248, 244, 0.2);
+    --ink: #faf8f4; --ink-body: #e0d9ca; --ink-soft: #c4bcad; --muted: #a8a094;
+    --accent: #8fa9c7; --accent-soft: rgba(143, 169, 199, 0.16); --accent-ink: #dde5ee;
+    --btn: #8fa9c7; --btn-ink: #0f1d33; --logo-four: #8fa9c7; --garnish: #c9a474;
+    --ok: #a3be96; --ok-soft: rgba(163, 190, 150, 0.14);
+    --warn: #d9bd95; --warn-dot: #c9a474; --warn-soft: rgba(201, 164, 116, 0.14);
+    --bad: #e09a8f; --bad-soft: rgba(224, 154, 143, 0.14);
+    --mel: #4a453b; --mel-line: #7a7468; --glass: rgba(143, 169, 199, 0.24); --glass-line: #8fa9c7;
+    --wood: #7a6a50; --frame: #c4bcad; --overlay: rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1a1814; --paper-2: #211f1a; --raised: #26231e;
+  --line: rgba(250, 248, 244, 0.1); --line-2: rgba(250, 248, 244, 0.2);
+  --ink: #faf8f4; --ink-body: #e0d9ca; --ink-soft: #c4bcad; --muted: #a8a094;
+  --accent: #8fa9c7; --accent-soft: rgba(143, 169, 199, 0.16); --accent-ink: #dde5ee;
+  --btn: #8fa9c7; --btn-ink: #0f1d33; --logo-four: #8fa9c7; --garnish: #c9a474;
+  --ok: #a3be96; --ok-soft: rgba(163, 190, 150, 0.14);
+  --warn: #d9bd95; --warn-dot: #c9a474; --warn-soft: rgba(201, 164, 116, 0.14);
+  --bad: #e09a8f; --bad-soft: rgba(224, 154, 143, 0.14);
+  --mel: #4a453b; --mel-line: #7a7468; --glass: rgba(143, 169, 199, 0.24); --glass-line: #8fa9c7;
+  --wood: #7a6a50; --frame: #c4bcad; --overlay: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink-body);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 30; background: var(--raised);
+}
+em, i { font-style: normal; }
+::selection { background: #15273f; color: #faf8f4; }
+h1, h2, h3 { font-family: var(--font-display); color: var(--ink); margin: 0; text-wrap: balance; font-weight: 500; }
+h1 em, h2 em, h3 em { color: var(--accent); }
+p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.num { font-variant-numeric: tabular-nums; }
+.eyebrow {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--accent); font-weight: 500;
+}
+.label {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--muted);
+}
+.hint { font-size: 12.5px; color: var(--muted); }
+.garnish { font-family: var(--font-mono); font-size: 12px; color: var(--garnish); letter-spacing: 0.04em; }
+
+.wrap {
+  max-width: 1320px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+@media (min-width: 960px) { .wrap { padding-left: max(32px, env(safe-area-inset-left, 0px)); padding-right: max(32px, env(safe-area-inset-right, 0px)); } }
+
+/* App bar */
+.topbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  background: var(--raised); border-bottom: 1px solid var(--line);
+}
+.topbar .wrap { display: flex; align-items: center; gap: 24px; min-height: 60px; flex-wrap: wrap; padding-block: 8px; }
+.brand { display: flex; align-items: center; gap: 14px; text-decoration: none; }
+.logo { font-family: var(--font-display); font-weight: 700; font-size: 22px; color: var(--accent-ink); letter-spacing: 0; line-height: 1; }
+:root:not([data-theme="dark"]) .logo { color: #15273f; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .logo { color: #faf8f4; } }
+:root[data-theme="dark"] .logo { color: #faf8f4; }
+.logo .four { color: var(--logo-four); }
+.brand-rule { width: 1px; height: 26px; background: var(--line-2); }
+.brand-name { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft); line-height: 1.35; }
+.tabs { display: flex; gap: 4px; overflow-x: auto; margin-left: auto; scrollbar-width: none; max-width: 100%; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  border: 0; background: none; padding: 10px 12px; font-size: 14px; font-weight: 500; color: var(--ink-soft);
+  border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; transition: color 150ms var(--ease), border-color 150ms var(--ease);
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tab:disabled { opacity: 0.45; cursor: default; }
+@media (max-width: 720px) { .tabs { margin-left: 0; width: 100%; } .topbar .wrap { gap: 4px; } }
+
+main { padding-block: 32px 96px; }
+.view-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap; margin-bottom: 24px; }
+.view-head h1 { font-size: clamp(30px, 4vw, 44px); line-height: 1.05; letter-spacing: -0.02em; font-weight: 500; margin-top: 12px; }
+.view-head .lede { margin-top: 10px; max-width: 62ch; color: var(--ink-soft); }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: var(--r-md); border: 1px solid var(--line-2); background: var(--raised); color: var(--ink);
+  padding: 9px 14px; font-size: 14px; font-weight: 500; cursor: pointer; text-decoration: none; white-space: nowrap;
+  transition: background 150ms var(--ease), border-color 150ms var(--ease), color 150ms var(--ease);
+}
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--btn); color: var(--btn-ink); border-color: var(--btn); }
+.btn.primary:hover { filter: brightness(1.12); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--ink-soft); }
+.btn.ghost:hover { color: var(--ink); background: var(--paper-2); }
+.btn.sm { padding: 6px 10px; font-size: 13px; }
+.btn.danger-armed { background: var(--bad-soft); color: var(--bad); border-color: var(--bad); }
+.btn svg { width: 16px; height: 16px; flex: none; }
+.btn[disabled] { opacity: 0.5; cursor: default; }
+
+/* Inputs */
+.field { display: grid; gap: 6px; min-width: 0; }
+.field > span:first-child, .field > label:first-child { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.input, .field input, .field select, .field textarea {
+  width: 100%; min-width: 0; border: 1px solid var(--line-2); background: var(--raised); color: var(--ink);
+  border-radius: var(--r-md); padding: 9px 11px; font-size: 14px; transition: border-color 150ms var(--ease);
+}
+.field textarea { resize: vertical; min-height: 72px; line-height: 1.45; }
+.input:focus, .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
+.field input[disabled], .field select[disabled], .field textarea[disabled] { opacity: 0.6; }
+.affix { display: flex; align-items: stretch; border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--raised); overflow: hidden; }
+.affix:focus-within { outline: 2px solid var(--accent); border-color: var(--accent); }
+.affix input { border: 0 !important; outline: none !important; border-radius: 0; background: transparent; min-width: 0; }
+.affix .unit { display: flex; align-items: center; padding: 0 10px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); background: var(--paper-2); white-space: nowrap; }
+input[type="number"] { font-variant-numeric: tabular-nums; }
+
+.card { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-lg); }
+.card-pad { padding: 20px; }
+.section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 32px 0 14px; }
+.section-title h2 { font-size: 22px; letter-spacing: -0.01em; }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap;
+  background: var(--accent-soft); color: var(--accent-ink);
+}
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.8; }
+.pill.s-sent { background: var(--warn-soft); color: var(--warn); }
+.pill.s-won { background: var(--ok-soft); color: var(--ok); }
+.pill.s-lost { background: var(--bad-soft); color: var(--bad); }
+
+/* Quotes list */
+.toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+.toolbar .search { flex: 1 1 240px; max-width: 420px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  border: 1px solid var(--line-2); background: transparent; border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--ink-soft);
+}
+.chip[aria-pressed="true"] { background: var(--btn); color: var(--btn-ink); border-color: var(--btn); }
+.qlist { display: grid; gap: 0; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--raised); overflow: hidden; }
+.qrow {
+  display: grid; grid-template-columns: 120px minmax(0, 1fr) 96px 130px 120px auto; gap: 16px; align-items: center;
+  padding: 14px 18px; border-top: 1px solid var(--line); cursor: pointer; transition: background 150ms var(--ease);
+}
+.qrow:first-child { border-top: 0; }
+.qrow:hover { background: var(--paper-2); }
+.qnum { font-size: 13px; color: var(--accent); }
+.qproj { font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.qsub { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.qamt { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink); font-size: 14px; }
+.qdate { font-size: 12.5px; color: var(--muted); text-align: right; }
+.qacts { display: flex; gap: 4px; justify-content: flex-end; }
+@media (max-width: 860px) {
+  .qrow { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
+  .qrow .qnum { grid-column: 1; }
+  .qrow .pill { grid-column: 2; grid-row: 1; justify-self: end; }
+  .qrow .qmain { grid-column: 1 / -1; }
+  .qrow .qamt { grid-column: 1; text-align: left; }
+  .qrow .qdate { grid-column: 2; }
+  .qrow .qacts { grid-column: 1 / -1; justify-content: flex-start; }
+}
+.empty { padding: 40px 24px; text-align: center; color: var(--ink-soft); display: grid; gap: 12px; justify-items: center; }
+.empty h3 { font-size: 20px; }
+
+/* Builder */
+.builder { display: grid; gap: 28px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 960px) { .builder { grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); align-items: start; } }
+.b-head { display: grid; gap: 10px; }
+.title-input {
+  font-family: var(--font-display); font-size: clamp(28px, 3.6vw, 40px); font-weight: 500; letter-spacing: -0.02em; line-height: 1.1;
+  color: var(--ink); background: transparent; border: 0; border-bottom: 1px dashed var(--line-2); padding: 4px 0; width: 100%; border-radius: 0;
+}
+.title-input:focus { outline: none; border-bottom: 1px solid var(--accent); }
+.title-input::placeholder { color: var(--muted); }
+.meta-line { display: flex; gap: 8px 16px; align-items: center; flex-wrap: wrap; }
+.banner { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 12px 16px; border-radius: var(--r-lg); background: var(--warn-soft); color: var(--ink-body); font-size: 14px; margin-top: 16px; }
+.grid-fields { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.grid-fields .span-2 { grid-column: span 2; }
+@media (max-width: 520px) { .grid-fields .span-2 { grid-column: auto; } }
+details.card > summary { list-style: none; cursor: pointer; padding: 16px 20px; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary .chev { transition: transform 240ms var(--ease); color: var(--muted); }
+details.card[open] > summary .chev { transform: rotate(180deg); }
+details.card > .card-pad { padding-top: 4px; }
+.sum-line { font-size: 13.5px; color: var(--ink-soft); overflow-wrap: anywhere; }
+.stack { display: grid; gap: 14px; }
+
+/* Wall cards */
+.walls { display: grid; gap: 16px; }
+.wall { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-lg); }
+.wall-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.wall-tag { font-family: var(--font-mono); font-size: 12px; color: var(--accent); background: var(--accent-soft); border-radius: var(--r-md); padding: 3px 8px; }
+.wall-name { flex: 1 1 200px; min-width: 0; border: 0; background: transparent; font-size: 16px; font-weight: 600; color: var(--ink); padding: 6px 4px; border-radius: var(--r-md); }
+.wall-name:focus { outline: 2px solid var(--accent); }
+.wall-name::placeholder { color: var(--muted); font-weight: 500; }
+.qty-ctl { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.qty-ctl input { width: 58px; border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 5px 6px; background: var(--raised); color: var(--ink); text-align: center; }
+.wall-body { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: 18px; padding: 16px; }
+@media (max-width: 640px) { .wall-body { grid-template-columns: minmax(0, 1fr); } }
+.elev { margin: 0; display: grid; gap: 6px; align-content: start; }
+.elev-box { background: var(--paper-2); border-radius: var(--r-md); padding: 10px; display: flex; align-items: center; justify-content: center; min-height: 150px; }
+.elev-box svg { width: 100%; height: 140px; display: block; }
+.elev figcaption { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); text-align: center; letter-spacing: 0.04em; }
+.wall-fields { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.dims { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.dim-hint { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); min-height: 1.3em; }
+.dim-hint.bad { color: var(--bad); }
+.model-btn {
+  display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%; text-align: left;
+  border: 1px solid var(--line-2); background: var(--raised); border-radius: var(--r-md); padding: 8px 12px; cursor: pointer;
+  transition: border-color 150ms var(--ease);
+}
+.model-btn:hover { border-color: var(--accent); }
+.model-btn svg.mini { width: 34px; height: 52px; }
+.model-btn .m-code { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+.model-btn .m-name { font-weight: 500; color: var(--ink); font-size: 14px; display: block; overflow-wrap: anywhere; }
+.model-btn .m-price { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-soft); white-space: nowrap; }
+.doors { display: grid; gap: 8px; }
+.door-row { display: grid; grid-template-columns: minmax(0, 1fr) 70px auto; gap: 8px; align-items: center; }
+.door-row select, .door-row input { border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 8px 10px; background: var(--raised); color: var(--ink); font-size: 14px; width: 100%; min-width: 0; }
+.door-row input { text-align: center; }
+.icon-btn { border: 0; background: transparent; color: var(--muted); width: 34px; height: 34px; border-radius: var(--r-md); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.icon-btn:hover { color: var(--bad); background: var(--bad-soft); }
+.icon-btn svg { width: 16px; height: 16px; }
+.add-door { justify-self: start; }
+.wall-nums {
+  display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 12px 16px; border-top: 1px solid var(--line); background: var(--paper-2);
+  border-radius: 0 0 var(--r-lg) var(--r-lg); font-size: 13px; color: var(--ink-soft); align-items: baseline;
+}
+.wall-nums b { font-family: var(--font-mono); font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.wall-nums .wt { margin-left: auto; font-size: 14px; }
+.wall-nums .wt b { font-size: 15px; }
+.warns { list-style: none; margin: 0; padding: 0 16px 14px; display: grid; gap: 6px; }
+.warns:empty { display: none; }
+.wall-nums + .warns { padding-top: 12px; background: var(--paper-2); border-radius: 0 0 var(--r-lg) var(--r-lg); margin-top: -1px; }
+.warns li { font-size: 13px; color: var(--ink-body); display: flex; gap: 8px; align-items: baseline; }
+.warns li::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--warn-dot); transform: translateY(-1px); }
+.warns li.info::before { background: var(--accent); }
+.add-wall {
+  width: 100%; border: 1px dashed var(--line-2); border-radius: var(--r-lg); background: transparent; color: var(--accent);
+  padding: 18px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px;
+}
+.add-wall:hover { border-color: var(--accent); background: var(--accent-soft); }
+.add-wall svg { width: 18px; height: 18px; flex: none; }
+
+/* SVG elevation */
+.g-mel { fill: var(--mel); stroke: var(--mel-line); stroke-width: 1; }
+.g-glass { fill: var(--glass); stroke: var(--glass-line); stroke-width: 1; }
+.g-glass.fl { stroke-dasharray: 3 2; }
+.g-frame { fill: none; stroke: var(--frame); stroke-width: 1.5; }
+.g-floor { stroke: var(--muted); stroke-width: 1; }
+.g-door { stroke: var(--frame); stroke-width: 1.25; }
+.g-door.wood { fill: var(--wood); }
+.g-door.glass, .g-door.alu { fill: var(--glass); }
+.g-door.glass { stroke-dasharray: 3 2; }
+.g-handle, .g-track { stroke: var(--frame); stroke-width: 1.5; fill: none; }
+svg.ghost { opacity: 0.45; }
+svg * { vector-effect: non-scaling-stroke; }
+
+/* Summary */
+.summary { display: grid; gap: 16px; }
+@media (min-width: 960px) { .summary { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 84px); } }
+.sum-card { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 20px; display: grid; gap: 16px; }
+.rows { margin: 0; display: grid; gap: 0; }
+.rows > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.rows > div:first-child { border-top: 0; }
+.rows dt { color: var(--ink-soft); }
+.rows dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink); text-align: right; }
+.rows .total dt { color: var(--ink); font-weight: 600; }
+.rows .total dd { font-weight: 500; font-size: 15px; }
+.margin-ctl { display: grid; gap: 8px; padding: 14px; border-radius: var(--r-md); background: var(--paper-2); }
+.margin-ctl .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.margin-ctl .affix { width: 110px; }
+.margin-ctl input[type="range"] { width: 100%; accent-color: var(--accent); }
+.sell-big { font-family: var(--font-display); font-size: 40px; line-height: 1; letter-spacing: -0.03em; color: var(--ink); font-weight: 400; font-variant-numeric: tabular-nums; margin-top: 6px; }
+.tax-in { display: inline-flex; align-items: center; gap: 4px; }
+.tax-in input { width: 64px; border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 3px 6px; text-align: right; background: var(--raised); color: var(--ink); font-family: var(--font-mono); font-size: 13px; }
+.save-state { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); letter-spacing: 0.04em; text-align: center; }
+.save-state.err { color: var(--bad); }
+.switch { display: flex; gap: 10px; align-items: center; font-size: 14px; cursor: pointer; }
+.switch input { width: 16px; height: 16px; accent-color: var(--accent); }
+
+/* Customer quote */
+.cq-tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
+.cq-tools .switch { margin-right: auto; }
+.doc-frame { overflow-x: auto; padding: 24px; background: var(--paper-2); border-radius: var(--r-lg); border: 1px solid var(--line); }
+.copy-fallback { width: 100%; min-height: 160px; margin-bottom: 16px; font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 10px; background: var(--raised); color: var(--ink); }
+@media (max-width: 600px) { .doc-frame { padding: 10px; } }
+
+/* Price list */
+.price-grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 960px) { .price-grid { grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); align-items: start; } }
+.tbl-wrap { overflow-x: auto; }
+table.plist { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 620px; }
+table.plist th { text-align: left; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); font-weight: 400; padding: 10px 12px; border-bottom: 1px solid var(--line-2); white-space: nowrap; }
+table.plist td { padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.plist tr:last-child td { border-bottom: 0; }
+table.plist td.code { font-family: var(--font-mono); color: var(--accent); font-size: 13px; white-space: nowrap; }
+table.plist td.r, table.plist th.r { text-align: right; }
+table.plist td.price { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+table.plist td.desc { color: var(--ink-body); }
+table.plist td.desc small { display: block; color: var(--muted); font-size: 12px; }
+table.plist .base-in { width: 96px; text-align: right; border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 5px 8px; background: var(--raised); color: var(--ink); font-family: var(--font-mono); font-size: 13px; }
+table.plist .base-in.changed { border-color: var(--accent); background: var(--accent-soft); }
+table.plist svg.mini { width: 22px; height: 36px; display: block; }
+.tbl-cap { padding: 16px 20px 6px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.tbl-cap h2 { font-size: 20px; }
+
+/* Picker */
+.overlay {
+  position: fixed; inset: 0; z-index: 50; background: var(--overlay);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 24px) max(16px, env(safe-area-inset-left, 0px));
+  overflow-y: auto;
+}
+.sheet { background: var(--paper); border-radius: var(--r-lg); width: 100%; max-width: 920px; box-shadow: var(--shadow-lg); border: 1px solid var(--line); }
+.sheet > header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 20px 24px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--paper); border-radius: var(--r-lg) var(--r-lg) 0 0; z-index: 1; }
+.sheet > header h2 { font-size: 24px; margin-top: 8px; }
+.picker-body { padding: 8px 24px 24px; display: grid; gap: 8px; }
+.picker-group h3 { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); font-weight: 400; margin: 16px 0 10px; }
+.model-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.model-card {
+  display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; align-items: center; text-align: left;
+  border: 1px solid var(--line); background: var(--raised); border-radius: var(--r-lg); padding: 10px 12px; cursor: pointer;
+  transition: border-color 150ms var(--ease), transform 240ms var(--ease), box-shadow 240ms var(--ease);
+}
+.model-card:hover { border-color: var(--accent); }
+.model-card[aria-pressed="true"] { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: -1px; }
+.model-card svg.mini { width: 40px; height: 64px; }
+.model-card .m-code { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+.model-card .m-name { font-size: 13.5px; font-weight: 500; color: var(--ink); line-height: 1.3; display: block; margin: 2px 0 4px; }
+.model-card .m-price { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+.model-card .m-note { display: block; font-size: 11.5px; color: var(--muted); }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); transform: translateX(-50%);
+  background: var(--btn); color: var(--btn-ink); padding: 10px 16px; border-radius: var(--r-md); font-size: 14px; z-index: 60;
+  box-shadow: var(--shadow-lg); max-width: calc(100% - 32px);
+}
+.store-note { font-family: var(--font-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<style id="doc-css"></style>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="#quotes" data-go="quotes" aria-label="Teilen quote builder home">
+      <span class="logo">OF<span class="four">4</span>S</span>
+      <span class="brand-rule" aria-hidden="true"></span>
+      <span class="brand-name">Teilen<br>quote builder</span>
+    </a>
+    <nav class="tabs" aria-label="Views">
+      <button class="tab" data-go="quotes" id="tab-quotes">Quotes</button>
+      <button class="tab" data-go="builder" id="tab-builder">Builder</button>
+      <button class="tab" data-go="customer" id="tab-customer">Customer quote</button>
+      <button class="tab" data-go="prices" id="tab-prices">Price list</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="v-quotes" aria-labelledby="h-quotes">
+    <div class="view-head">
+      <div>
+        <p class="eyebrow">Teilen demountable walls</p>
+        <h1 id="h-quotes">Wall quotes, <em>made easy</em>.</h1>
+        <p class="lede">Pick a model, enter height and length, add doors. Cost, margin and the customer quote update as you type.</p>
+      </div>
+      <button class="btn primary" data-act="new-quote" id="btn-new-quote">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        New quote
+      </button>
+    </div>
+    <p class="garnish" id="q-proof" style="margin-bottom:16px">Loading saved quotes</p>
+    <div class="toolbar">
+      <input class="input search" id="q-search" type="search" placeholder="Search project, client or quote number" aria-label="Search quotes">
+      <div class="chips" id="q-chips" role="group" aria-label="Filter by status"></div>
+    </div>
+    <div id="q-list" class="qlist"><div class="empty"><h3>Loading saved quotes</h3><p>Your quotes appear here. Start one with New quote.</p></div></div>
+  </section>
+
+  <section id="v-builder" hidden></section>
+  <section id="v-customer" hidden></section>
+  <section id="v-prices" hidden></section>
+</main>
+
+<div class="overlay" id="picker" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="picker-title">
+    <header>
+      <div>
+        <p class="eyebrow">Panel model</p>
+        <h2 id="picker-title">Choose a wall <em>model</em></h2>
+      </div>
+      <button class="btn ghost" data-act="close-picker" id="picker-close">Close</button>
+    </header>
+    <div class="picker-body" id="picker-body"></div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/*CALC-START*/
+(function (root) {
+  // Teilen "System Walls Pricing" sheet, 1/8/2026. Base prices before the increase.
+  var B32 = 32 / 12, DOORH = 80 / 12;
+  var PANELS = [
+    { code: 'T101', cat: 'Melamine', pic: '01', base: 11.42, short: 'Full melamine', desc: '5/8" thickness full melamine panel' },
+    { code: 'T102', cat: 'Melamine', pic: '02', base: 12.16, short: 'Melamine in 2 segments', desc: '5/8" thickness full melamine panel segment in two' },
+    { code: 'T103', cat: 'Melamine', pic: '03', base: 12.89, short: 'Melamine in 3 segments', desc: '5/8" thickness full melamine panel segment in three' },
+    { code: 'T104', cat: 'Melamine', pic: '04', base: 13.64, short: 'Melamine in 4 segments', desc: '5/8" thickness full melamine panel segment in four' },
+    { code: 'T105', cat: 'Glass', pic: '05', base: 19.68, short: 'Full glass, framed', desc: '1/4" thickness full tempered glass panel (framed)' },
+    { code: 'T105F', cat: 'Glass', pic: '05', base: 28.71, short: 'Full glass, frameless', desc: '3/8" thickness full tempered frameless glass panel' },
+    { code: 'T106', cat: 'Glass', pic: '06', base: 20.75, short: 'Glass in 2 segments', desc: '1/4" thickness full tempered glass panel segment in two' },
+    { code: 'T107', cat: 'Glass', pic: '07', base: 21.79, short: 'Glass in 3 segments', desc: '1/4" thickness full tempered glass panel segment in three' },
+    { code: 'T108', cat: 'Glass', pic: '08', base: 22.89, short: 'Glass in 4 segments', desc: '1/4" thickness full tempered glass panel segment in four' },
+    { code: 'T109', cat: 'Mixed', pic: '09', base: 19.93, short: 'Melamine base 32", glass above', desc: '5/8" melamine panel on bottom 32" and 1/4" tempered glass the rest' },
+    { code: 'T109F', cat: 'Mixed', pic: '09', base: 23.13, short: 'Melamine base 32", frameless glass above', desc: '5/8" melamine panel on bottom 32" and 3/8" tempered frameless glass the rest' },
+    { code: 'T110', cat: 'Mixed', pic: '10', base: 19.08, short: 'Glass to door height, melamine top', desc: '1/4" tempered glass panel till the door height and 5/8" melamine panel on top' },
+    { code: 'T110F', cat: 'Mixed', pic: '10', base: 24.87, short: 'Frameless glass to door height, melamine top', desc: '3/8" tempered frameless glass panel till the door height and 5/8" melamine panel on top' },
+    { code: 'T111', cat: 'Mixed', pic: '11', base: 15.47, short: "Melamine to 8', glass on top", desc: '5/8" melamine panel till 8\'H and 1/4" tempered glass on top' },
+    { code: 'T112', cat: 'Mixed', pic: '12', base: 16.13, short: 'Melamine base, glass band, melamine top', desc: '5/8" melamine on bottom 32" and 1/4" glass till door height, rest melamine' },
+    { code: 'T112F', cat: 'Mixed', pic: '12', base: 24.49, short: 'Melamine base, frameless glass band, melamine top', desc: '5/8" melamine on bottom 32" and 3/8" frameless glass till door height, rest melamine' },
+    { code: 'T113', cat: 'Mixed', pic: '13*', base: 17.89, approx: true, short: 'Melamine base, glass in 2 segments', desc: '5/8" melamine on bottom 32" and 1/4" glass the rest, segment in two' },
+    { code: 'T114', cat: 'Mixed', pic: '14*', base: 18.43, approx: true, short: 'Melamine base, glass in 3 segments', desc: '5/8" melamine on bottom 32" and 1/4" glass the rest, segment in three' },
+    { code: 'T115', cat: 'Mixed', pic: '15*', base: 15.48, approx: true, short: 'Melamine in 2 segments, glass above', desc: '5/8" melamine panel segment in two and 1/4" glass the rest' },
+    { code: 'T116', cat: 'Mixed', pic: '16*', base: 23.09, approx: true, short: 'Melamine in 3 segments, glass above', desc: '5/8" melamine panel segment in three and 1/4" glass the rest' },
+    { code: 'T117', cat: 'Mixed', pic: '', base: 19.85, approx: true, noPic: true, short: 'Melamine in 4 segments, glass above', desc: '5/8" melamine panel segment in four and 1/4" glass the rest' },
+    { code: 'T118', cat: 'Mixed', pic: '', base: 16.37, approx: true, noPic: true, short: 'Melamine in 5 segments, glass above', desc: '5/8" melamine panel segment in five and 1/4" glass the rest' }
+  ];
+  // h: fixed door height in ft. maxH / minH: the "up to" and "from" heights on the sheet.
+  var DOORS = [
+    { code: 'HW1', cat: 'Door', group: 'Hinged', base: 680, h: DOORH, kind: 'hinged', mat: 'wood', short: 'Hollow wood hinged, 80"H, lock', desc: '36"W x 80"H hollow wood hinged door with key lever lock' },
+    { code: 'A1', cat: 'Door', group: 'Hinged', base: 675, h: DOORH, kind: 'hinged', mat: 'alu', short: 'Aluminum/glass hinged, 80"H, lock', desc: '36"W x 80"H aluminum/glass hinged door with key lever lock' },
+    { code: 'A1C', cat: 'Door', group: 'Hinged', base: 825, maxH: 8, kind: 'hinged', mat: 'alu', short: 'Aluminum/glass hinged, up to 96"H, lock', desc: '36"W up to 96"H aluminum/glass hinged door with key lever lock' },
+    { code: 'FL1', cat: 'Door', group: 'Hinged', base: 935, h: DOORH, kind: 'hinged', mat: 'glass', short: 'Frameless glass hinged, 80"H', desc: '36"W x 80"H frameless glass 3/8" hinged door with handle 8" (no lock)' },
+    { code: 'FLHF', cat: 'Door', group: 'Hinged', base: 1220, maxH: 10, kind: 'hinged', mat: 'glass', short: 'Frameless glass hinged, up to 120"H, lock', desc: '36"W up to 120"H frameless with 3/8" glass hinged door with key lever lock' },
+    { code: 'FLP', cat: 'Door', group: 'Pivot', base: 1220, maxH: 9, kind: 'pivot', mat: 'glass', short: 'Frameless glass pivot, up to 108"H', desc: '36"W up to 108"H frameless 3/8" glass pivot door with handle 24" (no lock)' },
+    { code: 'FLP.5', cat: 'Door', group: 'Pivot', base: 1350, minH: 9, maxH: 10, kind: 'pivot', mat: 'glass', short: 'Frameless 1/2" glass pivot, 108" to 120"H', desc: '36"W from 108"H to 120"H frameless 1/2" glass pivot door with handle 24" (no lock)' },
+    { code: 'FLPS', cat: 'Door', group: 'Pivot', base: 1400, maxH: 10, kind: 'pivot', mat: 'alu', short: 'Slim-frame glass pivot, up to 120"H, lock', desc: '36"W up to 120"H slim frame with 3/8" glass pivot door with key lever lock' },
+    { code: 'HWS1', cat: 'Door', group: 'Barn and sliding', base: 770, h: DOORH, kind: 'barn', mat: 'wood', short: 'Hollow wood barn, 80"H', desc: '36"W x 80"H hollow wood barn door with handle insert (no lock)' },
+    { code: 'FLB', cat: 'Door', group: 'Barn and sliding', base: 905, h: DOORH, kind: 'barn', mat: 'glass', short: 'Frameless glass barn, 80"H', desc: '36"W x 80"H frameless 3/8" glass barn door with handle 8" (no lock)' },
+    { code: 'FLS', cat: 'Door', group: 'Barn and sliding', base: 1700, maxH: 10, kind: 'sliding', mat: 'glass', short: 'Frameless glass sliding, up to 120"H', desc: '36"W up to 120"H frameless 3/8" glass sliding door with handle 24" (no lock)' },
+    { code: 'FLSS', cat: 'Door', group: 'Barn and sliding', base: 1850, maxH: 10, kind: 'sliding', mat: 'alu', short: 'Slim-frame glass sliding, up to 120"H', desc: '36"W up to 120"H slim frame with 3/8" glass sliding door with handle 24" (no lock)' }
+  ];
+  var ALL = PANELS.concat(DOORS);
+  var BY_CODE = {};
+  ALL.forEach(function (p) { BY_CODE[p.code] = p; });
+
+  function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+
+  // Accepts 9'6", 9' 6, 9ft 6in, 9 6, 114", 114 in, 9.5
+  function parseLen(raw) {
+    if (raw == null) return null;
+    var s = String(raw).trim().toLowerCase()
+      .replace(/[’′‘`]/g, "'").replace(/[”″“]/g, '"').replace(/''/g, '"');
+    if (!s) return null;
+    var n = '(\\d+(?:\\.\\d+)?|\\.\\d+)', m;
+    m = s.match(new RegExp('^' + n + "\\s*(?:'|ft\\.?|feet|foot)\\s*-?\\s*(?:" + n + '\\s*(?:"|in\\.?|inch|inches)?)?$'));
+    if (m) return +m[1] + (m[2] ? +m[2] / 12 : 0);
+    m = s.match(new RegExp('^' + n + '\\s*(?:"|in\\.?|inch|inches)$'));
+    if (m) return +m[1] / 12;
+    m = s.match(new RegExp('^(\\d+)\\s+' + n + '$'));
+    if (m) return +m[1] + +m[2] / 12;
+    m = s.match(new RegExp('^' + n + '$'));
+    if (m) return +m[1];
+    return null;
+  }
+  function fmtLen(ft) {
+    if (ft == null || !isFinite(ft)) return '';
+    var inches = Math.round(ft * 1200) / 100;
+    var f = Math.floor(inches / 12 + 1e-9);
+    var i = round2(inches - f * 12);
+    if (i >= 12) { f += 1; i = 0; }
+    return f + "' " + i + '"';
+  }
+
+  // Elevation bands from the floor up, in feet. Models 13 to 18 are approximate.
+  function bands(code, H) {
+    var fl = /F$/.test(code), c = String(code || '').replace(/F$/, ''), out = [];
+    function seg(m, a, b, n) {
+      n = n || 1; b = Math.min(b, H); if (b <= a) return;
+      var s = (b - a) / n;
+      for (var k = 0; k < n; k++) out.push({ m: m, y0: a + k * s, y1: a + (k + 1) * s, fl: m === 'glass' && fl });
+    }
+    switch (c) {
+      case 'T102': seg('mel', 0, H, 2); break;
+      case 'T103': seg('mel', 0, H, 3); break;
+      case 'T104': seg('mel', 0, H, 4); break;
+      case 'T105': seg('glass', 0, H, 1); break;
+      case 'T106': seg('glass', 0, H, 2); break;
+      case 'T107': seg('glass', 0, H, 3); break;
+      case 'T108': seg('glass', 0, H, 4); break;
+      case 'T109': seg('mel', 0, B32); seg('glass', B32, H); break;
+      case 'T110': seg('glass', 0, DOORH); seg('mel', DOORH, H); break;
+      case 'T111': seg('mel', 0, 8); seg('glass', 8, H); break;
+      case 'T112': seg('mel', 0, B32); seg('glass', B32, DOORH); seg('mel', DOORH, H); break;
+      case 'T113': seg('mel', 0, B32); seg('glass', B32, H, 2); break;
+      case 'T114': seg('mel', 0, B32); seg('glass', B32, H, 3); break;
+      case 'T115': seg('mel', 0, DOORH, 2); seg('glass', DOORH, H); break;
+      case 'T116': seg('mel', 0, DOORH, 3); seg('glass', DOORH, H); break;
+      case 'T117': seg('mel', 0, DOORH, 4); seg('glass', DOORH, H); break;
+      case 'T118': seg('mel', 0, DOORH, 5); seg('glass', DOORH, H); break;
+      default: seg('mel', 0, H, 1);
+    }
+    return out;
+  }
+  function doorHeight(d, H) { return Math.min(d.h || d.maxH || DOORH, H); }
+
+  function makePrice(settings, frozen) {
+    var inc = +(settings && settings.increase) || 0, base = (settings && settings.base) || {};
+    return function (code) {
+      if (frozen && frozen.prices && frozen.prices[code] != null) return +frozen.prices[code];
+      var p = BY_CODE[code]; if (!p) return 0;
+      var b = base[code] != null && base[code] !== '' && isFinite(+base[code]) ? +base[code] : p.base;
+      return b * (1 + inc);
+    };
+  }
+
+  function computeWall(w, ctx) {
+    var h = +w.h > 0 ? +w.h : 0, l = +w.l > 0 ? +w.l : 0;
+    var qty = Math.max(1, Math.round(+w.qty || 1));
+    var doors = (w.doors || []).filter(function (d) { return d && BY_CODE[d.code] && (+d.qty || 0) > 0; });
+    var doorsN = doors.reduce(function (a, d) { return a + Math.round(+d.qty); }, 0);
+    var hasDims = h > 0 && l > 0;
+    var panel = BY_CODE[w.model] && BY_CODE[w.model].cat !== 'Door' ? BY_CODE[w.model] : null;
+    var sqft = hasDims ? h * l : 0;
+    var billable = hasDims ? Math.max(0, sqft - ctx.ded * doorsN) : 0;
+    var ppsf = panel ? ctx.price(panel.code) : 0;
+    var material = billable * ppsf;
+    var doorCost = doors.reduce(function (a, d) { return a + Math.round(+d.qty) * ctx.price(d.code); }, 0);
+    var labor = l > 0 ? l * ctx.labor : 0;
+    var unit = material + doorCost + labor;
+    var warnings = [];
+    if (!panel) warnings.push('Pick a panel model.');
+    if (!hasDims) warnings.push('Enter the wall height and length.');
+    if (hasDims && doorsN * 3 > l + 1e-9) warnings.push(doorsN + (doorsN === 1 ? ' door' : ' doors') + ' at 36" wide need at least ' + fmtLen(doorsN * 3) + ' of wall. This wall is ' + fmtLen(l) + '.');
+    if (hasDims && doorsN > 0 && billable === 0) warnings.push('The door deduction uses up all ' + round2(sqft) + ' sqft, so no panel is billed.');
+    var seen = {};
+    doors.forEach(function (d) {
+      var spec = BY_CODE[d.code]; if (seen[d.code] || !h) return; seen[d.code] = 1;
+      if (spec.h && h < spec.h - 1e-9) warnings.push(d.code + ' is 80" tall. This wall is only ' + fmtLen(h) + '.');
+      if (spec.minH && h < spec.minH - 1e-9) warnings.push(d.code + ' is made for openings 108" to 120" tall. For a ' + fmtLen(h) + ' wall, FLP covers up to 108".');
+    });
+    if (panel && h) {
+      var c = panel.code.replace(/F$/, '');
+      if (c === 'T111' && h <= 8) warnings.push("T111 switches to glass at 8'. At " + fmtLen(h) + ' this wall would be all melamine.');
+      if ((c === 'T110' || c === 'T112') && h <= DOORH) warnings.push(panel.code + ' changes material at door height (80"). This wall is shorter than that.');
+    }
+    return {
+      h: h, l: l, qty: qty, doors: doors, doorsN: doorsN, hasDims: hasDims, panel: panel,
+      sqft: sqft, billable: billable, ppsf: ppsf, material: material, doorCost: doorCost, labor: labor, unit: unit,
+      ext: { sqft: sqft * qty, lf: l * qty, doorsN: doorsN * qty, material: material * qty, doors: doorCost * qty, labor: labor * qty, total: unit * qty },
+      warnings: warnings, complete: hasDims && !!panel
+    };
+  }
+
+  function computeQuote(q, price) {
+    var a = q.assumptions || {};
+    var ctx = { price: price, ded: +a.doorDeduction || 0, labor: +a.laborRate || 0 };
+    var walls = (q.walls || []).map(function (w) { return computeWall(w, ctx); });
+    function sum(k) { return walls.reduce(function (s, w) { return s + w.ext[k]; }, 0); }
+    var material = sum('material'), doors = sum('doors'), labor = sum('labor');
+    var subtotal = material + doors + labor, shipping = +a.shipping || 0, cost = subtotal + shipping;
+    var m = Math.min(Math.max(+q.margin || 0, 0), 0.95), f = 1 / (1 - m);
+    var itemize = q.itemize !== false, lines = [];
+    walls.forEach(function (w, i) {
+      var base = itemize ? w.ext.material + w.ext.doors : w.ext.total;
+      lines.push({ type: 'wall', index: i, amount: round2(base * f) });
+    });
+    if (itemize && labor > 0) lines.push({ type: 'install', amount: round2(labor * f) });
+    if (shipping > 0) lines.push({ type: 'freight', amount: round2(shipping * f) });
+    var sell = round2(lines.reduce(function (s, l) { return s + l.amount; }, 0));
+    var taxRate = Math.max(0, +q.taxRate || 0), tax = round2(sell * taxRate), total = round2(sell + tax);
+    var sqft = sum('sqft'), profit = sell - cost;
+    return {
+      walls: walls, material: material, doors: doors, labor: labor, subtotal: subtotal, shipping: shipping, cost: cost,
+      margin: m, markup: f - 1, lines: lines, sell: sell, taxRate: taxRate, tax: tax, total: total, profit: profit,
+      realMargin: sell > 0 ? profit / sell : 0, sqft: sqft, lf: sum('lf'), doorsN: sum('doorsN'), perSqft: sqft > 0 ? sell / sqft : 0
+    };
+  }
+
+  root.TQ = { PANELS: PANELS, DOORS: DOORS, ALL: ALL, BY_CODE: BY_CODE, B32: B32, DOORH: DOORH, round2: round2, parseLen: parseLen, fmtLen: fmtLen, bands: bands, doorHeight: doorHeight, makePrice: makePrice, computeWall: computeWall, computeQuote: computeQuote };
+})(typeof window !== 'undefined' ? window : globalThis);
+/*CALC-END*/
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var TQ = window.TQ;
+  var PANELS = TQ.PANELS, DOORS = TQ.DOORS, BY_CODE = TQ.BY_CODE, fmtLen = TQ.fmtLen, parseLen = TQ.parseLen, round2 = TQ.round2;
+
+  var STATUS = { draft: 'Draft', sent: 'Sent', won: 'Won', lost: 'Lost' };
+  var LOCKED = { sent: 1, won: 1, lost: 1 };
+  var DEFAULTS = {
+    increase: 0.05, sheetDate: '2026-01-08', base: {},
+    laborRate: 50, doorDeduction: 21, shipping: 600, margin: 0.30, validDays: 30,
+    preparedBy: 'Thomas', terms: ''
+  };
+  var CONTACT = { phone: '+1 305 889 3364', address: '1790 W 8th Ave, Hialeah, FL 33010', site: 'officefurniture4sale.com' };
+
+  var S = {
+    view: 'quotes', store: null, storeKind: null, quotes: [], quotesLoaded: false,
+    settings: clone(DEFAULTS), canEditSettings: true, current: null, dirty: false,
+    filter: 'all', search: '', pickerWall: null, canDownload: false, hasClaude: !!(window.claude && window.claude.use)
+  };
+
+  /* ---------- helpers ---------- */
+  function $(s, r) { return (r || document).querySelector(s); }
+  function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function money(n) { n = +n || 0; return (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function money0(n) { return '$' + Math.round(+n || 0).toLocaleString('en-US'); }
+  function num(n, d) { return (+n || 0).toLocaleString('en-US', { maximumFractionDigits: d || 0 }); }
+  function pctStr(f, d) { return (Math.round((+f || 0) * 100 * Math.pow(10, d == null ? 1 : d)) / Math.pow(10, d == null ? 1 : d)) + '%'; }
+  function uid(p) { return (p || 'q') + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function todayISO() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function addDays(iso, n) { var p = String(iso || todayISO()).split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2]); d.setDate(d.getDate() + (+n || 0)); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function fmtDate(iso) { if (!iso) return ''; var p = String(iso).split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2]); return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+  function fmtStamp(ms) { if (!ms) return ''; var d = new Date(ms); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+  function setPath(o, path, v) { var k = path.split('.'); var t = o; for (var i = 0; i < k.length - 1; i++) { if (!t[k[i]] || typeof t[k[i]] !== 'object') t[k[i]] = {}; t = t[k[i]]; } t[k[k.length - 1]] = v; }
+  function getPath(o, path) { return path.split('.').reduce(function (t, k) { return t == null ? undefined : t[k]; }, o); }
+  function toast(msg) { var t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(function () { t.hidden = true; }, 2600); }
+  function priceFn(q) { return TQ.makePrice(S.settings, q && q.frozen); }
+  function wallLabel(w, i) { return (w.name && w.name.trim()) || 'Wall ' + (i + 1); }
+  function firstName(n) { return String(n || '').trim().split(/\s+/)[0] || ''; }
+  var ICON = {
+    copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/></svg>',
+    x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+    chev: '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'
+  };
+
+  /* ---------- storage ---------- */
+  function makeLocalStore() {
+    var KEY = 'teilen-quote-builder-v1', data = { quotes: {}, settings: null };
+    try { var raw = localStorage.getItem(KEY); if (raw) { var p = JSON.parse(raw); if (p && typeof p === 'object') data = { quotes: p.quotes || {}, settings: p.settings || null }; } } catch (e) {}
+    function persist() { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} }
+    var qcb = function () {}, scb = function () {};
+    function list() { return Object.keys(data.quotes).map(function (k) { return clone(data.quotes[k]); }); }
+    return {
+      kind: 'local',
+      subscribeQuotes: function (cb) { qcb = cb; cb(list()); },
+      subscribeSettings: function (cb) { scb = cb; cb(data.settings ? clone(data.settings) : null); },
+      saveQuote: function (q) { data.quotes[q.id] = clone(q); persist(); qcb(list()); return Promise.resolve(); },
+      deleteQuote: function (id) { delete data.quotes[id]; persist(); qcb(list()); return Promise.resolve(); },
+      saveSettings: function (s) { data.settings = clone(s); persist(); scb(clone(data.settings)); return Promise.resolve(); }
+    };
+  }
+  function makeDbStore(db) {
+    var col = db.collection('quotes'), sref = db.doc('settings/pricing');
+    return {
+      kind: 'db',
+      subscribeQuotes: function (cb) {
+        col.onSnapshot(function (snap) { cb(snap.docs.map(function (d) { var o = clone(d.data()); o.id = d.id; return o; })); }, storeError);
+      },
+      subscribeSettings: function (cb) {
+        sref.onSnapshot(function (snap) { cb(snap.exists ? clone(snap.data()) : null); }, storeError);
+      },
+      saveQuote: function (q) { var b = clone(q); delete b.id; return col.doc(q.id).set(b); },
+      deleteQuote: function (id) { return col.doc(id).delete(); },
+      saveSettings: function (s) { return sref.set(clone(s)); }
+    };
+  }
+  function storeError(e) {
+    if (e && e.code === 'revoked') { setSaveState('error', 'This page can no longer save.'); return; }
+    setSaveState('error', 'Saved quotes stopped updating. Reload the page to reconnect.');
+  }
+  function useStore(store) {
+    S.store = store; S.storeKind = store.kind;
+    store.subscribeSettings(onSettings);
+    store.subscribeQuotes(onQuotes);
+    if (S.current && S.dirty) flushSave();
+    renderStoreNote();
+  }
+  function boot() {
+    if (!S.hasClaude) { S.canDownload = true; useStore(makeLocalStore()); return; }
+    window.claude.use('db').then(function (db) { useStore(db ? makeDbStore(db) : makeLocalStore()); }, function () { useStore(makeLocalStore()); });
+    window.claude.use('downloads').then(function (d) { S.downloads = d; S.canDownload = !!d; if (S.view === 'customer') renderCustomer(); }, function () {});
+    window.claude.use('user').then(function (u) {
+      if (!u) return;
+      return u.canEdit().then(function (ok) { S.canEditSettings = !!ok; if (S.view === 'prices') renderPrices(); });
+    }).catch(function () {});
+  }
+
+  function onSettings(s) {
+    var base = Object.assign({}, (s && s.base) || {});
+    S.settings = Object.assign(clone(DEFAULTS), s || {}, { base: base });
+    if (S.view === 'prices' && !$('#v-prices').contains(document.activeElement)) renderPrices();
+    if (S.current && S.view === 'builder') { refreshAllWalls(); refreshSummary(); }
+    if (S.view === 'quotes') renderQuoteList();
+    if (S.view === 'customer') renderCustomer();
+  }
+  function onQuotes(list) {
+    S.quotes = list; S.quotesLoaded = true;
+    if (S.current) {
+      var r = list.find(function (q) { return q.id === S.current.id; });
+      if (r && !S.dirty && !saving && (r.updatedAt || 0) > (S.current.updatedAt || 0)) {
+        S.current = clone(r);
+        if (S.view === 'builder' && !$('#v-builder').contains(document.activeElement)) renderBuilder();
+        if (S.view === 'customer') renderCustomer();
+      }
+    } else if ((S.view === 'builder' || S.view === 'customer') && list.length) {
+      openQuote(latest().id, S.view);
+    }
+    if (S.view === 'quotes') renderQuoteList();
+    renderTabs();
+  }
+  function latest() { return S.quotes.slice().sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); })[0]; }
+
+  var saveTimer = null, saving = false, pendingSave = false;
+  function touch() {
+    if (!S.current) return;
+    S.dirty = true; S.current.updatedAt = Date.now();
+    setSaveState('pending');
+    clearTimeout(saveTimer); saveTimer = setTimeout(flushSave, 700);
+  }
+  function flushSave() {
+    clearTimeout(saveTimer); saveTimer = null;
+    if (!S.current || !S.store || !S.dirty) return Promise.resolve();
+    if (saving) { pendingSave = true; return Promise.resolve(); }
+    saving = true; pendingSave = false;
+    var q = S.current, c = TQ.computeQuote(q, priceFn(q));
+    q.totals = { cost: round2(c.cost), sell: c.total, sqft: round2(c.sqft), walls: (q.walls || []).length };
+    var id = q.id, stamp = q.updatedAt;
+    setSaveState('saving');
+    return S.store.saveQuote(q).then(function () {
+      if (S.current && S.current.id === id && S.current.updatedAt === stamp) S.dirty = false;
+      setSaveState('saved');
+    }, function (e) {
+      setSaveState('error', e && e.code === 'invalid_argument' ? 'You have view-only access, so changes are not saved.' : e && e.code === 'quota_exceeded' ? 'Storage is full. Delete old quotes to save new ones.' : 'Could not save. Your changes are still here; keep editing to retry.');
+    }).then(function () {
+      saving = false;
+      if (pendingSave || (S.dirty && S.current && S.current.id === id && S.current.updatedAt !== stamp)) flushSave();
+    });
+  }
+  function setSaveState(st, msg) {
+    S.saveState = st; S.saveMsg = msg || '';
+    var el = $('#save-state'); if (!el) return;
+    el.classList.toggle('err', st === 'error');
+    var where = S.storeKind === 'local' ? ' in this browser' : '';
+    el.textContent = st === 'pending' ? 'Unsaved changes' : st === 'saving' ? 'Saving' : st === 'saved' ? 'All changes saved' + where : st === 'error' ? msg : (S.storeKind ? 'Saved' + where : 'Connecting');
+  }
+
+  var settingsTimer = null, savingSettings = false, pendingSettings = false;
+  function touchSettings() {
+    clearTimeout(settingsTimer); settingsTimer = setTimeout(flushSettings, 700);
+  }
+  function flushSettings() {
+    if (!S.store) return;
+    if (savingSettings) { pendingSettings = true; return; }
+    savingSettings = true; pendingSettings = false;
+    var s = clone(S.settings); s.updatedAt = Date.now();
+    S.store.saveSettings(s).then(function () { toast('Price list saved'); }, function (e) {
+      if (e && e.code === 'invalid_argument') { S.canEditSettings = false; renderPrices(); toast('Only editors can change pricing.'); }
+      else toast('Could not save the price list. Try again.');
+    }).then(function () { savingSettings = false; if (pendingSettings) flushSettings(); });
+  }
+
+  /* ---------- quotes ---------- */
+  function nextNumber() {
+    var d = new Date(), pre = 'TN-' + String(d.getFullYear()).slice(2) + String(d.getMonth() + 1).padStart(2, '0') + '-';
+    var max = 0;
+    S.quotes.forEach(function (q) { if (q.number && q.number.indexOf(pre) === 0) { var n = parseInt(q.number.slice(pre.length), 10); if (n > max) max = n; } });
+    return pre + String(max + 1).padStart(3, '0');
+  }
+  function newWall() { return { id: uid('w'), name: '', model: 'T105', hText: '', lText: '', h: null, l: null, qty: 1, doors: [] }; }
+  function newQuote() {
+    var s = S.settings, now = Date.now();
+    return {
+      id: uid('q'), number: nextNumber(), status: 'draft', project: '', site: '',
+      client: { company: '', name: '', email: '', phone: '' },
+      date: todayISO(), validDays: +s.validDays || 30, preparedBy: s.preparedBy || '',
+      assumptions: { laborRate: +s.laborRate, doorDeduction: +s.doorDeduction, shipping: +s.shipping },
+      margin: +s.margin, taxRate: 0, itemize: true, notes: s.terms || '', internal: '',
+      walls: [newWall()], frozen: null, createdAt: now, updatedAt: now
+    };
+  }
+  function openQuote(id, view) {
+    flushSave();
+    var q = S.quotes.find(function (x) { return x.id === id; });
+    if (!q) return;
+    S.current = clone(q); S.dirty = false;
+    go(view || 'builder');
+  }
+  function freezeIfNeeded(q) {
+    if (LOCKED[q.status] && !q.frozen) {
+      var live = TQ.makePrice(S.settings, null), prices = {};
+      TQ.ALL.forEach(function (p) { prices[p.code] = live(p.code); });
+      q.frozen = { at: Date.now(), increase: S.settings.increase, prices: prices };
+    }
+  }
+
+  /* ---------- drawing ---------- */
+  function elevationSVG(w, cls) {
+    var real = +w.h > 0 && +w.l > 0;
+    var H = +w.h > 0 ? +w.h : 9, L = +w.l > 0 ? +w.l : 12;
+    var pad = Math.max(H, L) * 0.04;
+    var vbW = L + pad * 2, vbH = H + pad * 2;
+    function Y(v) { return pad + (H - v); }
+    var o = [];
+    o.push('<svg class="' + (cls || '') + (real || cls ? '' : ' ghost') + '" viewBox="0 0 ' + vbW.toFixed(3) + ' ' + vbH.toFixed(3) + '" preserveAspectRatio="xMidYMid meet" aria-hidden="true">');
+    TQ.bands(w.model, H).forEach(function (b) {
+      o.push('<rect class="' + (b.m === 'glass' ? 'g-glass' : 'g-mel') + (b.fl ? ' fl' : '') + '" x="' + pad + '" y="' + Y(b.y1).toFixed(3) + '" width="' + L + '" height="' + (b.y1 - b.y0).toFixed(3) + '"/>');
+    });
+    var doors = [];
+    (w.doors || []).forEach(function (d) { var spec = BY_CODE[d.code]; var n = Math.max(0, Math.round(+d.qty || 0)); for (var k = 0; k < n && doors.length < 12; k++) if (spec) doors.push(spec); });
+    var n = doors.length;
+    if (n) {
+      var dw = Math.min(3, (L / n) * 0.8), gap = (L - n * dw) / (n + 1);
+      doors.forEach(function (spec, i) {
+        var x = pad + gap + i * (dw + gap), dh = TQ.doorHeight(spec, H), y = Y(dh);
+        if (spec.kind === 'barn' || spec.kind === 'sliding') {
+          o.push('<line class="g-track" x1="' + (x - dw * 0.1).toFixed(3) + '" y1="' + (y - pad * 0.4).toFixed(3) + '" x2="' + (x + dw * 1.6).toFixed(3) + '" y2="' + (y - pad * 0.4).toFixed(3) + '"/>');
+        }
+        o.push('<rect class="g-door ' + spec.mat + '" x="' + x.toFixed(3) + '" y="' + y.toFixed(3) + '" width="' + dw.toFixed(3) + '" height="' + dh.toFixed(3) + '"/>');
+        var hx = spec.kind === 'pivot' ? x + dw * 0.22 : x + dw * 0.85, hy = Y(Math.min(3.5, dh * 0.5));
+        var hl = spec.kind === 'pivot' || spec.kind === 'sliding' ? 1 : 0.35;
+        o.push('<line class="g-handle" x1="' + hx.toFixed(3) + '" y1="' + (hy - hl / 2).toFixed(3) + '" x2="' + hx.toFixed(3) + '" y2="' + (hy + hl / 2).toFixed(3) + '"/>');
+      });
+    }
+    o.push('<rect class="g-frame" x="' + pad + '" y="' + pad + '" width="' + L + '" height="' + H + '"/>');
+    o.push('<line class="g-floor" x1="0" y1="' + (pad + H).toFixed(3) + '" x2="' + vbW.toFixed(3) + '" y2="' + (pad + H).toFixed(3) + '"/>');
+    o.push('</svg>');
+    return o.join('');
+  }
+  function miniSVG(code) { return elevationSVG({ model: code, h: 9, l: 5, doors: [] }, 'mini'); }
+
+  /* ---------- navigation ---------- */
+  var VIEWS = ['quotes', 'builder', 'customer', 'prices'];
+  function go(view) {
+    if (VIEWS.indexOf(view) < 0) view = 'quotes';
+    if (view !== 'builder') flushSave();
+    S.view = view;
+    VIEWS.forEach(function (v) { $('#v-' + v).hidden = v !== view; });
+    if (view === 'quotes') renderQuoteList();
+    if (view === 'builder') renderBuilder();
+    if (view === 'customer') renderCustomer();
+    if (view === 'prices') renderPrices();
+    renderTabs();
+    try { history.replaceState(null, '', '#' + view); } catch (e) {}
+    window.scrollTo(0, 0);
+  }
+  function renderTabs() {
+    VIEWS.forEach(function (v) {
+      var t = $('#tab-' + v);
+      if (v === S.view) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current');
+    });
+  }
+  function renderStoreNote() { setSaveState(S.saveState || 'idle', S.saveMsg); }
+
+  /* ---------- quotes list ---------- */
+  function renderChips() {
+    var counts = { all: S.quotes.length };
+    Object.keys(STATUS).forEach(function (k) { counts[k] = S.quotes.filter(function (q) { return (q.status || 'draft') === k; }).length; });
+    $('#q-chips').innerHTML = ['all'].concat(Object.keys(STATUS)).map(function (k) {
+      return '<button class="chip" data-filter="' + k + '" aria-pressed="' + (S.filter === k) + '">' + (k === 'all' ? 'All' : STATUS[k]) + ' <span class="mono">' + counts[k] + '</span></button>';
+    }).join('');
+  }
+  function renderQuoteList() {
+    renderChips();
+    var el = $('#q-list'), proof = $('#q-proof');
+    if (!S.quotesLoaded) return;
+    var sums = { open: 0, won: 0 };
+    var rows = S.quotes.map(function (q) { return { q: q, c: TQ.computeQuote(q, priceFn(q)) }; });
+    rows.forEach(function (r) { var st = r.q.status || 'draft'; if (st === 'won') sums.won += r.c.total; else if (st !== 'lost') sums.open += r.c.total; });
+    proof.textContent = S.quotes.length + (S.quotes.length === 1 ? ' quote' : ' quotes') + ' · ' + money0(sums.open) + ' open · ' + money0(sums.won) + ' won';
+    var term = S.search.trim().toLowerCase();
+    rows = rows.filter(function (r) {
+      if (S.filter !== 'all' && (r.q.status || 'draft') !== S.filter) return false;
+      if (!term) return true;
+      var c = r.q.client || {};
+      return [r.q.number, r.q.project, r.q.site, c.company, c.name].join(' ').toLowerCase().indexOf(term) >= 0;
+    }).sort(function (a, b) { return (b.q.updatedAt || 0) - (a.q.updatedAt || 0); });
+    if (!S.quotes.length) {
+      el.innerHTML = '<div class="empty"><h3>No quotes yet</h3><p>Start with New quote. Each quote keeps its walls, doors, margin and customer details.</p><button class="btn primary" data-act="new-quote">' + ICON.plus + 'New quote</button></div>';
+      return;
+    }
+    if (!rows.length) { el.innerHTML = '<div class="empty"><h3>No matching quotes</h3><p>Try a different search or status.</p></div>'; return; }
+    el.innerHTML = rows.map(function (r) {
+      var q = r.q, c = q.client || {}, st = q.status || 'draft';
+      var sub = [c.company || c.name, (q.walls || []).length + ((q.walls || []).length === 1 ? ' wall' : ' walls'), num(r.c.sqft) + ' sqft'].filter(Boolean).join(' · ');
+      return '<article class="qrow" data-open="' + esc(q.id) + '" tabindex="0" aria-label="Open quote ' + esc(q.number) + '">' +
+        '<span class="mono qnum">' + esc(q.number) + '</span>' +
+        '<div class="qmain"><p class="qproj">' + esc(q.project || 'Untitled project') + '</p><p class="qsub">' + esc(sub) + '</p></div>' +
+        '<span class="pill s-' + st + '">' + STATUS[st] + '</span>' +
+        '<span class="qamt">' + money(r.c.total) + '</span>' +
+        '<span class="qdate">Updated ' + fmtStamp(q.updatedAt) + '</span>' +
+        '<div class="qacts"><button class="btn ghost sm" data-dupq="' + esc(q.id) + '">Duplicate</button><button class="btn ghost sm" data-delq="' + esc(q.id) + '">Delete</button></div>' +
+        '</article>';
+    }).join('');
+  }
+
+  /* ---------- builder ---------- */
+  function doorOptions(sel) {
+    var price = priceFn(S.current), groups = {};
+    DOORS.forEach(function (d) { (groups[d.group] = groups[d.group] || []).push(d); });
+    return '<option value=""' + (sel ? '' : ' selected') + ' disabled>Choose a door</option>' + Object.keys(groups).map(function (g) {
+      return '<optgroup label="' + esc(g) + '">' + groups[g].map(function (d) {
+        return '<option value="' + d.code + '"' + (d.code === sel ? ' selected' : '') + '>' + d.code + ' · ' + esc(d.short) + ' · ' + money(price(d.code)) + '</option>';
+      }).join('') + '</optgroup>';
+    }).join('');
+  }
+  function modelBtnInner(code) {
+    var p = BY_CODE[code], price = priceFn(S.current);
+    if (!p) return '<span></span><span><span class="m-name">Choose a model</span></span><span></span>';
+    return miniSVG(code) + '<span><span class="m-code">' + p.code + (p.pic ? ' · catalog ' + p.pic.replace('*', '') : '') + '</span><span class="m-name">' + esc(p.short) + '</span></span><span class="m-price">' + money(price(code)) + '/sqft</span>';
+  }
+  function wallCard(w, i) {
+    var id = esc(w.id);
+    return '<article class="wall" data-wid="' + id + '">' +
+      '<header class="wall-head">' +
+        '<span class="wall-tag">W' + (i + 1) + '</span>' +
+        '<input class="wall-name" id="w-' + id + '-name" data-f="name" value="' + esc(w.name) + '" placeholder="Wall ' + (i + 1) + ', e.g. Conference room A front" aria-label="Wall name">' +
+        '<label class="qty-ctl" title="Number of identical walls">Qty <input id="w-' + id + '-qty" type="number" min="1" step="1" data-f="qty" value="' + esc(w.qty || 1) + '" aria-label="Number of identical walls"></label>' +
+        '<button class="btn ghost sm" data-act="dup-wall">Duplicate</button>' +
+        '<button class="btn ghost sm" data-act="del-wall">Remove</button>' +
+      '</header>' +
+      '<div class="wall-body">' +
+        '<figure class="elev"><div class="elev-box" data-out="elev"></div><figcaption data-out="cap"></figcaption></figure>' +
+        '<div class="wall-fields">' +
+          '<div class="field"><span>Panel model</span><button class="model-btn" data-act="pick-model" id="w-' + id + '-model">' + modelBtnInner(w.model) + '</button></div>' +
+          '<div class="dims">' +
+            '<div class="field"><label for="w-' + id + '-h">Height</label><input id="w-' + id + '-h" data-f="hText" inputmode="text" autocomplete="off" value="' + esc(w.hText) + '" placeholder="9\'6&quot; or 9.5"><span class="dim-hint" data-out="hh"></span></div>' +
+            '<div class="field"><label for="w-' + id + '-l">Length</label><input id="w-' + id + '-l" data-f="lText" inputmode="text" autocomplete="off" value="' + esc(w.lText) + '" placeholder="12\' or 144&quot;"><span class="dim-hint" data-out="lh"></span></div>' +
+          '</div>' +
+          '<div class="field"><span>Doors</span><div class="doors">' +
+            (w.doors || []).map(function (d, di) {
+              return '<div class="door-row"><select id="w-' + id + '-d' + di + '" data-door-f="code" data-di="' + di + '" aria-label="Door type">' + doorOptions(d.code) + '</select>' +
+                '<input id="w-' + id + '-dq' + di + '" type="number" min="1" step="1" data-door-f="qty" data-di="' + di + '" value="' + esc(d.qty) + '" aria-label="Door quantity">' +
+                '<button class="icon-btn" data-act="del-door" data-di="' + di + '" aria-label="Remove door">' + ICON.x + '</button></div>';
+            }).join('') +
+            '<button class="btn sm add-door" data-act="add-door">' + ICON.plus + ((w.doors || []).length ? 'Add another door' : 'Add a door') + '</button>' +
+          '</div></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="wall-nums" data-out="nums"></div>' +
+      '<ul class="warns" data-out="warns"></ul>' +
+    '</article>';
+  }
+  function wallCtx() { var a = S.current.assumptions || {}; return { price: priceFn(S.current), ded: +a.doorDeduction || 0, labor: +a.laborRate || 0 }; }
+  function refreshWall(wid) {
+    var el = $('.wall[data-wid="' + wid + '"]'); if (!el) return;
+    var w = S.current.walls.find(function (x) { return x.id === wid; }); if (!w) return;
+    var c = TQ.computeWall(w, wallCtx());
+    $('[data-out="elev"]', el).innerHTML = elevationSVG(w);
+    $('[data-out="cap"]', el).textContent = c.hasDims ? fmtLen(c.l) + ' long × ' + fmtLen(c.h) + ' high' : 'Sketch updates as you type';
+    function hint(key, text, val) {
+      var h = $('[data-out="' + key + '"]', el);
+      if (!String(text || '').trim()) { h.textContent = ''; h.classList.remove('bad'); return; }
+      if (val == null) { h.textContent = 'Try 9\'6" or 9.5'; h.classList.add('bad'); return; }
+      h.classList.remove('bad'); h.textContent = fmtLen(val) + ' · ' + num(val, 2) + ' ft';
+    }
+    hint('hh', w.hText, w.h); hint('lh', w.lText, w.l);
+    var parts = [
+      '<span><b>' + num(c.sqft, 1) + '</b> sqft</span>',
+      c.doorsN ? '<span><b>' + num(c.billable, 1) + '</b> billable after doors</span>' : '',
+      '<span>Panels <b>' + money(c.material) + '</b></span>',
+      c.doorsN ? '<span>Doors <b>' + money(c.doorCost) + '</b></span>' : '',
+      '<span>Install <b>' + money(c.labor) + '</b></span>',
+      '<span class="wt">' + (c.qty > 1 ? money(c.unit) + ' × ' + c.qty + ' = ' : 'Wall cost ') + '<b>' + money(c.unit * c.qty) + '</b></span>'
+    ];
+    $('[data-out="nums"]', el).innerHTML = parts.join('');
+    var warns = c.warnings.map(function (t) { return '<li>' + esc(t) + '</li>'; });
+    if (c.panel && c.panel.approx) warns.push('<li class="info">' + (c.panel.noPic ? 'Teilen has no catalog drawing for ' + c.panel.code + '. The sketch is a best guess.' : 'The ' + c.panel.code + ' sketch is approximate. Teilen has not confirmed its segment layout.') + '</li>');
+    $('[data-out="warns"]', el).innerHTML = warns.join('');
+  }
+  function refreshAllWalls() { if (!S.current) return; S.current.walls.forEach(function (w) { refreshWall(w.id); }); }
+  function renderWalls() {
+    var box = $('#walls'); if (!box) return;
+    var walls = S.current.walls;
+    box.innerHTML = walls.length ? walls.map(wallCard).join('') : '<div class="card empty"><h3>No walls yet</h3><p>Add the first wall to start pricing.</p></div>';
+    refreshAllWalls();
+    var t = $('#walls-count'); if (t) t.textContent = walls.length + (walls.length === 1 ? ' wall' : ' walls');
+  }
+  function refreshSummary() {
+    if (!S.current || !$('#s-cost')) return;
+    var q = S.current, c = TQ.computeQuote(q, priceFn(q));
+    function set(id, v) { var e = $('#' + id); if (e) e.textContent = v; }
+    set('s-material', money(c.material)); set('s-doors', money(c.doors)); set('s-labor', money(c.labor));
+    set('s-ship', money(c.shipping)); set('s-cost', money(c.cost));
+    set('s-markup', 'Markup on cost: ' + pctStr(c.markup));
+    set('s-sell', money(c.sell));
+    set('s-sell-sub', c.sqft ? money(c.perSqft) + ' per sqft · ' + num(c.sqft, 1) + ' sqft · ' + num(c.lf, 1) + ' linear ft' : 'Enter wall sizes to see the price');
+    set('s-profit', money(c.profit));
+    set('s-tax', money(c.tax)); set('s-total', money(c.total));
+    var t = $('#walls-sqft'); if (t) t.textContent = num(c.sqft, 1) + ' sqft · ' + num(c.doorsN) + (c.doorsN === 1 ? ' door' : ' doors');
+    var sl = $('#client-sum'); if (sl) sl.textContent = clientSummary(q);
+  }
+  function clientSummary(q) {
+    var c = q.client || {};
+    var bits = [c.company, c.name, q.site].filter(function (x) { return x && String(x).trim(); });
+    return bits.length ? bits.join(' · ') : 'Add the client and site';
+  }
+  function renderBuilder() {
+    var host = $('#v-builder');
+    var q = S.current;
+    if (!q) {
+      host.innerHTML = '<div class="card empty" style="margin-top:24px"><h3>No quote open</h3><p>Start a new quote or open one from your saved quotes.</p><div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"><button class="btn primary" data-act="new-quote">' + ICON.plus + 'New quote</button><button class="btn" data-go="quotes">Saved quotes</button></div></div>';
+      return;
+    }
+    var a = q.assumptions || {}, c = q.client || {}, st = q.status || 'draft';
+    var statusOpts = Object.keys(STATUS).map(function (k) { return '<option value="' + k + '"' + (k === st ? ' selected' : '') + '>' + STATUS[k] + '</option>'; }).join('');
+    host.innerHTML =
+      '<div class="builder">' +
+      '<div class="b-main">' +
+        '<div class="b-head">' +
+          '<div class="meta-line"><span class="eyebrow">Quote ' + esc(q.number) + '</span><span class="pill s-' + st + '" id="b-pill">' + STATUS[st] + '</span></div>' +
+          '<input class="title-input" id="q-project" data-q="project" value="' + esc(q.project) + '" placeholder="Project name" aria-label="Project name">' +
+        '</div>' +
+        (q.frozen ? '<div class="banner" id="frozen-banner"><span>Prices locked on ' + fmtStamp(q.frozen.at) + ' when this quote left Draft. Changes to the price list do not affect it.</span><button class="btn sm" data-act="unfreeze">Use current price list</button></div>' : '') +
+        '<details class="card" style="margin-top:20px"' + (c.company || c.name ? '' : ' open') + '>' +
+          '<summary><div><p class="label">Client and project</p><p class="sum-line" id="client-sum">' + esc(clientSummary(q)) + '</p></div>' + ICON.chev + '</summary>' +
+          '<div class="card-pad"><div class="grid-fields">' +
+            fieldText('q-company', 'client.company', 'Company', c.company) +
+            fieldText('q-name', 'client.name', 'Contact name', c.name) +
+            fieldText('q-email', 'client.email', 'Email', c.email, 'email') +
+            fieldText('q-phone', 'client.phone', 'Phone', c.phone, 'tel') +
+            '<div class="field span-2"><label for="q-site">Site address</label><input id="q-site" data-q="site" value="' + esc(q.site) + '" autocomplete="off"></div>' +
+            '<div class="field"><label for="q-date">Quote date</label><input id="q-date" type="date" data-q="date" value="' + esc(q.date) + '"></div>' +
+            '<div class="field"><label for="q-valid">Valid for</label><div class="affix"><input id="q-valid" type="number" min="1" data-q="validDays" data-type="num" value="' + esc(q.validDays) + '"><span class="unit">days</span></div></div>' +
+            fieldText('q-prep', 'preparedBy', 'Prepared by', q.preparedBy) +
+            '<div class="field"><label for="q-status">Status</label><select id="q-status" data-q="status">' + statusOpts + '</select></div>' +
+          '</div></div>' +
+        '</details>' +
+        '<details class="card" style="margin-top:12px">' +
+          '<summary><div><p class="label">Install and freight</p><p class="sum-line" id="assume-sum">' + assumeSummary(q) + '</p></div>' + ICON.chev + '</summary>' +
+          '<div class="card-pad"><div class="grid-fields">' +
+            '<div class="field"><label for="q-labor">Install labor</label><div class="affix"><span class="unit">$</span><input id="q-labor" type="number" min="0" step="1" data-q="assumptions.laborRate" data-type="num" value="' + esc(a.laborRate) + '"><span class="unit">per linear ft</span></div></div>' +
+            '<div class="field"><label for="q-ded">Door deduction</label><div class="affix"><input id="q-ded" type="number" min="0" step="0.5" data-q="assumptions.doorDeduction" data-type="num" value="' + esc(a.doorDeduction) + '"><span class="unit">sqft per door</span></div></div>' +
+            '<div class="field"><label for="q-ship">Freight, whole project</label><div class="affix"><span class="unit">$</span><input id="q-ship" type="number" min="0" step="25" data-q="assumptions.shipping" data-type="num" value="' + esc(a.shipping) + '"></div></div>' +
+          '</div><p class="hint" style="margin-top:12px">Panels are billed on wall sqft minus the door deduction for each door. Teilen prices include the ' + pctStr(S.settings.increase) + ' increase from the price list.</p></div>' +
+        '</details>' +
+        '<div class="section-title"><h2>Walls</h2><span class="label"><span id="walls-count"></span> · <span id="walls-sqft"></span></span></div>' +
+        '<div class="walls" id="walls"></div>' +
+        '<button class="add-wall" data-act="add-wall" style="margin-top:16px">' + ICON.plus + 'Add a wall</button>' +
+        '<div class="grid-fields" style="margin-top:28px">' +
+          '<div class="field span-2"><label for="q-notes">Notes on the customer quote</label><textarea id="q-notes" data-q="notes" placeholder="Lead time, finish colors, exclusions">' + esc(q.notes) + '</textarea></div>' +
+          '<div class="field span-2"><label for="q-internal">Internal notes</label><textarea id="q-internal" data-q="internal" placeholder="Only you see these">' + esc(q.internal) + '</textarea></div>' +
+        '</div>' +
+      '</div>' +
+      '<aside class="summary" aria-label="Quote summary">' +
+        '<div class="sum-card">' +
+          '<div><p class="eyebrow">Your cost from Teilen</p></div>' +
+          '<dl class="rows">' +
+            '<div><dt>Panels</dt><dd id="s-material"></dd></div>' +
+            '<div><dt>Doors</dt><dd id="s-doors"></dd></div>' +
+            '<div><dt>Installation</dt><dd id="s-labor"></dd></div>' +
+            '<div><dt>Freight</dt><dd id="s-ship"></dd></div>' +
+            '<div class="total"><dt>Total cost</dt><dd id="s-cost"></dd></div>' +
+          '</dl>' +
+          '<div class="margin-ctl">' +
+            '<div class="top"><label class="label" for="q-margin">Margin</label><div class="affix"><input id="q-margin" type="number" min="0" max="90" step="0.5" value="' + round2((+q.margin || 0) * 100) + '"><span class="unit">%</span></div></div>' +
+            '<input type="range" id="q-margin-range" min="0" max="60" step="0.5" value="' + Math.min(60, round2((+q.margin || 0) * 100)) + '" aria-label="Margin slider">' +
+            '<p class="hint" id="s-markup"></p>' +
+          '</div>' +
+          '<div><p class="eyebrow">Customer price</p><p class="sell-big" id="s-sell"></p><p class="hint" id="s-sell-sub" style="margin-top:8px"></p></div>' +
+          '<dl class="rows">' +
+            '<div><dt>Gross profit</dt><dd id="s-profit"></dd></div>' +
+            '<div><dt><span class="tax-in"><label for="q-tax">Sales tax</label> <input id="q-tax" type="number" min="0" step="0.25" value="' + round2((+q.taxRate || 0) * 100) + '"> %</span></dt><dd id="s-tax"></dd></div>' +
+            '<div class="total"><dt>Quote total</dt><dd id="s-total"></dd></div>' +
+          '</dl>' +
+          '<button class="btn primary" data-go="customer">View customer quote</button>' +
+          '<p class="save-state" id="save-state"></p>' +
+        '</div>' +
+      '</aside>' +
+      '</div>';
+    renderWalls();
+    refreshSummary();
+    setSaveState(S.dirty ? 'pending' : (S.saveState === 'error' ? 'error' : 'idle'), S.saveMsg);
+  }
+  function fieldText(id, path, label, val, type) {
+    return '<div class="field"><label for="' + id + '">' + label + '</label><input id="' + id + '" data-q="' + path + '"' + (type ? ' type="' + type + '"' : '') + ' value="' + esc(val) + '" autocomplete="off"></div>';
+  }
+  function assumeSummary(q) {
+    var a = q.assumptions || {};
+    return money(+a.laborRate || 0) + ' per linear ft · ' + num(a.doorDeduction, 1) + ' sqft off per door · ' + money(+a.shipping || 0) + ' freight';
+  }
+
+  /* builder events */
+  function onBuilderInput(e) {
+    var t = e.target, q = S.current; if (!q) return;
+    var wallEl = t.closest('.wall');
+    if (wallEl) {
+      var w = q.walls.find(function (x) { return x.id === wallEl.dataset.wid; }); if (!w) return;
+      if (t.dataset.f) {
+        var f = t.dataset.f;
+        if (f === 'hText') { w.hText = t.value; w.h = parseLen(t.value); }
+        else if (f === 'lText') { w.lText = t.value; w.l = parseLen(t.value); }
+        else if (f === 'qty') { w.qty = Math.max(1, parseInt(t.value, 10) || 1); }
+        else w[f] = t.value;
+      } else if (t.dataset.doorF) {
+        var d = w.doors[+t.dataset.di]; if (!d) return;
+        if (t.dataset.doorF === 'qty') d.qty = Math.max(1, parseInt(t.value, 10) || 1); else d.code = t.value;
+      } else return;
+      refreshWall(w.id); refreshSummary(); touch();
+      return;
+    }
+    if (t.id === 'q-margin' || t.id === 'q-margin-range') {
+      var v = Math.min(90, Math.max(0, parseFloat(t.value) || 0));
+      q.margin = round2(v) / 100;
+      if (t.id === 'q-margin') $('#q-margin-range').value = Math.min(60, v); else $('#q-margin').value = v;
+      refreshSummary(); touch(); return;
+    }
+    if (t.id === 'q-tax') { q.taxRate = Math.max(0, parseFloat(t.value) || 0) / 100; refreshSummary(); touch(); return; }
+    var path = t.dataset.q; if (!path) return;
+    if (path === 'status') return; // handled on change
+    var val = t.dataset.type === 'num' ? (t.value === '' ? '' : +t.value) : t.value;
+    setPath(q, path, val);
+    if (path.indexOf('assumptions.') === 0) { var as = $('#assume-sum'); if (as) as.textContent = assumeSummary(q); refreshAllWalls(); }
+    refreshSummary(); touch();
+  }
+  function onBuilderChange(e) {
+    var t = e.target, q = S.current; if (!q) return;
+    if (t.id === 'q-status') {
+      q.status = t.value; freezeIfNeeded(q); touch(); renderBuilder();
+      toast(q.frozen && LOCKED[q.status] ? 'Marked ' + STATUS[q.status] + '. Prices are locked for this quote.' : 'Marked ' + STATUS[q.status]);
+    }
+  }
+  function armDanger(btn, label, fn) {
+    if (btn.dataset.armed) { fn(); return; }
+    var orig = btn.textContent; btn.dataset.armed = '1'; btn.textContent = label; btn.classList.add('danger-armed');
+    setTimeout(function () { if (!btn.isConnected) return; delete btn.dataset.armed; btn.textContent = orig; btn.classList.remove('danger-armed'); }, 3500);
+  }
+  function onBuilderClick(e) {
+    var b = e.target.closest('[data-act]'); if (!b || !S.current) return;
+    var q = S.current, act = b.dataset.act, wallEl = b.closest('.wall');
+    var w = wallEl ? q.walls.find(function (x) { return x.id === wallEl.dataset.wid; }) : null;
+    if (act === 'add-wall') {
+      var nw = newWall();
+      var prev = q.walls[q.walls.length - 1];
+      if (prev) { nw.model = prev.model; nw.hText = prev.hText; nw.h = prev.h; }
+      q.walls.push(nw); renderWalls(); refreshSummary(); touch();
+      var nameIn = $('#w-' + nw.id + '-name'); if (nameIn) { nameIn.focus(); nameIn.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+    } else if (act === 'dup-wall' && w) {
+      var copy = clone(w); copy.id = uid('w'); copy.name = w.name ? w.name + ' copy' : '';
+      q.walls.splice(q.walls.indexOf(w) + 1, 0, copy); renderWalls(); refreshSummary(); touch(); toast('Wall duplicated');
+    } else if (act === 'del-wall' && w) {
+      armDanger(b, 'Confirm remove', function () { q.walls.splice(q.walls.indexOf(w), 1); renderWalls(); refreshSummary(); touch(); });
+    } else if (act === 'add-door' && w) {
+      w.doors = w.doors || []; w.doors.push({ code: w.doors.length ? w.doors[w.doors.length - 1].code : 'A1', qty: 1 });
+      replaceWall(w); refreshSummary(); touch();
+    } else if (act === 'del-door' && w) {
+      w.doors.splice(+b.dataset.di, 1); replaceWall(w); refreshSummary(); touch();
+    } else if (act === 'pick-model' && w) {
+      openPicker(w.id);
+    } else if (act === 'unfreeze') {
+      q.frozen = null; touch(); renderBuilder(); toast('Using the current price list');
+    }
+  }
+  function replaceWall(w) {
+    var el = $('.wall[data-wid="' + w.id + '"]'); if (!el) return;
+    var i = S.current.walls.indexOf(w);
+    el.outerHTML = wallCard(w, i); refreshWall(w.id);
+  }
+
+  /* ---------- model picker ---------- */
+  function openPicker(wid) {
+    S.pickerWall = wid;
+    var w = S.current.walls.find(function (x) { return x.id === wid; });
+    var price = priceFn(S.current), groups = {};
+    PANELS.forEach(function (p) { (groups[p.cat] = groups[p.cat] || []).push(p); });
+    $('#picker-body').innerHTML = Object.keys(groups).map(function (g) {
+      return '<div class="picker-group"><h3>' + g + '</h3><div class="model-grid">' + groups[g].map(function (p) {
+        var note = p.noPic ? 'No catalog drawing' : p.approx ? 'Sketch approximate' : 'Catalog ' + p.pic;
+        return '<button class="model-card" data-code="' + p.code + '" aria-pressed="' + (w && w.model === p.code) + '">' + miniSVG(p.code) +
+          '<span><span class="m-code">' + p.code + '</span><span class="m-name">' + esc(p.short) + '</span><span class="m-price">' + money(price(p.code)) + '/sqft</span><span class="m-note">' + note + '</span></span></button>';
+      }).join('') + '</div></div>';
+    }).join('');
+    $('#picker').hidden = false;
+    var cur = $('#picker .model-card[aria-pressed="true"]') || $('#picker .model-card');
+    if (cur) cur.focus();
+  }
+  function closePicker() {
+    var wid = S.pickerWall; $('#picker').hidden = true; S.pickerWall = null;
+    var btn = wid && $('#w-' + wid + '-model'); if (btn) btn.focus();
+  }
+
+  /* ---------- customer quote ---------- */
+  var DOC_CSS = [
+    '.qdoc{--d-bg:#ffffff;--d-ink:#1a1814;--d-body:#3a362f;--d-muted:#7a7468;--d-band:#1a1814;--d-accent:#2d4a6e;--d-accent-on-band:#8fa9c7;--d-line:rgba(15,29,51,.12);--d-soft:#f3efe7;',
+    'background:var(--d-bg);color:var(--d-body);font-family:"Geist",-apple-system,system-ui,"Segoe UI",sans-serif;font-size:14px;line-height:1.5;max-width:820px;min-width:560px;margin:0 auto;border-radius:8px;overflow:hidden;box-shadow:0 4px 12px rgba(15,29,51,.08)}',
+    '.qdoc *{box-sizing:border-box}.qdoc p{margin:0}.qdoc em{font-style:normal}',
+    '.qd-band{background:var(--d-band);color:#faf8f4;padding:28px 36px;display:flex;justify-content:space-between;align-items:flex-end;gap:24px}',
+    '.qd-lockup{display:flex;align-items:center;gap:18px}',
+    '.qd-logo{font-family:"Schibsted Grotesk","Geist",Arial,sans-serif;font-weight:700;font-size:40px;line-height:1;color:#faf8f4}.qd-logo span{color:var(--d-accent-on-band)}',
+    '.qd-rule{width:1px;height:38px;background:rgba(250,248,244,.3)}',
+    '.qd-cap{font-family:"Geist Mono",Menlo,monospace;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;line-height:1.5;color:#d6cfbe}',
+    '.qd-meta{text-align:right;font-size:12.5px;color:#d6cfbe}',
+    '.qd-eyebrow{font-family:"Geist Mono",Menlo,monospace;font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--d-accent);margin-bottom:6px}',
+    '.qd-band .qd-eyebrow{color:var(--d-accent-on-band)}',
+    '.qd-num{font-family:"Geist Mono",Menlo,monospace;font-size:18px;color:#faf8f4;margin-bottom:4px}',
+    '.qd-body{padding:32px 36px 28px}',
+    '.qd-intro{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding-bottom:24px;border-bottom:1px solid var(--d-line)}',
+    '.qd-strong{font-weight:600;color:var(--d-ink);font-size:15px}',
+    '.qd-title{font-family:"Schibsted Grotesk","Geist",Arial,sans-serif;font-weight:500;font-size:28px;letter-spacing:-.02em;color:var(--d-ink);margin:28px 0 8px;line-height:1.15}',
+    '.qd-title em{color:var(--d-accent)}',
+    '.qd-lede{color:var(--d-body);max-width:62ch;margin-bottom:20px}',
+    '.qd-table{width:100%;border-collapse:collapse;font-size:13.5px}',
+    '.qd-table th{font-family:"Geist Mono",Menlo,monospace;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--d-muted);font-weight:400;text-align:left;padding:8px 10px;border-bottom:1px solid var(--d-ink)}',
+    '.qd-table td{padding:12px 10px;border-bottom:1px solid var(--d-line);vertical-align:top}',
+    '.qd-table .n{font-family:"Geist Mono",Menlo,monospace;color:var(--d-muted);width:34px}',
+    '.qd-table .r{text-align:right;white-space:nowrap;font-family:"Geist Mono",Menlo,monospace;font-variant-numeric:tabular-nums;color:var(--d-ink)}',
+    '.qd-item{font-weight:600;color:var(--d-ink)}.qd-det{color:var(--d-muted);font-size:12.5px;margin-top:2px}',
+    '.qd-totals{display:flex;justify-content:flex-end;margin-top:16px}',
+    '.qd-totals dl{margin:0;min-width:280px}',
+    '.qd-totals div{display:flex;justify-content:space-between;gap:24px;padding:6px 10px}',
+    '.qd-totals dt{color:var(--d-body)}.qd-totals dd{margin:0;font-family:"Geist Mono",Menlo,monospace;font-variant-numeric:tabular-nums;color:var(--d-ink)}',
+    '.qd-totals .grand{background:var(--d-soft);border-radius:4px;margin-top:6px;padding:10px}',
+    '.qd-totals .grand dt{font-weight:600;color:var(--d-ink)}.qd-totals .grand dd{font-size:17px;font-weight:500}',
+    '.qd-notes{margin-top:28px;padding-top:20px;border-top:1px solid var(--d-line);white-space:pre-wrap}',
+    '.qd-foot{padding:18px 36px;background:var(--d-soft);font-family:"Geist Mono",Menlo,monospace;font-size:11px;color:var(--d-muted);letter-spacing:.03em;display:flex;flex-wrap:wrap;gap:6px 18px;justify-content:space-between}',
+    '.qd-foot .tm span{color:var(--d-accent);font-weight:600}'
+  ].join('\n');
+
+  function lineText(q, c, ln) {
+    if (ln.type === 'wall') {
+      var w = q.walls[ln.index], cw = c.walls[ln.index], p = cw.panel;
+      var det = ['Teilen ' + (p ? p.code + ', ' + p.short : 'model to be confirmed')];
+      if (cw.hasDims) det.push(fmtLen(cw.l) + ' long × ' + fmtLen(cw.h) + ' high, ' + num(cw.sqft, 1) + ' sqft');
+      var doors = cw.doors.map(function (d) { return Math.round(+d.qty) + ' × ' + d.code + ', ' + BY_CODE[d.code].short; });
+      var extra = doors.length ? 'Doors: ' + doors.join('; ') : '';
+      if (q.itemize === false) extra = (extra ? extra + '. ' : '') + 'Installed.';
+      return { item: wallLabel(w, ln.index), det: det.join(' · '), extra: extra, qty: cw.qty };
+    }
+    if (ln.type === 'install') return { item: 'Installation', det: num(c.lf, 1) + ' linear ft of wall', extra: '', qty: '' };
+    return { item: 'Freight and delivery', det: 'Whole project', extra: '', qty: '' };
+  }
+  function quoteDocHTML(q, c) {
+    var cl = q.client || {}, valid = addDays(q.date, q.validDays);
+    var nWalls = q.walls.reduce(function (s, w) { return s + Math.max(1, Math.round(+w.qty || 1)); }, 0);
+    var hi = firstName(cl.name) ? 'Hi ' + esc(firstName(cl.name)) + ', here' : 'Here';
+    var rows = c.lines.map(function (ln, i) {
+      var t = lineText(q, c, ln);
+      return '<tr><td class="n">' + String(i + 1).padStart(2, '0') + '</td><td><p class="qd-item">' + esc(t.item) + '</p><p class="qd-det">' + esc(t.det) + '</p>' + (t.extra ? '<p class="qd-det">' + esc(t.extra) + '</p>' : '') + '</td><td class="r">' + esc(t.qty) + '</td><td class="r">' + money(ln.amount) + '</td></tr>';
+    }).join('');
+    return '<article class="qdoc">' +
+      '<header class="qd-band"><div class="qd-lockup"><span class="qd-logo">OF<span>4</span>S</span><span class="qd-rule"></span><span class="qd-cap">Office Furniture<br>4 Sale</span></div>' +
+      '<div class="qd-meta"><p class="qd-eyebrow">Quote</p><p class="qd-num">' + esc(q.number) + '</p><p>Dated ' + esc(fmtDate(q.date)) + '<br>Valid until ' + esc(fmtDate(valid)) + '</p></div></header>' +
+      '<div class="qd-body">' +
+        '<section class="qd-intro"><div><p class="qd-eyebrow">Prepared for</p><p class="qd-strong">' + esc(cl.company || cl.name || 'Client') + '</p><p>' + [cl.company ? cl.name : '', cl.email, cl.phone].filter(Boolean).map(esc).join('<br>') + '</p></div>' +
+        '<div><p class="qd-eyebrow">Project</p><p class="qd-strong">' + esc(q.project || 'Teilen demountable walls') + '</p><p>' + esc(q.site) + '</p></div></section>' +
+        '<h2 class="qd-title">Teilen demountable <em>walls</em></h2>' +
+        '<p class="qd-lede">' + hi + ' is pricing for ' + nWalls + ' Teilen ' + (nWalls === 1 ? 'wall' : 'walls') + ', ' + num(c.sqft, 0) + ' sqft in total' + (c.doorsN ? ' with ' + c.doorsN + (c.doorsN === 1 ? ' door' : ' doors') : '') + '.</p>' +
+        '<table class="qd-table"><thead><tr><th>#</th><th>Item</th><th class="r">Qty</th><th class="r">Amount</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+        '<div class="qd-totals"><dl>' +
+          (c.tax ? '<div><dt>Subtotal</dt><dd>' + money(c.sell) + '</dd></div><div><dt>Sales tax ' + pctStr(c.taxRate, 2) + '</dt><dd>' + money(c.tax) + '</dd></div>' : '') +
+          '<div class="grand"><dt>Total</dt><dd>' + money(c.total) + '</dd></div>' +
+        '</dl></div>' +
+        (q.notes && q.notes.trim() ? '<div class="qd-notes"><p class="qd-eyebrow">Notes</p>' + esc(q.notes) + '</div>' : '') +
+      '</div>' +
+      '<footer class="qd-foot"><span>Prepared by ' + esc(q.preparedBy || 'Office Furniture 4 Sale') + ' · ' + CONTACT.phone + '</span><span>' + CONTACT.address + '</span><span class="tm">of<span>4</span>s · ' + CONTACT.site + '</span></footer>' +
+    '</article>';
+  }
+  function quoteText(q, c) {
+    var cl = q.client || {}, out = [];
+    out.push('Quote ' + q.number + (q.project ? ' · ' + q.project : ''));
+    out.push('Dated ' + fmtDate(q.date) + ' · Valid until ' + fmtDate(addDays(q.date, q.validDays)));
+    if (cl.company || cl.name) out.push('Prepared for ' + [cl.company, cl.name].filter(Boolean).join(', '));
+    if (q.site) out.push('Site: ' + q.site);
+    out.push('');
+    c.lines.forEach(function (ln, i) {
+      var t = lineText(q, c, ln);
+      out.push((i + 1) + '. ' + t.item + (t.qty && t.qty > 1 ? ' (qty ' + t.qty + ')' : '') + '  ' + money(ln.amount));
+      out.push('   ' + t.det + (t.extra ? '. ' + t.extra : ''));
+    });
+    out.push('');
+    if (c.tax) { out.push('Subtotal  ' + money(c.sell)); out.push('Sales tax ' + pctStr(c.taxRate, 2) + '  ' + money(c.tax)); }
+    out.push('Total  ' + money(c.total));
+    if (q.notes && q.notes.trim()) { out.push(''); out.push(q.notes.trim()); }
+    out.push('');
+    out.push((q.preparedBy || 'Office Furniture 4 Sale') + ' · Office Furniture 4 Sale · ' + CONTACT.phone + ' · ' + CONTACT.site);
+    return out.join('\n');
+  }
+  function csvCell(v) { var s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+  function quoteCSV(q, c) {
+    var rows = [['Line', 'Item', 'Details', 'Qty', 'Amount']];
+    c.lines.forEach(function (ln, i) { var t = lineText(q, c, ln); rows.push([i + 1, t.item, t.det + (t.extra ? '. ' + t.extra : ''), t.qty, ln.amount.toFixed(2)]); });
+    rows.push(['', 'Subtotal', '', '', c.sell.toFixed(2)]);
+    if (c.tax) rows.push(['', 'Sales tax', pctStr(c.taxRate, 2), '', c.tax.toFixed(2)]);
+    rows.push(['', 'Total', '', '', c.total.toFixed(2)]);
+    return rows.map(function (r) { return r.map(csvCell).join(','); }).join('\n');
+  }
+  function fileBase(q) { return (q.number + ' ' + (q.project || 'Teilen quote')).replace(/[^\w .-]+/g, '').trim().replace(/\s+/g, ' '); }
+  function offerDownload(filename, data, mime) {
+    if (S.downloads) {
+      S.downloads.save({ filename: filename, data: data }).then(function () { toast('Saved ' + filename); }, function (e) {
+        if (e && e.code === 'declined') return;
+        toast(e && e.code === 'rate_limited' ? 'A save prompt is already open.' : 'This view cannot save files.');
+      });
+      return;
+    }
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([data], { type: mime })); a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  function renderCustomer() {
+    var host = $('#v-customer'), q = S.current;
+    if (!q) {
+      host.innerHTML = '<div class="card empty" style="margin-top:24px"><h3>No quote open</h3><p>Open a saved quote to see the customer version.</p><button class="btn" data-go="quotes">Saved quotes</button></div>';
+      return;
+    }
+    var c = TQ.computeQuote(q, priceFn(q));
+    var incomplete = c.walls.filter(function (w) { return !w.complete; }).length;
+    host.innerHTML =
+      '<div class="view-head"><div><p class="eyebrow">Quote ' + esc(q.number) + '</p><h1>Customer <em>quote</em></h1><p class="lede">This is what the client sees. Margin is built into every line. Your cost and profit stay off the page.</p></div>' +
+      '<button class="btn" data-go="builder">Back to builder</button></div>' +
+      (incomplete ? '<div class="banner" style="margin:0 0 16px">' + incomplete + (incomplete === 1 ? ' wall is' : ' walls are') + ' missing a model or size and price at $0. Finish ' + (incomplete === 1 ? 'it' : 'them') + ' in the builder.</div>' : '') +
+      '<div class="cq-tools">' +
+        '<label class="switch"><input type="checkbox" id="cq-itemize"' + (q.itemize !== false ? ' checked' : '') + '> Show installation as its own line</label>' +
+        '<button class="btn" data-act="copy-text">' + ICON.copy + 'Copy for email</button>' +
+        (S.canDownload ? '<button class="btn" data-act="dl-csv">' + ICON.down + 'CSV</button><button class="btn primary" data-act="dl-html">' + ICON.down + 'Download quote</button>' : '') +
+      '</div>' +
+      '<textarea class="copy-fallback" id="copy-fallback" hidden readonly aria-label="Quote text to copy"></textarea>' +
+      '<div class="doc-frame">' + quoteDocHTML(q, c) + '</div>' +
+      (S.canDownload ? '<p class="hint" style="margin-top:12px">Download quote saves a page you can open in any browser and print to PDF.</p>' : '');
+  }
+  function onCustomerClick(e) {
+    var b = e.target.closest('[data-act]'); if (!b || !S.current) return;
+    var q = S.current, c = TQ.computeQuote(q, priceFn(q));
+    if (b.dataset.act === 'copy-text') {
+      var text = quoteText(q, c);
+      var fb = $('#copy-fallback');
+      var showFallback = function () { fb.value = text; fb.hidden = false; fb.focus(); fb.select(); toast('Press Ctrl+C or Cmd+C to copy'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { toast('Quote copied. Paste it into your email.'); }, showFallback);
+      else showFallback();
+    } else if (b.dataset.act === 'dl-html') {
+      var html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Quote ' + esc(q.number) + '</title>' +
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700&family=Geist:wght@400;600&family=Geist+Mono:wght@400&display=swap">' +
+        '<style>' + DOC_CSS + '\nbody{margin:0;background:#f3efe7;padding:32px 16px}@media print{body{background:#fff;padding:0}.qdoc{box-shadow:none;border-radius:0;max-width:none}.qd-band,.qd-foot,.qd-totals .grand{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>' +
+        quoteDocHTML(q, c) + '</body></html>';
+      offerDownload(fileBase(q) + '.html', html, 'text/html');
+    } else if (b.dataset.act === 'dl-csv') {
+      offerDownload(fileBase(q) + '.csv', quoteCSV(q, c), 'text/csv');
+    }
+  }
+
+  /* ---------- price list ---------- */
+  function renderPrices() {
+    var host = $('#v-prices'), s = S.settings, can = S.canEditSettings, dis = can ? '' : ' disabled';
+    var live = TQ.makePrice(s, null);
+    function row(p) {
+      var b = s.base[p.code] != null && s.base[p.code] !== '' ? s.base[p.code] : p.base;
+      var changed = s.base[p.code] != null && s.base[p.code] !== '' && +s.base[p.code] !== p.base;
+      var isDoor = p.cat === 'Door';
+      return '<tr>' + (isDoor ? '' : '<td>' + miniSVG(p.code) + '</td>') +
+        '<td class="code">' + p.code + '</td>' +
+        '<td class="desc">' + esc(p.desc) + (isDoor ? '' : '<small>' + (p.noPic ? 'No catalog drawing' : 'Catalog ' + esc(p.pic) + (p.approx ? ', drawing approximate' : '')) + '</small>') + '</td>' +
+        '<td class="r"><input class="base-in' + (changed ? ' changed' : '') + '" type="number" step="0.01" min="0" data-base="' + p.code + '" value="' + b + '" aria-label="' + p.code + ' base price"' + dis + '></td>' +
+        '<td class="r price" data-live="' + p.code + '">' + money(live(p.code)) + '</td></tr>';
+    }
+    host.innerHTML =
+      '<div class="view-head"><div><p class="eyebrow">Price list</p><h1>Teilen <em>pricing</em></h1>' +
+      '<p class="lede">From Teilen\'s System Walls price sheet. Draft quotes always use these prices. A quote marked Sent, Won or Lost keeps the prices it had at that moment.</p></div></div>' +
+      (can ? '' : '<div class="banner" style="margin:0 0 20px">Only editors of this page can change pricing. You can still read it.</div>') +
+      '<div class="price-grid">' +
+        '<div class="stack">' +
+          '<div class="card"><div class="tbl-cap"><h2>Panels</h2><span class="label">Price per sqft</span></div><div class="tbl-wrap"><table class="plist"><thead><tr><th></th><th>Code</th><th>Description</th><th class="r">Teilen base</th><th class="r">Your price</th></tr></thead><tbody>' + PANELS.map(row).join('') + '</tbody></table></div></div>' +
+          '<div class="card"><div class="tbl-cap"><h2>Doors</h2><span class="label">Price each</span></div><div class="tbl-wrap"><table class="plist"><thead><tr><th>Code</th><th>Description</th><th class="r">Teilen base</th><th class="r">Your price</th></tr></thead><tbody>' + DOORS.map(row).join('') + '</tbody></table></div></div>' +
+        '</div>' +
+        '<div class="stack">' +
+          '<div class="card card-pad stack">' +
+            '<p class="eyebrow">Teilen price sheet</p>' +
+            '<div class="grid-fields">' +
+              '<div class="field"><label for="s-increase">Price increase</label><div class="affix"><input id="s-increase" type="number" step="0.5" data-s="increase" data-type="pct" value="' + round2((+s.increase || 0) * 100) + '"' + dis + '><span class="unit">%</span></div></div>' +
+              '<div class="field"><label for="s-date">Sheet date</label><input id="s-date" type="date" data-s="sheetDate" value="' + esc(s.sheetDate) + '"' + dis + '></div>' +
+            '</div>' +
+            '<p class="hint">Applied to every Teilen base price. When Teilen sends a new sheet, type the new base prices into the tables.</p>' +
+            (can ? '<button class="btn sm" data-act="reset-base" style="justify-self:start">Reset base prices to the Jan 2026 sheet</button>' : '') +
+          '</div>' +
+          '<div class="card card-pad stack">' +
+            '<p class="eyebrow">Defaults for new quotes</p>' +
+            '<div class="grid-fields">' +
+              '<div class="field"><label for="s-labor">Install labor</label><div class="affix"><span class="unit">$</span><input id="s-labor" type="number" min="0" data-s="laborRate" data-type="num" value="' + esc(s.laborRate) + '"' + dis + '><span class="unit">/ lin ft</span></div></div>' +
+              '<div class="field"><label for="s-ded">Door deduction</label><div class="affix"><input id="s-ded" type="number" min="0" step="0.5" data-s="doorDeduction" data-type="num" value="' + esc(s.doorDeduction) + '"' + dis + '><span class="unit">sqft</span></div></div>' +
+              '<div class="field"><label for="s-ship">Freight</label><div class="affix"><span class="unit">$</span><input id="s-ship" type="number" min="0" step="25" data-s="shipping" data-type="num" value="' + esc(s.shipping) + '"' + dis + '></div></div>' +
+              '<div class="field"><label for="s-margin">Margin</label><div class="affix"><input id="s-margin" type="number" min="0" max="90" step="0.5" data-s="margin" data-type="pct" value="' + round2((+s.margin || 0) * 100) + '"' + dis + '><span class="unit">%</span></div></div>' +
+              '<div class="field"><label for="s-valid">Valid for</label><div class="affix"><input id="s-valid" type="number" min="1" data-s="validDays" data-type="num" value="' + esc(s.validDays) + '"' + dis + '><span class="unit">days</span></div></div>' +
+              '<div class="field"><label for="s-prep">Prepared by</label><input id="s-prep" data-s="preparedBy" value="' + esc(s.preparedBy) + '"' + dis + '></div>' +
+              '<div class="field span-2"><label for="s-terms">Standard notes</label><textarea id="s-terms" data-s="terms" placeholder="Added to the notes of every new quote"' + dis + '>' + esc(s.terms) + '</textarea></div>' +
+            '</div>' +
+            '<p class="hint">Changes apply to quotes you create from now on. Open quotes keep their own settings.</p>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+  function onPricesInput(e) {
+    var t = e.target; if (!S.canEditSettings) return;
+    if (t.dataset.base) {
+      var code = t.dataset.base, v = t.value;
+      if (v === '' || +v === BY_CODE[code].base) delete S.settings.base[code]; else S.settings.base[code] = +v;
+      t.classList.toggle('changed', S.settings.base[code] != null);
+    } else if (t.dataset.s) {
+      var k = t.dataset.s, ty = t.dataset.type;
+      S.settings[k] = ty === 'pct' ? (parseFloat(t.value) || 0) / 100 : ty === 'num' ? (t.value === '' ? '' : +t.value) : t.value;
+    } else return;
+    var live = TQ.makePrice(S.settings, null);
+    $$('[data-live]', $('#v-prices')).forEach(function (td) { td.textContent = money(live(td.dataset.live)); });
+    touchSettings();
+  }
+
+  /* ---------- global events ---------- */
+  document.addEventListener('click', function (e) {
+    var g = e.target.closest('[data-go]');
+    if (g) { e.preventDefault(); if ((g.dataset.go === 'builder' || g.dataset.go === 'customer') && !S.current && S.quotes.length) { openQuote(latest().id, g.dataset.go); return; } go(g.dataset.go); return; }
+    var a = e.target.closest('[data-act]');
+    if (a && a.dataset.act === 'new-quote') { flushSave(); S.current = newQuote(); S.dirty = false; go('builder'); var p = $('#q-project'); if (p) p.focus(); return; }
+    if (a && a.dataset.act === 'close-picker') { closePicker(); return; }
+    if (a && a.dataset.act === 'reset-base') { S.settings.base = {}; renderPrices(); touchSettings(); return; }
+    var f = e.target.closest('[data-filter]');
+    if (f) { S.filter = f.dataset.filter; renderQuoteList(); return; }
+    var dq = e.target.closest('[data-dupq]');
+    if (dq) {
+      var src = S.quotes.find(function (x) { return x.id === dq.dataset.dupq; }); if (!src) return;
+      var copy = clone(src); copy.id = uid('q'); copy.number = nextNumber(); copy.status = 'draft'; copy.frozen = null;
+      copy.project = (src.project || 'Untitled project') + ' copy'; copy.createdAt = copy.updatedAt = Date.now();
+      S.store.saveQuote(copy).then(function () { toast('Duplicated as ' + copy.number); }, function () { toast('Could not duplicate. Try again.'); });
+      return;
+    }
+    var del = e.target.closest('[data-delq]');
+    if (del) {
+      armDanger(del, 'Confirm delete', function () {
+        var id = del.dataset.delq;
+        if (S.current && S.current.id === id) { clearTimeout(saveTimer); S.current = null; S.dirty = false; }
+        S.store.deleteQuote(id).then(function () { toast('Quote deleted'); }, function () { toast('Could not delete. Try again.'); });
+      });
+      return;
+    }
+    var row = e.target.closest('[data-open]');
+    if (row) { openQuote(row.dataset.open); return; }
+    var mc = e.target.closest('.model-card');
+    if (mc && S.pickerWall && S.current) {
+      var w = S.current.walls.find(function (x) { return x.id === S.pickerWall; });
+      if (w) { w.model = mc.dataset.code; replaceWall(w); refreshSummary(); touch(); }
+      closePicker(); return;
+    }
+    if (e.target.id === 'picker') closePicker();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !$('#picker').hidden) closePicker();
+    if (e.key === 'Enter' && e.target.matches && e.target.matches('.qrow')) openQuote(e.target.dataset.open);
+  });
+  $('#v-builder').addEventListener('input', onBuilderInput);
+  $('#v-builder').addEventListener('change', onBuilderChange);
+  $('#v-builder').addEventListener('click', onBuilderClick);
+  $('#v-customer').addEventListener('click', onCustomerClick);
+  $('#v-customer').addEventListener('change', function (e) {
+    if (e.target.id === 'cq-itemize' && S.current) { S.current.itemize = e.target.checked; touch(); renderCustomer(); }
+  });
+  $('#v-prices').addEventListener('input', onPricesInput);
+  $('#q-search').addEventListener('input', function (e) { S.search = e.target.value; renderQuoteList(); });
+  window.addEventListener('pagehide', function () { flushSave(); });
+
+  $('#doc-css').textContent = DOC_CSS;
+  var start = (location.hash || '').slice(1);
+  go(VIEWS.indexOf(start) >= 0 ? start : 'quotes');
+  renderChips();
+  boot();
+})();
+</script>
