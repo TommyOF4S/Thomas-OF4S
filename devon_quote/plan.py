@@ -1,0 +1,428 @@
+"""Read panel joints straight off a CET 2D plan exported as PDF.
+
+CET draws each panel as a thin gray-filled outline (about 2" thick at drawing scale) and
+leaves a small gap at each post. So the joints can be measured instead of guessed:
+
+  * find the panels: the group of filled, neutral-gray, thin rectangles whose lengths
+    match standard panel widths (24", 30", 36", 42", 48", 60", ...) at that thickness;
+  * gather panel ends that sit within two panel-thicknesses of each other into a joint;
+  * classify each joint by how many panels meet there and at what angle:
+      2 in a straight line (180 degrees) -> panel-to-panel connector (Devon HMP213)
+      2 at 90 degrees                    -> 2-way corner (HMA130)
+      3                                  -> 3-way (HMA137)
+      4                                  -> 4-way (HMC132)
+      a lone end                         -> finished end (HMA128)
+
+Panel heights come from CET's panel labels: a letter, then height and width in inches
+(A6660 = 66"H x 60"W; the letter only tells the heights in one drawing apart). Each label is
+matched to the nearest panel of that width, so every joint knows the heights meeting there; a
+joint where heights differ needs a high/low filler strip. A designer can also mark a height change
+with a colored dot on the joint; the color says which filler strip it needs (DOT_COLORS).
+The designer can also draw a pink dash on each panel-to-panel joint; when a plan has pink
+dashes, they set the panel-to-panel connector count instead of the measured straight joints.
+
+The same algorithm is ported to JavaScript in web/engine.js for the hosted page;
+tests/test_plan.py checks both against tests/fixtures/sample_plan.pdf.
+"""
+
+from __future__ import annotations
+
+import math
+import re
+from collections import Counter, defaultdict
+from dataclasses import dataclass, field
+from pathlib import Path
+
+STD_WIDTHS = (12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72)
+PANEL_INCHES = 2.0  # drawn panel thickness
+POST_GAP = 1.4  # inches between the drawn ends of two panels at a post
+WIDTH_TOLERANCE = 1.5
+JOIN_FACTOR = 2.0  # ends closer than this many panel thicknesses form one joint
+KINDS = ("straight", "l", "tee", "cross", "ends", "angled", "other")
+MARK_JOINT_FACTOR = 6.0  # a colored dot within this many panel thicknesses of a joint marks it
+MARK_MAX_FACTOR = 20.0  # dots bigger than this many thicknesses are not marks
+MAX_THICKNESS = 20.0  # thickest drawn panel accepted, in PDF points (CET's scale varies with the sheet)
+PANEL_LABEL = re.compile(r"^[A-Z](\d{2})(\d{2})$")  # CET panel tag: letter, height, width
+LABEL_REACH = 12.0  # a panel label sits within this many panel thicknesses of its panel
+# Dot color -> Devon high/low filler strip
+DOT_COLORS = {
+    "red": "HMHL3953",  # 39" to 53"
+    "blue": "HMHL3967",  # 39" to 67"
+    "yellow": "HMHL4753",  # 47" to 53"
+    "green": "HMHL4767",  # 47" to 67"
+    "purple": "HMHL5367",  # 53" to 67"
+}
+
+
+@dataclass
+class Rect:
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    fill: tuple[float, float, float] | None  # None = not filled
+
+    @property
+    def w(self) -> float:
+        return self.x1 - self.x0
+
+    @property
+    def h(self) -> float:
+        return self.y1 - self.y0
+
+
+@dataclass
+class Joint:
+    kind: str
+    x: float
+    y: float
+    page: int
+    panels: tuple = ()  # (nominal width, labeled Divi height or None) for each panel meeting here
+
+
+@dataclass
+class Word:
+    """A word of text on the plan: its center and whether it runs up the page."""
+    text: str
+    x: float
+    y: float
+    vertical: bool = False
+
+
+@dataclass
+class PanelLabel:
+    text: str
+    height: int  # Divi inches
+    width: int
+    page: int
+    x: float
+    y: float
+    matched: bool  # sits next to a panel of that width
+
+
+@dataclass
+class Shape:
+    """Any filled path (rectangle, circle, polygon): its bounding box and fill."""
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    fill: tuple[float, float, float] | None
+
+
+@dataclass
+class Stroke:
+    """A stroked path (line, outline): its bounding box, stroke color, and whether it is one straight segment."""
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    color: tuple[float, float, float] | None
+    line: bool
+
+
+@dataclass
+class PinkDash:
+    x: float
+    y: float
+    page: int
+    joint: str | None  # kind of joint the dash sits on (None: not on a joint)
+    panels: tuple = ()  # that joint's panels (see Joint.panels)
+
+
+@dataclass
+class HeightChange:
+    x: float
+    y: float
+    page: int
+    joint: str | None  # kind of joint the dot sits on (None: not on a joint)
+    color: str  # a DOT_COLORS key
+
+
+@dataclass
+class PlanResult:
+    counts: Counter = field(default_factory=Counter)  # straight, l, tee, cross, ends, angled, other
+    widths: Counter = field(default_factory=Counter)  # nominal panel width -> count
+    joints: list[Joint] = field(default_factory=list)
+    pages: list[dict] = field(default_factory=list)  # per page: panels found, thickness
+    height_changes: list[HeightChange] = field(default_factory=list)
+    pink_dashes: list[PinkDash] = field(default_factory=list)  # one per marked joint (or stray dash)
+    labels: list[PanelLabel] = field(default_factory=list)  # CET panel labels found on the plan
+
+    @property
+    def panels(self) -> int:
+        return sum(self.widths.values())
+
+
+def _neutral_gray(fill) -> bool:
+    if not fill:
+        return False
+    r, g, b = fill[:3]
+    return max(r, g, b) - min(r, g, b) < 0.02 and 0.5 < r < 0.97
+
+
+def nominal_width(length: float, thickness: float) -> int | None:
+    implied = length / thickness * PANEL_INCHES + POST_GAP
+    best = min(STD_WIDTHS, key=lambda s: abs(implied - s))
+    return best if abs(implied - best) <= WIDTH_TOLERANCE else None
+
+
+def find_panels(rects: list[Rect]) -> tuple[list[Rect], float | None]:
+    """The panel rectangles on one page, and their drawn thickness."""
+    groups: dict[tuple, list[Rect]] = defaultdict(list)
+    for r in rects:
+        t, length = min(r.w, r.h), max(r.w, r.h)
+        if 0.05 <= t <= MAX_THICKNESS and length >= 3 * t and _neutral_gray(r.fill):
+            groups[(round(t, 2), tuple(round(c, 2) for c in r.fill[:3]))].append(r)
+    best, best_fit = None, 0
+    for key, rs in groups.items():
+        fit = sum(1 for r in rs if nominal_width(max(r.w, r.h), key[0]))
+        if fit >= 2 and fit / len(rs) >= 0.9 and fit > best_fit:
+            best, best_fit = key, fit
+    if best is None:
+        return [], None
+    t = best[0]
+    return [r for r in groups[best] if nominal_width(max(r.w, r.h), t)], t
+
+
+def joints_on_page(panels: list[Rect], thickness: float, page: int) -> list[Joint]:
+    ends = []  # (x, y, unit direction pointing out of the panel, panel index)
+    for i, r in enumerate(panels):
+        cx, cy = (r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2
+        if r.w >= r.h:
+            a, b = (r.x0, cy), (r.x1, cy)
+        else:
+            a, b = (cx, r.y0), (cx, r.y1)
+        for e, o in ((a, b), (b, a)):
+            dx, dy = e[0] - o[0], e[1] - o[1]
+            n = math.hypot(dx, dy) or 1
+            ends.append((e[0], e[1], dx / n, dy / n, i))
+
+    parent = list(range(len(ends)))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    tol = JOIN_FACTOR * thickness
+    for i in range(len(ends)):
+        for j in range(i + 1, len(ends)):
+            if ends[i][4] != ends[j][4] and math.hypot(ends[i][0] - ends[j][0], ends[i][1] - ends[j][1]) <= tol:
+                parent[find(i)] = find(j)
+
+    groups: dict[int, list] = defaultdict(list)
+    for i, e in enumerate(ends):
+        groups[find(i)].append(e)
+
+    out = []
+    for g in sorted(groups.values(), key=lambda g: (round(g[0][1], 1), round(g[0][0], 1))):
+        x = sum(e[0] for e in g) / len(g)
+        y = sum(e[1] for e in g) / len(g)
+        n = len(g)
+        if n == 1:
+            kind = "ends"
+        elif n == 2:
+            dot = g[0][2] * g[1][2] + g[0][3] * g[1][3]
+            kind = "straight" if dot < -0.95 else "l" if abs(dot) < 0.15 else "angled"
+        elif n == 3:
+            kind = "tee"
+        elif n == 4:
+            kind = "cross"
+        else:
+            kind = "other"
+        out.append(Joint(kind, round(x, 2), round(y, 2), page, tuple(sorted(e[4] for e in g))))
+    return out
+
+
+def _rect_distance(x: float, y: float, r: Rect) -> float:
+    return math.hypot(max(r.x0 - x, 0.0, x - r.x1), max(r.y0 - y, 0.0, y - r.y1))
+
+
+def panel_labels(words: list[Word], panels: list[Rect], t: float, page: int) -> tuple[list[PanelLabel], dict[int, int]]:
+    """CET panel labels on the page, and the labeled Divi height of each panel they name (panel index -> height).
+
+    A label goes to the nearest panel of the width it names; closest pairs are matched first, one label per panel.
+    """
+    found = []
+    for w in words:
+        m = PANEL_LABEL.match(w.text)
+        if m:
+            found.append((w, int(m.group(1)), int(m.group(2))))
+    widths = [nominal_width(max(r.w, r.h), t) for r in panels]
+    pairs = sorted((_rect_distance(w.x, w.y, r), li, pi)
+                   for li, (w, _, width) in enumerate(found)
+                   for pi, r in enumerate(panels) if widths[pi] == width)
+    heights, used = {}, set()
+    for d, li, pi in pairs:
+        if d > LABEL_REACH * t or li in used or pi in heights:
+            continue
+        used.add(li)
+        heights[pi] = found[li][1]
+    labels = [PanelLabel(w.text, h, width, page, round(w.x, 2), round(w.y, 2), li in used)
+              for li, (w, h, width) in enumerate(found)]
+    return labels, heights
+
+
+def dot_color(fill) -> str | None:
+    if not fill:
+        return None
+    r, g, b = fill[:3]
+    if r > 0.6 and g < 0.4 and b < 0.4:
+        return "red"
+    if r > 0.6 and g > 0.6 and b < 0.4:
+        return "yellow"
+    if g > 0.45 and r < 0.4 and b < 0.4:
+        return "green"
+    if b > 0.5 and r < 0.4 and g < 0.5:
+        return "blue"
+    if 0.4 <= r <= 0.8 and g < 0.3 and b > 0.45:
+        return "purple"
+    return None
+
+
+def height_marks(shapes: list[Shape], joints: list[Joint], t: float, page: int) -> list[HeightChange]:
+    """Colored dots the designer put on joints where the panel height changes."""
+    out = []
+    for s in shapes:
+        color = dot_color(s.fill)
+        w, h = s.x1 - s.x0, s.y1 - s.y0
+        if not color or max(w, h) > MARK_MAX_FACTOR * t or min(w, h) <= 0 or not 0.5 <= w / h <= 2:
+            continue
+        x, y = (s.x0 + s.x1) / 2, (s.y0 + s.y1) / 2
+        near = min(joints, key=lambda j: math.hypot(j.x - x, j.y - y), default=None)
+        joint = near.kind if near and math.hypot(near.x - x, near.y - y) <= MARK_JOINT_FACTOR * t else None
+        out.append(HeightChange(round(x, 2), round(y, 2), page, joint, color))
+    return out
+
+
+def is_pink(c) -> bool:
+    return bool(c) and c[0] > 0.8 and c[2] > 0.45 and c[1] < 0.8 and c[0] - c[1] > 0.2
+
+
+def pink_dashes(shapes: list[Shape], strokes: list[Stroke], joints: list[Joint], t: float, page: int) -> list[PinkDash]:
+    """Pink dashes the designer drew on panel-to-panel joints. Several strokes on one joint count once."""
+    cands = [(s.x0, s.y0, s.x1, s.y1, s.fill, False) for s in shapes] + \
+            [(s.x0, s.y0, s.x1, s.y1, s.color, s.line) for s in strokes]
+    out, marked = [], set()
+    for x0, y0, x1, y1, color, line in cands:
+        if not is_pink(color):
+            continue
+        w, h = x1 - x0, y1 - y0
+        length = math.hypot(w, h) if line else max(w, h)
+        if not line and length < 2.5 * min(w, h):
+            continue  # a dot or a blob, not a dash
+        if length < 0.5 * t or length > MARK_MAX_FACTOR * t:
+            continue
+        x, y = (x0 + x1) / 2, (y0 + y1) / 2
+        best, bd = None, None
+        for i, j in enumerate(joints):
+            d = math.hypot(j.x - x, j.y - y)
+            if bd is None or d < bd:
+                best, bd = i, d
+        if best is not None and bd <= MARK_JOINT_FACTOR * t:
+            if best not in marked:
+                marked.add(best)
+                out.append(PinkDash(round(x, 2), round(y, 2), page, joints[best].kind, joints[best].panels))
+        elif not any(m.joint is None and math.hypot(m.x - x, m.y - y) <= JOIN_FACTOR * t for m in out):
+            out.append(PinkDash(round(x, 2), round(y, 2), page, None))
+    return out
+
+
+def analyze_rects(pages: list[list[Rect]], shapes: list[list[Shape]] | None = None,
+                  strokes: list[list[Stroke]] | None = None, words: list[list[Word]] | None = None) -> PlanResult:
+    res = PlanResult()
+    for p, rects in enumerate(pages):
+        panels, t = find_panels(rects)
+        res.pages.append({"page": p + 1, "panels": len(panels), "thickness": t})
+        if not panels:
+            continue
+        for r in panels:
+            res.widths[nominal_width(max(r.w, r.h), t)] += 1
+        js = joints_on_page(panels, t, p + 1)
+        labels, heights = panel_labels(words[p] if words else [], panels, t, p + 1)
+        res.labels.extend(labels)
+        sizes = [(nominal_width(max(r.w, r.h), t), heights.get(i)) for i, r in enumerate(panels)]
+        for j in js:
+            j.panels = tuple(sizes[i] for i in j.panels)
+        res.joints.extend(js)
+        res.counts.update(j.kind for j in js)
+        if shapes:
+            res.height_changes.extend(height_marks(shapes[p], js, t, p + 1))
+        if shapes or strokes:
+            res.pink_dashes.extend(pink_dashes(shapes[p] if shapes else [], strokes[p] if strokes else [], js, t, p + 1))
+    return res
+
+
+def _color(c):
+    if c is None:
+        return None
+    if isinstance(c, (int, float)):
+        return (float(c),) * 3
+    if len(c) == 1:
+        return (float(c[0]),) * 3
+    if len(c) == 3:
+        return tuple(float(v) for v in c)
+    return None  # CMYK and patterns
+
+
+def _rgb(obj):
+    fill = obj.get("non_stroking_color") if obj.get("fill") else None
+    if fill is None:
+        return None
+    if isinstance(fill, (int, float)):
+        return (float(fill),) * 3
+    if len(fill) == 1:
+        return (float(fill[0]),) * 3
+    if len(fill) == 3:
+        return tuple(float(c) for c in fill)
+    return None  # CMYK and patterns: not a CET panel fill
+
+
+def _words(chars: list[dict]) -> list[Word]:
+    """Words from pdfplumber chars. CET writes each label's characters in reading order, so neighbors in the
+    content stream that touch on the page form a word (pdfplumber's own word grouping reverses vertical text)."""
+    out, cur = [], []
+
+    def flush():
+        if cur:
+            x0, x1 = min(c["x0"] for c in cur), max(c["x1"] for c in cur)
+            y0, y1 = min(c["top"] for c in cur), max(c["bottom"] for c in cur)
+            out.append(Word("".join(c["text"] for c in cur), (x0 + x1) / 2, (y0 + y1) / 2, not cur[0]["upright"]))
+            cur.clear()
+
+    for c in chars:
+        if not c["text"].strip():
+            flush()
+            continue
+        if cur:
+            p = cur[-1]
+            size = min(p["x1"] - p["x0"], p["bottom"] - p["top"]) or 1
+            gap = max(c["x0"] - p["x1"], p["x0"] - c["x1"], c["top"] - p["bottom"], p["top"] - c["bottom"])
+            line = abs(c["top"] - p["top"]) if p["upright"] else abs(c["x0"] - p["x0"])
+            if c["upright"] != p["upright"] or gap > 0.3 * size or line > 0.3 * size:
+                flush()
+        cur.append(c)
+    flush()
+    return out
+
+
+def read_pdf(path: str | Path) -> tuple[list[list[Rect]], list[list[Shape]], list[list[Stroke]], list[list[Word]]]:
+    import pdfplumber
+
+    pages, shapes, strokes, words = [], [], [], []
+    with pdfplumber.open(path) as pdf:
+        for page in pdf.pages:
+            pages.append([Rect(r["x0"], r["top"], r["x1"], r["bottom"], _rgb(r)) for r in page.rects])
+            shapes.append([Shape(o["x0"], o["top"], o["x1"], o["bottom"], _rgb(o))
+                           for o in list(page.rects) + list(page.curves) if o.get("fill")])
+            strokes.append([Stroke(o["x0"], o["top"], o["x1"], o["bottom"], _color(o.get("stroking_color")), kind == "line")
+                            for kind, objs in (("line", page.lines), ("rect", page.rects), ("curve", page.curves))
+                            for o in objs if o.get("stroke", True) and is_pink(_color(o.get("stroking_color")))])
+            words.append(_words(page.chars))
+    return pages, shapes, strokes, words
+
+
+def analyze_pdf(path: str | Path) -> PlanResult:
+    return analyze_rects(*read_pdf(path))

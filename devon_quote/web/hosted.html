@@ -1,0 +1,1135 @@
+<title>Devon Quote Builder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Earth-tone theme: sand, walnut, terracotta, moss. Layout: OF4S workbench. Inputs left, quote details right, results stacked below with the plan beside the flags. */
+:root {
+  --bg: #f3ede2; --surface: #fbf8f2; --surface-2: #ebe3d4; --sunken: #f3ede2;
+  --fg: #2a241d; --fg-2: #5a4f42; --fg-3: #7a6e5c;
+  --accent: #a0522d; --accent-2: #b5653d; --accent-tint: #f0dccd; --accent-ink: #6b3418;
+  --primary: #4b3a2b; --primary-hover: #5e4836; --on-primary: #f8f3ea;
+  --panel: #3f3226; --panel-fg: #f6efe4; --panel-fg-2: #e6d6c2; --panel-accent: #d8a47f; --panel-line: rgba(255,255,255,0.14);
+  --line: rgba(70, 50, 30, 0.12); --line-2: rgba(70, 50, 30, 0.24); --dash: #cdbb9c;
+  --success: #5f7340; --warn: #b07a2a; --danger: #9c3a30; --danger-tint: #f5e4dc;
+  --shadow: 0 4px 12px rgba(60, 40, 20, 0.08), 0 2px 4px rgba(60, 40, 20, 0.04);
+  --display: 'Schibsted Grotesk', 'Geist', system-ui, sans-serif;
+  --sans: 'Geist', -apple-system, system-ui, sans-serif;
+  --mono: 'Geist Mono', 'SF Mono', Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1b1713; --surface: #241e18; --surface-2: #2e261e; --sunken: #1b1713;
+  --fg: #f1e8da; --fg-2: #cdbfa9; --fg-3: #a39580;
+  --accent: #d9935f; --accent-2: #e0a477; --accent-tint: #3d2a1c; --accent-ink: #f3dcc8;
+  --primary: #e8d5bd; --primary-hover: #f6e8d6; --on-primary: #2a2119;
+  --panel: #2e261e; --panel-fg: #f1e8da; --panel-fg-2: #cdbfa9; --panel-accent: #d9935f; --panel-line: rgba(255,255,255,0.12);
+  --line: rgba(241, 232, 218, 0.12); --line-2: rgba(241, 232, 218, 0.22); --dash: #5a4a38;
+  --success: #a3b77f; --warn: #d6a95e; --danger: #e08a7e; --danger-tint: #3a1f1c;
+  --shadow: none; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #1b1713; --surface: #241e18; --surface-2: #2e261e; --sunken: #1b1713;
+  --fg: #f1e8da; --fg-2: #cdbfa9; --fg-3: #a39580;
+  --accent: #d9935f; --accent-2: #e0a477; --accent-tint: #3d2a1c; --accent-ink: #f3dcc8;
+  --primary: #e8d5bd; --primary-hover: #f6e8d6; --on-primary: #2a2119;
+  --panel: #2e261e; --panel-fg: #f1e8da; --panel-fg-2: #cdbfa9; --panel-accent: #d9935f; --panel-line: rgba(255,255,255,0.12);
+  --line: rgba(241, 232, 218, 0.12); --line-2: rgba(241, 232, 218, 0.22); --dash: #5a4a38;
+  --success: #a3b77f; --warn: #d6a95e; --danger: #e08a7e; --danger-tint: #3a1f1c;
+  --shadow: none; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+header.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+header.bar .wrap { display: flex; align-items: center; gap: 14px; min-height: 58px; padding-block: 8px; flex-wrap: wrap; }
+.logo { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: -0.01em; color: var(--accent-ink); }
+.logo b { color: var(--accent-2); font-weight: 700; }
+.bar .name { font-family: var(--display); font-weight: 500; color: var(--fg-2); }
+.bar .spacer { flex: 1; }
+.chip { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 10px; border-radius: 999px; background: var(--accent-tint); color: var(--accent-ink); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; }
+.chip.warn { background: var(--danger-tint); color: var(--danger); }
+button.chip { cursor: pointer; }
+
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+h1 { font-family: var(--display); font-weight: 600; font-size: clamp(30px, 4.4vw, 42px); line-height: 1.08; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+h1 .accent { color: var(--accent); }
+h2 { font-family: var(--display); font-weight: 600; font-size: 22px; letter-spacing: -0.01em; margin: 0 0 4px; text-wrap: balance; }
+.lede { color: var(--fg-2); max-width: 64ch; margin: 12px 0 0; }
+section.hero { padding-block: 36px 24px; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; box-shadow: var(--shadow); min-width: 0; }
+.step { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--fg-3); margin-bottom: 10px; display: flex; justify-content: space-between; gap: 4px 12px; flex-wrap: wrap; }
+
+.seg { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 0 0 12px; font-size: 14px; color: var(--fg-2); }
+.seg .opts { display: inline-flex; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; }
+.seg label { position: relative; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg label span { display: block; padding: 7px 14px; font-weight: 500; color: var(--fg-2); background: var(--surface); }
+.seg label + label span { border-left: 1px solid var(--line-2); }
+.seg input:checked + span { background: var(--primary); color: var(--on-primary); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -2px; }
+.drop { display: block; width: 100%; border: 1.5px dashed var(--dash); border-radius: 10px; background: var(--sunken); padding: 22px; text-align: center; cursor: pointer; transition: border-color 150ms, background 150ms; }
+.drop:hover, .drop.over { border-color: var(--accent-2); background: var(--accent-tint); }
+.drop .big { font-family: var(--display); font-weight: 600; font-size: 17px; }
+.drop .small { color: var(--fg-3); font-size: 13.5px; margin-top: 2px; }
+.drop.has { border-style: solid; border-color: var(--accent-2); background: var(--surface); text-align: left; }
+.file { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.file > div { min-width: 0; }
+.fname { font-family: var(--mono); font-size: 13.5px; overflow-wrap: anywhere; }
+.meta { color: var(--fg-3); font-size: 13px; }
+.x { margin-left: auto; border: 0; background: none; color: var(--fg-3); cursor: pointer; padding: 4px 6px; font-size: 13px; flex: none; }
+.x:hover { color: var(--danger); }
+.icon { width: 22px; height: 22px; flex: none; stroke: var(--accent); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.linkish { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-size: 13.5px; }
+
+.hint { color: var(--fg-3); font-size: 13px; margin: 8px 0 0; }
+
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.fields .full { grid-column: 1 / -1; }
+label.f span { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-2); margin-bottom: 4px; }
+label.f input, label.f select, .fixform input { width: 100%; border: 1px solid var(--line-2); border-radius: 8px; padding: 9px 11px; background: var(--surface); min-width: 0; }
+.btn { border: 1px solid var(--line-2); background: var(--surface); border-radius: 8px; padding: 8px 14px; cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; color: var(--fg); text-align: left; }
+.btn:hover { border-color: var(--accent-2); }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); padding: 12px 20px; font-size: 16px; }
+.btn.primary:hover { background: var(--primary-hover); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.small { padding: 5px 10px; font-size: 13.5px; }
+.go { margin-top: 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.msg { font-size: 14px; color: var(--fg-3); }
+.msg.error { color: var(--danger); }
+
+#results { padding-block: 36px 24px; }
+.totals { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 24px; }
+.total-card { background: var(--panel); color: var(--panel-fg); border-radius: 14px; padding: 24px; min-width: 0; }
+.total-card .eyebrow { color: var(--panel-accent); }
+.amount { font-family: var(--display); font-weight: 600; font-size: clamp(36px, 6vw, 50px); letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+.total-card .sub { color: var(--panel-fg-2); margin-top: 8px; font-size: 14px; }
+.total-card table { width: 100%; margin-top: 18px; border-collapse: collapse; font-size: 14px; }
+.total-card td { padding: 5px 0; border-top: 1px solid var(--panel-line); }
+.total-card td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.downloads { display: flex; flex-direction: column; gap: 10px; }
+.downloads .btn { padding: 12px 14px; width: 100%; }
+.downloads .btn small { display: block; color: var(--fg-3); font-weight: 400; font-size: 12.5px; }
+
+.attn { margin-top: 28px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+.attn.with-plan { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+.plan { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 74px); min-width: 0; }
+.plan img { width: 100%; max-height: 72vh; object-fit: contain; border: 1px solid var(--line); border-radius: 10px; background: #fff; display: block; }
+.canvasbox { overflow: auto; max-height: 72vh; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.canvasbox canvas { display: block; width: 100%; height: auto; }
+.canvasbox.zoom canvas { width: 260%; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 13px; color: var(--fg-2); align-items: center; }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.planread { margin-top: 4px; font-size: 13px; color: var(--fg-2); }
+.planread b { color: var(--fg); font-weight: 600; }
+.marklist { margin-top: 8px; font-size: 13.5px; }
+.marklist summary { cursor: pointer; color: var(--fg-2); font-size: 13px; }
+.markrow { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.markrow.off { color: var(--fg-3); }
+.markrow i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,0.35); flex: none; }
+.markrow .num { font-family: var(--mono); font-size: 12px; min-width: 1.6em; text-align: right; color: var(--fg-2); }
+.tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.tabs button { border: 1px solid var(--line-2); background: var(--surface); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tabs button.on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+
+.items { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.item { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: 8px; padding: 12px 14px; min-width: 0; }
+.item.bad { border-left-color: var(--danger); }
+.item.warnline { border-left-color: var(--danger); background: var(--danger-tint); }
+.item .top { display: flex; gap: 6px 10px; align-items: baseline; flex-wrap: wrap; }
+.pn { font-family: var(--mono); font-size: 13.5px; font-weight: 500; overflow-wrap: anywhere; }
+.arrow { color: var(--fg-3); }
+.dv { font-family: var(--mono); font-size: 13.5px; color: var(--accent); overflow-wrap: anywhere; }
+.q { margin-left: auto; font-family: var(--mono); font-size: 13px; color: var(--fg-2); }
+.desc { color: var(--fg-2); font-size: 13.5px; }
+.note { margin-top: 4px; font-size: 14px; }
+.item .actions { margin-top: 8px; }
+.fixform { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line-2); display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 8px 10px; align-items: end; }
+.fixform .full { grid-column: 1 / -1; }
+.fixform label > span { display: block; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-2); margin-bottom: 3px; }
+.fixform .check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.ok { color: var(--success); font-weight: 500; }
+
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table.data { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.data th { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-2); text-align: left; padding: 10px 12px; background: var(--surface-2); font-weight: 500; white-space: nowrap; }
+table.data td { padding: 8px 12px; border-top: 1px solid var(--line); vertical-align: top; }
+table.data .n { text-align: right; font-family: var(--mono); white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.data td.pn { white-space: nowrap; font-size: 13px; }
+table.data td.src { font-family: var(--mono); font-size: 12px; color: var(--fg-3); }
+table.data tfoot td { font-weight: 600; background: var(--surface-2); }
+.block { margin-top: 36px; }
+.block > p { color: var(--fg-2); margin: 4px 0 12px; }
+.empty { color: var(--fg-3); font-size: 14px; padding: 14px; }
+
+.spinner { width: 18px; height: 18px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; display: none; }
+.busy .spinner { display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } * { scroll-behavior: auto !important; } }
+.page-drop { position: fixed; inset: 0; background: rgba(63, 50, 38, 0.88); color: #f8f3ea; display: flex; align-items: center; justify-content: center; z-index: 50; font-family: var(--display); font-size: 28px; font-weight: 600; padding: 24px; text-align: center; }
+.page-drop[hidden] { display: none; }
+footer { border-top: 1px solid var(--line); margin-top: 40px; }
+footer .wrap { padding-block: 18px 30px; color: var(--fg-3); font-size: 13px; }
+
+@media (max-width: 880px) {
+  .grid, .totals, .attn.with-plan { grid-template-columns: minmax(0, 1fr); }
+  .plan { position: static; }
+  .fields { grid-template-columns: 1fr; }
+  .bar .name { display: none; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></symbol>
+  <symbol id="i-plan" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M3 10h8V3M11 10v11M11 15h10"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-sheet" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M4 9h16M4 15h16M10 3v18"/></symbol>
+</svg>
+
+<header class="bar">
+  <div class="wrap">
+    <span class="logo">OF<b>4</b>S</span>
+    <span class="name">Devon quote builder</span>
+    <span class="spacer"></span>
+    <button id="tplChip" class="chip" type="button">Loading Devon calc…</button>
+    <input id="tplInput" type="file" accept=".xlsm,.xlsx" hidden>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <p class="eyebrow">AIS Divi to Devon</p>
+    <h1>Drop the CET file. Get the <span class="accent">Devon quote.</span></h1>
+    <p class="lede">Export the bill of materials from CET, drop it here with the 2D plan as a PDF. You get Devon's own calculator, filled in and ready to send.</p>
+  </section>
+
+  <div id="tplPanel" class="card" style="margin-bottom:16px" hidden></div>
+
+  <div class="grid">
+    <div class="stack">
+      <div class="card">
+        <div class="step"><span>CET bill of materials</span><span>Required</span></div>
+        <div class="seg" role="radiogroup" aria-label="Devon height for 50-inch AIS panels">
+          <span>AIS 50"H panels quote as Devon</span>
+          <span class="opts">
+            <label><input type="radio" name="divi50" value="53" checked><span>53"H</span></label>
+            <label><input type="radio" name="divi50" value="47"><span>47"H</span></label>
+          </span>
+        </div>
+        <div id="bomDrop" class="drop" tabindex="0" role="button" aria-label="Add the CET bill of materials"></div>
+        <input id="bomInput" type="file" accept=".sif,.csv,.txt,.xlsx" hidden>
+      </div>
+
+      <div class="card">
+        <div class="step"><span>2D plan</span><span>Optional</span></div>
+        <div id="planDrop" class="drop" tabindex="0" role="button" aria-label="Add the 2D plan">
+          <div class="big">Drop the 2D plan here</div>
+          <div class="small">Best: the CET 2D exported as a PDF with panel labels on. The page measures every panel joint and reads each panel's height from its label. PNG and JPG work too, for pink dashes and colored dots.</div>
+        </div>
+        <input id="planInput" type="file" accept=".pdf,image/*" multiple hidden>
+        <div id="planList"></div>
+        <p class="hint"><b>Height changes:</b> nothing to draw when the 2D is a PDF with CET's panel labels (A6660 = 66"H × 60"W). Where panels of different heights meet, the connector is quoted at the taller height and a high/low filler strip covers the step, such as HMHL3967 where a 42" (Devon 39") panel meets a 66" (Devon 67").</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="step"><span>Quote details</span></div>
+      <div class="fields">
+        <label class="f full"><span>Project name</span><input id="project" placeholder="Acme HQ, 3rd floor"></label>
+        <label class="f"><span>Ship-to zip</span><input id="ship_to" inputmode="numeric" placeholder="33010"></label>
+        <label class="f"><span>Fabric grade</span>
+          <select id="grade"><option value="0">Keystone (grade 1)</option><option value="1">Summit (grade 2)</option><option value="2">Aspen (grade 3)</option></select>
+        </label>
+        <label class="f"><span>Workstations</span><input id="stations" inputmode="numeric" placeholder="24"></label>
+        <label class="f"><span>Delivery ($)</span><input id="delivery" inputmode="decimal" placeholder="Auto from weight"></label>
+        <label class="f"><span>Trim code</span><input id="trim" placeholder="Keep Devon's default"></label>
+        <label class="f"><span>Description</span><input id="description" value="WORKSTATIONS"></label>
+      </div>
+      <div class="go">
+        <button id="buildBtn" class="btn primary" type="button" disabled><span class="spinner"></span><span>Build Devon quote</span></button>
+        <span id="buildMsg" class="msg">Add the CET file to start.</span>
+      </div>
+      <p class="hint" style="margin-top:16px">Your files are read in this browser. Only the Devon calculator your team stores, and the mapping corrections you save, are kept with this page.</p>
+    </div>
+  </div>
+
+  <section id="results" hidden>
+    <p class="eyebrow" id="resEyebrow">Estimate</p>
+    <div class="totals">
+      <div class="total-card">
+        <p class="eyebrow">Estimated Devon cost</p>
+        <div class="amount" id="total">$0.00</div>
+        <div class="sub" id="totalSub"></div>
+        <table id="breakdown"></table>
+      </div>
+      <div class="card downloads">
+        <div class="step"><span>Downloads</span></div>
+        <button id="dlQuote" class="btn" type="button"><svg class="icon"><use href="#i-sheet"/></svg><span>Devon calculator, filled in<small>.xlsx · opens in Excel or Google Sheets and prices itself</small></span></button>
+        <button id="dlReport" class="btn" type="button"><svg class="icon"><use href="#i-doc"/></svg><span>Review report<small>.md · flags, finishes, line items</small></span></button>
+        <button id="dlCross" class="btn" type="button"><svg class="icon"><use href="#i-down"/></svg><span>AIS to Devon crosswalk<small>.csv · every AIS line and what it became</small></span></button>
+        <span id="dlMsg" class="msg"></span>
+      </div>
+    </div>
+
+    <div id="attn" class="attn">
+      <div class="block" style="margin-top:0">
+        <h2 id="attnTitle">Needs your attention</h2>
+        <p id="attnLede"></p>
+        <div id="attnItems" class="items"></div>
+      </div>
+      <div id="planView" class="plan" hidden>
+        <div class="tabs" id="planTabs"></div>
+        <div id="planFrame"></div>
+      </div>
+    </div>
+
+    <div class="block" id="finBlock">
+      <h2>AIS finishes in the design</h2>
+      <p>Pick the matching Devon trim, fabric and worksurface colors.</p>
+      <div class="scroll"><table class="data" id="finTable"></table></div>
+    </div>
+
+    <div class="block">
+      <h2>Devon line items</h2>
+      <p>What went into the calculator. Net is list × Devon's multiplier.</p>
+      <div class="scroll"><table class="data" id="lineTable"></table></div>
+    </div>
+  </section>
+
+  <section class="block" id="corrections">
+    <h2>Saved corrections</h2>
+    <p id="corrLede">When a flagged part maps wrong, fix it once and every future quote uses the fix. Corrections are shared with everyone who uses this page.</p>
+    <div class="scroll"><table class="data" id="corrTable"></table></div>
+  </section>
+</main>
+
+<footer><div class="wrap">Office Furniture 4 Sale · Devon quote builder · AIS Divi designs from CET, priced on Devon's own calculator.</div></footer>
+<div class="page-drop" id="pageDrop" hidden>Drop to add</div>
+<datalist id="devonParts"></datalist>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+/*__ENGINE__*/
+</script>
+<script>
+"use strict";
+const E = window.DevonEngine;
+const SAMPLE_SIF = /*__SAMPLE__*/"";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = (n) => (n == null ? "" : n.toLocaleString("en-US", { style: "currency", currency: "USD" }));
+const kb = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB");
+const qtyText = (n) => String(Number.isInteger(n) ? n : +n.toFixed(3));
+
+const state = {
+  calc: null,          // {catalog, bytes, name, source: "team" | "session", savedAt}
+  bom: null,           // File
+  plans: [],           // [{file, url}]
+  overrides: [],       // [{id, ais_part, devon_part, ratio, note}]
+  sessionOverrides: [],
+  out: null,           // last build
+  db: null, user: null, downloads: null,
+  canEdit: false, canWrite: null,
+};
+
+// ---------------------------------------------------------------- helpers
+function b64ToBytes(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function bytesToB64(bytes) {
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+const cap = (name) => (window.claude && window.claude.use ? window.claude.use(name).catch(() => null) : Promise.resolve(null));
+
+// ---------------------------------------------------------------- Devon calculator
+function priceListName(cat) {
+  return (cat.title || "").replace(/^.*NET PRICER\s*-\s*/i, "") || "Devon calc";
+}
+
+async function useCalculator(bytes, name, source, savedAt) {
+  const { catalog } = await E.loadCalculator(JSZip, bytes);
+  state.calc = { catalog, bytes, name, source, savedAt };
+  $("devonParts").innerHTML = catalog.order.map((p) => `<option value="${esc(p)}">${esc(catalog.items[p].description)}</option>`).join("");
+  renderCalc();
+  refresh();
+  if (state.out) build();
+}
+
+function renderCalc() {
+  const chip = $("tplChip"), panel = $("tplPanel");
+  const c = state.calc;
+  if (c) {
+    chip.className = "chip";
+    chip.textContent = `Devon calc · ${priceListName(c.catalog)} · ${c.catalog.order.length} items`;
+    chip.title = `${c.name} (${c.source === "team" ? "stored for the team" : "this visit only"})`;
+  } else {
+    chip.className = "chip warn";
+    chip.textContent = "No Devon calc · add it";
+    chip.title = "Add Devon's calculator (.xlsm)";
+  }
+  // Panel: shown when there's no calc yet, or opened from the chip.
+  const editorLine = state.canEdit && state.db
+    ? "As an editor you can store it for the team, so nobody else needs the file."
+    : state.db ? "An editor of this page can store it for the whole team." : "";
+  const status = c
+    ? `<p style="margin:0">Using <span class="fname">${esc(c.name)}</span>, price list ${esc(priceListName(c.catalog))}, ${c.catalog.order.length} items. ${c.source === "team" ? `Stored for the team${c.savedAt ? " on " + esc(new Date(c.savedAt).toLocaleDateString()) : ""}.` : "Loaded for this visit only."}</p>`
+    : `<p style="margin:0">Add the Devon calculator (the <span class="fname">DEVON_OFFICIAL_CALC_*.xlsm</span> file) so the page has Devon's prices. ${editorLine}</p>`;
+  const storeBtn = c && c.source === "session" && state.canEdit && state.db
+    ? `<button id="storeTpl" class="btn small" type="button">Store it for the team</button>` : "";
+  panel.innerHTML = `<div class="step"><span>Devon calculator</span><button class="x" type="button" id="closeTpl" ${c ? "" : "hidden"}>Close</button></div>
+    ${status}
+    <div class="go" style="margin-top:12px">
+      <button id="pickTpl" class="btn small" type="button">${c ? "Use a different calculator" : "Choose the Devon calculator"}</button>
+      ${storeBtn}
+      <span id="tplMsg" class="msg"></span>
+    </div>`;
+  panel.hidden = !!c && !panel.dataset.open;
+  $("pickTpl").onclick = () => $("tplInput").click();
+  const close = $("closeTpl");
+  if (close) close.onclick = () => { delete panel.dataset.open; panel.hidden = true; };
+  const store = $("storeTpl");
+  if (store) store.onclick = () => storeForTeam();
+}
+
+$("tplChip").onclick = () => {
+  const panel = $("tplPanel");
+  panel.dataset.open = "1";
+  panel.hidden = false;
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+};
+
+async function addCalculatorFile(file) {
+  const panel = $("tplPanel");
+  panel.dataset.open = "1";
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    await useCalculator(bytes, file.name, "session", null);
+    if (state.canEdit && state.db) await storeForTeam();
+    else setTplMsg(state.db ? "Loaded for this visit. Ask an editor of this page to store it for the team." : "Loaded for this visit.");
+  } catch (e) {
+    renderCalc();
+    setTplMsg(e.message || String(e), true);
+  }
+}
+function setTplMsg(text, error) {
+  const el = $("tplMsg");
+  if (el) { el.textContent = text; el.className = "msg" + (error ? " error" : ""); }
+}
+
+async function storeForTeam() {
+  const c = state.calc;
+  if (!c || !state.db) return;
+  setTplMsg("Storing for the team…");
+  try {
+    const doc = {
+      name: c.name, title: c.catalog.title, items: c.catalog.order.length,
+      b64: bytesToB64(c.bytes), savedAt: new Date().toISOString(),
+    };
+    await state.db.doc("config/template").set(doc);
+    state.calc.source = "team";
+    state.calc.savedAt = doc.savedAt;
+    delete $("tplPanel").dataset.open;
+    renderCalc();
+  } catch (e) {
+    setTplMsg(e && e.code === "invalid_argument"
+      ? "Couldn't store it. Only editors of this page can, and the file must be under about 190 KB."
+      : "Couldn't store it right now. It's loaded for this visit.", true);
+  }
+}
+$("tplInput").onchange = (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) addCalculatorFile(f); };
+
+// ---------------------------------------------------------------- inputs
+function renderBom() {
+  const z = $("bomDrop"), f = state.bom;
+  if (!f) {
+    z.className = "drop";
+    z.innerHTML = `<div class="big">Drop the CET export here</div><div class="small">.sif works best. A .csv or .xlsx with part numbers and quantities also works. Or click to choose.</div>
+      <div class="small" style="margin-top:8px"><button type="button" class="linkish" id="useSample">Try the sample AIS Divi job</button></div>`;
+    $("useSample").onclick = (e) => {
+      e.stopPropagation();
+      setBom(new File([SAMPLE_SIF], "sample_ais_divi.sif", { type: "text/plain" }));
+      if (!$("project").value || $("project").value === "sample ais divi") $("project").value = "Sample Divi job";
+      if (!$("stations").value) $("stations").value = "30";
+    };
+  } else {
+    z.className = "drop has";
+    z.innerHTML = `<div class="file"><svg class="icon"><use href="#i-doc"/></svg><div><div class="fname">${esc(f.name)}</div><div class="meta">${kb(f.size)} · click to replace</div></div><button class="x" type="button">Remove</button></div>`;
+    z.querySelector(".x").onclick = (e) => { e.stopPropagation(); setBom(null); };
+  }
+}
+function setBom(file) {
+  state.bom = file;
+  if (file && !$("project").value) $("project").value = file.name.replace(/\.[^.]+$/, "").replace(/^CET_/i, "").replace(/_+/g, " ");
+  renderBom();
+  refresh();
+}
+
+// ---- reading CET PDF plans (PDF.js runs on the page's main thread; no worker file needed)
+const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+let pdfjsPromise = null;
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const el = document.createElement("script");
+    el.src = src; el.onload = resolve; el.onerror = () => reject(new Error("Couldn't load the PDF reader."));
+    document.head.appendChild(el);
+  });
+}
+function loadPdfjs() {
+  pdfjsPromise ||= loadScript(PDFJS + "pdf.worker.min.js").then(() => loadScript(PDFJS + "pdf.min.js")).then(() => {
+    const lib = window.pdfjsLib;
+    if (!lib) throw new Error("Couldn't load the PDF reader.");
+    lib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js";
+    return lib;
+  });
+  pdfjsPromise.catch(() => { pdfjsPromise = null; });
+  return pdfjsPromise;
+}
+
+// Joint markers avoid the designer's mark colors: the five filler-strip dots and the pink panel-to-panel dash.
+const JOINT_STYLE = {
+  straight: { color: "#00acc1", label: "Straight joint" },
+  l: { color: "#ef6c00", label: "Corner" },
+  tee: { color: "#3949ab", label: "3-way" },
+  cross: { color: "#8d6e63", label: "4-way" },
+  ends: { color: "#78909c", label: "Free end" },
+  angled: { color: "#795548", label: "Check: odd angle" },
+  other: { color: "#795548", label: "Check: 5+ panels" },
+};
+const DOT_STYLE = { red: "#e00000", blue: "#0040ff", yellow: "#ffe000", green: "#00a000", purple: "#8000c0" };
+
+function planSummaryText(r) {
+  const c = r.counts;
+  const hc = (r.heightChanges || []).length;
+  const pinkOn = (r.pinkDashes || []).filter((d) => d.joint).length;
+  const pinkOff = (r.pinkDashes || []).length - pinkOn;
+  const labeled = (r.labels || []).filter((l) => l.matched).length;
+  return `<b>${r.panels} panels read:</b> ${c.straight} straight · ${c.l} corners · ${c.tee} three-way · ${c.cross} four-way · ${c.ends} free ends` +
+    (labeled ? ` · <b>heights from ${labeled} panel label${labeled === 1 ? "" : "s"}</b>` : "") +
+    (hc ? ` · <b>${hc} height change${hc === 1 ? "" : "s"} (colored dots)</b>` : "") +
+    (pinkOn + pinkOff ? ` · <b>${pinkOn} pink-dash panel-to-panel joint${pinkOn === 1 ? "" : "s"}</b>${pinkOff ? ` (${pinkOff} off a joint)` : ""}` : "") +
+    (c.angled + c.other ? ` · <b>${c.angled + c.other} to check</b>` : "");
+}
+
+const MAX_SIDE = 4000; // images are read at up to this many pixels on the long side
+const markLabel = (m) => (m.kind === "dash" ? "pink dash · panel-to-panel (HMP213)" : `${m.color} dot · ${E.DOT_COLORS[m.color] || ""}`);
+const markHex = (m) => (m.kind === "dash" ? "#ff66b3" : DOT_STYLE[m.color] || "#000000");
+
+function marksSummaryText(list) {
+  const s = E.summarizeMarks(list);
+  const dots = Object.entries(s.dots).map(([c, n]) => `${n} ${c}`).join(" · ");
+  const total = s.pink + Object.values(s.dots).reduce((a, b) => a + b, 0);
+  if (!total && !s.offPanel) return "No pink dashes or colored dots found in this 2D.";
+  return `<b>Marks read:</b> ${s.pink} pink dash${s.pink === 1 ? "" : "es"}` + (dots ? ` · dots: ${dots}` : "") +
+    (s.offPanel ? ` · ${s.offPanel} off the drawing (not counted)` : "");
+}
+
+async function pixelsOf(source, w, h) {
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h);
+  if (source.render) await source.render(ctx);
+  else ctx.drawImage(source, 0, 0, w, h);
+  return ctx.getImageData(0, 0, w, h).data;
+}
+
+function withUse(marks) {
+  for (const m of [...marks.dashes, ...marks.dots]) m.use = m.onPanel;
+  return marks;
+}
+
+async function readImageMarks(p) {
+  const img = new Image();
+  img.src = p.url;
+  await img.decode();
+  const s = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.max(1, Math.round(img.naturalWidth * s)), h = Math.max(1, Math.round(img.naturalHeight * s));
+  const data = await pixelsOf(img, w, h);
+  p.rasters = [{ name: p.file.name, marks: withUse(E.imageMarks(data, w, h)), w, h, image: img }];
+}
+
+async function readPdfMarks(p) {
+  p.rasters = [];
+  for (let i = 0; i < Math.min(p.pdfPages.length, 6); i++) {
+    const page = p.pdfPages[i];
+    const base = page.getViewport({ scale: 1 });
+    const scale = Math.min(4, MAX_SIDE / Math.max(base.width, base.height));
+    const vp = page.getViewport({ scale });
+    const w = Math.round(vp.width), h = Math.round(vp.height);
+    const data = await pixelsOf({ render: (ctx) => page.render({ canvasContext: ctx, viewport: vp }).promise }, w, h);
+    p.rasters.push({ name: p.pdfPages.length > 1 ? `${p.file.name} · p${i + 1}` : p.file.name, page: i + 1, scale, marks: withUse(E.imageMarks(data, w, h)), w, h });
+  }
+}
+
+async function readPlan(p) {
+  p.status = "reading";
+  renderPlans();
+  try {
+    if (p.image) {
+      await readImageMarks(p);
+    } else {
+      const lib = await loadPdfjs();
+      const { result, pdfPages } = await E.analyzePdf(lib, new Uint8Array(await p.file.arrayBuffer()));
+      p.analysis = result; p.pdfPages = pdfPages;
+      const vectorMarks = (result.pinkDashes || []).length + (result.heightChanges || []).length;
+      if (!vectorMarks) await readPdfMarks(p); // marks may be drawn as an image, or the PDF may be a picture
+    }
+    p.status = "done";
+  } catch (e) {
+    p.status = "error"; p.error = e.message || String(e);
+  }
+  renderPlans();
+  if (state.out) build();
+}
+
+function combinedPlan() {
+  const read = state.plans.map((p, src) => [p, src]).filter(([p]) => p.status === "done" && p.analysis && p.analysis.panels);
+  if (!read.length) return null;
+  const out = { counts: {}, widths: {}, joints: [], pages: [], panels: 0, heightChanges: [], pinkDashes: [], labels: [] };
+  for (const [p, src] of read) {
+    const r = p.analysis;
+    out.joints.push(...r.joints.map((j) => ({ ...j, src }))); // src: which plan file, for drawing it later
+    out.labels.push(...(r.labels || []));
+    out.heightChanges.push(...(r.heightChanges || []));
+    out.pinkDashes.push(...(r.pinkDashes || []));
+    for (const [k, v] of Object.entries(r.counts)) out.counts[k] = (out.counts[k] || 0) + v;
+    for (const [k, v] of Object.entries(r.widths)) out.widths[k] = (out.widths[k] || 0) + v;
+    out.panels += r.panels;
+  }
+  return out;
+}
+
+function combinedMarks() {
+  const list = state.plans.filter((p) => p.status === "done" && p.rasters).flatMap((p) => p.rasters.map((r) => r.marks));
+  return list.length ? E.summarizeMarks(list) : null;
+}
+
+function markRows(p, pi) {
+  const rows = [];
+  (p.rasters || []).forEach((r, ri) => {
+    [...r.marks.dashes, ...r.marks.dots].forEach((m, mi) => {
+      const id = `mk-${pi}-${ri}-${mi}`;
+      rows.push(`<label class="markrow${m.onPanel ? "" : " off"}" for="${id}"><input type="checkbox" id="${id}" data-p="${pi}" data-r="${ri}" data-m="${mi}" ${m.use ? "checked" : ""}>` +
+        `<span class="num">${mi + 1}</span><i style="background:${markHex(m)}"></i>${esc(markLabel(m))}` +
+        `${p.rasters.length > 1 ? ` <span class="meta">· ${esc(r.name)}</span>` : ""}${m.onPanel ? "" : ` <span class="meta">· not on a panel line</span>`}</label>`);
+    });
+  });
+  if (!rows.length) return "";
+  return `<details class="marklist" open><summary>Check the marks (untick anything that isn't a designer mark)</summary>${rows.join("")}</details>`;
+}
+
+function renderPlans() {
+  $("planList").innerHTML = state.plans.map((p, i) => {
+    let read = "";
+    if (p.status === "reading") read = p.image ? "Reading pink dashes and colored dots…" : "Reading panel joints and marks…";
+    else if (p.status === "error") read = "Couldn't read this file: " + esc(p.error);
+    else if (p.status === "done") {
+      const parts = [];
+      if (p.analysis && p.analysis.panels) parts.push(planSummaryText(p.analysis));
+      else if (p.analysis) parts.push("No vector CET panels in this PDF, so the joints can't be measured; marks are read from the picture.");
+      if (p.rasters) parts.push(marksSummaryText(p.rasters.map((r) => r.marks)));
+      read = parts.join("<br>");
+    }
+    return `<div class="file" style="margin-top:10px;align-items:flex-start"><svg class="icon"><use href="#i-plan"/></svg><div style="flex:1"><div class="fname">${esc(p.file.name)}</div><div class="meta">${kb(p.file.size)}</div>${read ? `<div class="planread">${read}</div>` : ""}${p.status === "done" ? markRows(p, i) : ""}</div><button class="x" type="button" data-i="${i}">Remove</button></div>`;
+  }).join("");
+  $("planList").querySelectorAll(".x").forEach((b) => (b.onclick = () => {
+    const [p] = state.plans.splice(+b.dataset.i, 1);
+    if (p.url) URL.revokeObjectURL(p.url);
+    renderPlans();
+    if (state.out) build();
+  }));
+  $("planList").querySelectorAll(".marklist input").forEach((cb) => (cb.onchange = () => {
+    const r = state.plans[+cb.dataset.p].rasters[+cb.dataset.r];
+    const m = [...r.marks.dashes, ...r.marks.dots][+cb.dataset.m];
+    m.use = cb.checked;
+    renderPlans();
+    if (state.out) build();
+  }));
+}
+function addPlans(files) {
+  for (const f of files) {
+    const image = (f.type || "").startsWith("image/");
+    const p = { file: f, image, url: image ? URL.createObjectURL(f) : null };
+    state.plans.push(p);
+    readPlan(p);
+  }
+  renderPlans();
+  if (state.out) renderPlanView();
+}
+
+const isBom = (f) => /\.(sif|csv|txt|xlsx)$/i.test(f.name) && !/^devon/i.test(f.name);
+const isPlan = (f) => /\.pdf$/i.test(f.name) || (f.type || "").startsWith("image/");
+const isCalc = (f) => /\.xlsm$/i.test(f.name) || (/\.xlsx$/i.test(f.name) && /^devon/i.test(f.name));
+
+function routeFiles(files) {
+  const plans = [];
+  const unknown = [];
+  for (const f of files) {
+    if (isCalc(f)) addCalculatorFile(f);
+    else if (isBom(f)) setBom(f);
+    else if (isPlan(f)) plans.push(f);
+    else unknown.push(f.name);
+  }
+  if (plans.length) addPlans(plans);
+  if (unknown.length) setMsg(`Not sure what ${unknown.join(", ")} is. Drop a CET .sif/.csv/.xlsx, a plan image or PDF, or the Devon calculator .xlsm.`, true);
+}
+
+function wireDrop(zone, input, onFiles) {
+  zone.addEventListener("click", (e) => { if (!e.target.closest(".x, .linkish")) input.click(); });
+  zone.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } });
+  input.addEventListener("change", () => { onFiles([...input.files]); input.value = ""; });
+  zone.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); zone.classList.add("over"); });
+  zone.addEventListener("dragleave", () => zone.classList.remove("over"));
+  zone.addEventListener("drop", (e) => {
+    e.preventDefault(); e.stopPropagation(); zone.classList.remove("over"); hidePageDrop();
+    onFiles([...e.dataTransfer.files]);
+  });
+}
+wireDrop($("bomDrop"), $("bomInput"), routeFiles);
+// 50"H AIS panels: 53" or 47" Devon. Remembered in this browser; changing it rebuilds a quote already on screen.
+try { const saved = localStorage.getItem("divi50"); if (saved === "47" || saved === "53") document.querySelector(`input[name="divi50"][value="${saved}"]`).checked = true; } catch (e) {}
+document.querySelectorAll('input[name="divi50"]').forEach((r) => (r.onchange = () => {
+  try { localStorage.setItem("divi50", r.value); } catch (e) {}
+  if (state.out) build();
+}));
+wireDrop($("planDrop"), $("planInput"), (fs) => addPlans(fs.filter(isPlan)));
+
+let dragDepth = 0;
+const hidePageDrop = () => { dragDepth = 0; $("pageDrop").hidden = true; };
+window.addEventListener("dragenter", (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) { dragDepth++; $("pageDrop").hidden = false; } });
+window.addEventListener("dragleave", () => { if (--dragDepth <= 0) hidePageDrop(); });
+window.addEventListener("dragover", (e) => e.preventDefault());
+window.addEventListener("drop", (e) => { e.preventDefault(); hidePageDrop(); routeFiles([...(e.dataTransfer?.files || [])]); });
+
+function setMsg(text, error) { $("buildMsg").textContent = text; $("buildMsg").className = "msg" + (error ? " error" : ""); }
+function refresh() {
+  $("buildBtn").disabled = !(state.bom && state.calc);
+  if (!state.calc) setMsg("Add Devon's calculator first (top right).");
+  else if (!state.bom) setMsg("Add the CET file to start.");
+  else if (!state.out) setMsg("Ready.");
+}
+
+// ---------------------------------------------------------------- build
+function allOverrides() { return [...state.overrides, ...state.sessionOverrides]; }
+
+async function build() {
+  const btn = $("buildBtn");
+  if (!state.bom || !state.calc) return;
+  btn.disabled = true; btn.classList.add("busy"); setMsg("Building…");
+  try {
+    const c = state.calc;
+    const bomBytes = new Uint8Array(await state.bom.arrayBuffer());
+    const lines = await E.parseBom(JSZip, state.bom.name, bomBytes);
+    if (!lines.length) throw new Error(`No parts found in ${state.bom.name}.`);
+    const divi50 = +document.querySelector('input[name="divi50"]:checked').value;
+    const result = E.makeMapper(c.catalog, allOverrides(), { divi50 }).map(lines, combinedPlan(), combinedMarks());
+    const grade = +$("grade").value;
+    const num = (v) => { const n = Number(String(v || "").replace(/[$,\s]/g, "")); return v && !Number.isNaN(n) ? n : null; };
+    const delivery = num($("delivery").value); // blank: estimated from the weight
+    const stations = num($("stations").value) ? Math.round(num($("stations").value)) : null;
+    const project = $("project").value.trim();
+    const est = E.estimate(c.catalog, result.quantities, grade, delivery, stations);
+    $("delivery").placeholder = est.deliveryAuto ? `Auto: ${money(est.delivery)}` : "Auto from weight";
+    const today = new Date();
+    const header = {
+      project, description: $("description").value.trim(), shipTo: $("ship_to").value.trim(),
+      date: `${today.getMonth() + 1}.${today.getDate()}.${String(today.getFullYear()).slice(2)}`,
+      grade, trim: $("trim").value.trim() || null, delivery: est.delivery, stations,
+    };
+    const stem = E.safeStem(project || state.bom.name.replace(/\.[^.]+$/, ""));
+    const quoteName = `${stem}_Devon_Quote.xlsx`;
+    const xlsx = await E.writeQuote(JSZip, c.bytes, c.catalog, result.quantities, header, "xlsx");
+    const report = E.reportMd({
+      project, bomFile: state.bom.name, quoteFile: quoteName, catalog: c.catalog, grade, lines, result, est,
+      notes: "", drawings: state.plans.map((p) => p.file.name),
+    });
+    state.out = {
+      lines, result, est, grade,
+      files: {
+        quote: { filename: quoteName, data: new Blob([xlsx]) },
+        report: { filename: `${stem}_review.md`, data: report },
+        crosswalk: { filename: `${stem}_crosswalk.csv`, data: E.crosswalkCsv(result) },
+      },
+    };
+    renderResults();
+    setMsg("Done. Change anything and build again.");
+  } catch (e) {
+    setMsg(e.message || String(e), true);
+  } finally {
+    btn.classList.remove("busy");
+    btn.disabled = !(state.bom && state.calc);
+  }
+}
+$("buildBtn").onclick = async () => { await build(); if (state.out) $("results").scrollIntoView({ behavior: "smooth", block: "start" }); };
+
+// ---------------------------------------------------------------- results
+function renderResults() {
+  const { result: r, est: e, lines, grade } = state.out;
+  const cat = state.calc.catalog;
+  $("results").hidden = false;
+  $("resEyebrow").textContent = `${state.bom.name} · ${lines.length} lines · ${qtyText(lines.reduce((s, l) => s + l.qty, 0))} pieces`;
+  $("total").textContent = money(e.total);
+  $("totalSub").textContent = `Devon price list ${priceListName(cat)} · ${E.GRADES[grade]}` + (e.perStation ? ` · ${money(e.perStation)} per station` : "");
+  $("breakdown").innerHTML = [
+    ["List", money(e.listTotal)], ["Product net", money(e.product)],
+    [`Surcharge (${Math.round(cat.surchargeRate * 100)}%)`, money(e.surcharge)], [e.deliveryAuto ? `Delivery (est. from ${Math.round(e.weight).toLocaleString("en-US")} lbs)` : "Delivery", money(e.delivery)],
+    ["Weight (approx.)", Math.round(e.weight).toLocaleString("en-US") + " lbs"],
+  ].map(([k, v]) => `<tr><td>${k}</td><td class="n">${v}</td></tr>`).join("");
+
+  const items = [];
+  r.warnings.forEach((w) => items.push(`<div class="item warnline"><div class="note">${esc(w)}</div></div>`));
+  r.unmapped.forEach((m, i) => items.push(itemHtml(m, true, "u" + i)));
+  r.review.forEach((m, i) => items.push(itemHtml(m, false, "r" + i)));
+  if (r.marks && !r.plan) {
+    const parts = r.planParts.map((x) => x[1] + " × " + x[2]).join(", ");
+    items.unshift(`<div class="item" style="border-left-color:var(--accent-2)"><div class="note"><b>Read from the 2D:</b> ${r.marks.pink} pink dash${r.marks.pink === 1 ? "" : "es"}` +
+      `${Object.keys(r.marks.dots).length ? " · dots: " + esc(Object.entries(r.marks.dots).map(([c, n]) => `${n} ${c}`).join(", ")) : ""}. ` +
+      `Quoted from the marks: ${esc(parts || "nothing")}. The AIS SIF doesn't list straight joints, so each pink dash adds a panel-to-panel connector; AIS 2-way posts are quoted as corners.</div></div>`);
+  } else if (!r.plan && state.plans.length) {
+    items.unshift(`<div class="item warnline"><div class="note"><b>No marks found on the 2D.</b> The AIS SIF doesn't list straight joints, so no panel-to-panel connectors are quoted. Export the CET 2D as a PDF with panel labels on, or draw a pink dash on each panel-to-panel joint and colored dots at height changes, then export again.</div></div>`);
+  }
+  if (r.plan) {
+    items.unshift(`<div class="item" style="border-left-color:var(--accent-2)"><div class="note">${planSummaryText(r.plan)}. Connectors are quoted from the plan: ${esc(r.planParts.map((x) => x[1] + " × " + x[2]).join(", "))}. Free ends are quoted as finished ends; swap any at a wall to a wall start (HMA199).</div></div>`);
+  }
+  const n = r.unmapped.length + r.review.length + r.warnings.length;
+  $("attnTitle").textContent = n ? `Needs your attention (${r.unmapped.length} unmapped, ${r.review.length} to confirm)` : "Nothing flagged";
+  $("attnLede").innerHTML = n
+    ? "Unmapped parts are <b>not</b> in the Devon quote yet. Check the rest against the plan. Use <b>Fix mapping</b> to teach the page, and the quote rebuilds."
+    : '<span class="ok">Every AIS part mapped cleanly.</span>';
+  $("attnItems").innerHTML = items.join("");
+  $("attnItems").querySelectorAll("[data-fix]").forEach((b) => (b.onclick = () => openFix(b)));
+  renderPlanView();
+
+  const fin = E.finishes(lines);
+  $("finBlock").hidden = !fin.length;
+  $("finTable").innerHTML = "<thead><tr><th>Option</th><th>AIS selection</th><th class=n>Pieces</th></tr></thead><tbody>" +
+    fin.map((f) => `<tr><td>${esc(f.group)}</td><td>${esc(f.selection)}</td><td class="n">${qtyText(f.pieces)}</td></tr>`).join("") + "</tbody>";
+
+  const auto = new Set(r.autoAdded.map((a) => a[0]));
+  $("lineTable").innerHTML = "<thead><tr><th>Devon part</th><th>Description</th><th class=n>Qty</th><th class=n>Net each</th><th class=n>Net ext</th><th>From AIS</th></tr></thead><tbody>" +
+    e.lines.map((l) => `<tr><td class="pn">${esc(l.part)}</td><td>${esc(l.description)}</td><td class="n">${l.qty}</td><td class="n">${money(l.netEach)}</td><td class="n">${money(l.netExt)}</td><td class="src">${esc((r.sources[l.part] || []).join(", ") || (auto.has(l.part) ? "auto-added" : ""))}</td></tr>`).join("") +
+    `</tbody><tfoot><tr><td colspan="4">Product net</td><td class="n">${money(e.product)}</td><td></td></tr></tfoot>`;
+}
+
+function itemHtml(m, bad, key) {
+  const dv = m.targets.length ? m.targets.map((t) => t[0]).join(" + ") : bad ? "not quoted" : "nothing quoted";
+  return `<div class="item${bad ? " bad" : ""}" data-key="${key}"><div class="top"><span class="pn">${esc(m.source.part)}</span><span class="arrow">→</span><span class="dv">${esc(dv)}</span><span class="q">× ${qtyText(m.source.qty)}</span></div>
+    <div class="desc">${esc(m.source.description)}</div><div class="note">${esc(m.note)}</div>
+    <div class="actions"><button class="btn small" type="button" data-fix="${esc(m.source.part)}" data-devon="${esc(m.targets.length === 1 ? m.targets[0][0] : "")}" data-ratio="${m.targets.length === 1 ? m.targets[0][1] : 1}">Fix mapping</button></div></div>`;
+}
+
+function openFix(btn) {
+  const item = btn.closest(".item");
+  const existing = item.querySelector(".fixform");
+  if (existing) { existing.remove(); return; }
+  const part = btn.dataset.fix;
+  const f = document.createElement("form");
+  f.className = "fixform";
+  const uid = Math.random().toString(36).slice(2, 8);
+  f.innerHTML = `
+    <label><span>Devon part</span><input id="fx-p-${uid}" list="devonParts" value="${esc(btn.dataset.devon)}" placeholder="e.g. HMP213.48" autocomplete="off"></label>
+    <label><span>Devon qty per AIS piece</span><input id="fx-r-${uid}" inputmode="decimal" value="${esc(btn.dataset.ratio || 1)}"></label>
+    <label class="full"><span>Note (optional)</span><input id="fx-n-${uid}" placeholder="Why, so the team knows"></label>
+    <label class="check full"><input id="fx-none-${uid}" type="checkbox"> Nothing needed on the Devon side for ${esc(part)}</label>
+    <div class="full go" style="margin-top:4px"><button class="btn small" type="submit">Save correction</button><span class="msg" id="fx-m-${uid}"></span></div>`;
+  item.appendChild(f);
+  f.querySelector(`#fx-p-${uid}`).focus();
+  f.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const none = f.querySelector(`#fx-none-${uid}`).checked;
+    const devon = none ? "" : f.querySelector(`#fx-p-${uid}`).value.trim();
+    const ratio = Number(f.querySelector(`#fx-r-${uid}`).value) || 1;
+    const note = f.querySelector(`#fx-n-${uid}`).value.trim();
+    const msg = f.querySelector(`#fx-m-${uid}`);
+    if (!none && !state.calc.catalog.has(devon)) { msg.textContent = `${devon || "That"} isn't in the Devon calculator. Pick a part from the list.`; msg.className = "msg error"; return; }
+    msg.textContent = "Saving…"; msg.className = "msg";
+    await saveOverride({ ais_part: part, devon_part: devon, ratio, note }, msg);
+  });
+}
+
+async function saveOverride(o, msgEl) {
+  const record = { ...o, savedAt: new Date().toISOString() };
+  if (state.db && state.canWrite !== false) {
+    try {
+      // Replace any earlier correction for the same AIS part.
+      const old = state.overrides.filter((x) => x.ais_part.toUpperCase() === o.ais_part.toUpperCase());
+      await state.db.collection("overrides").add(record);
+      for (const x of old) await state.db.doc("overrides/" + x.id).delete();
+      return; // the snapshot listener rebuilds the quote
+    } catch (e) {
+      if (e && e.code === "invalid_argument") state.canWrite = false;
+    }
+  }
+  state.sessionOverrides = state.sessionOverrides.filter((x) => x.ais_part.toUpperCase() !== o.ais_part.toUpperCase());
+  state.sessionOverrides.push({ ...record, id: "session-" + Date.now(), session: true });
+  if (msgEl) { msgEl.textContent = "Saved for this visit only (you can't save shared corrections on this page)."; }
+  renderCorrections();
+  build();
+}
+
+function renderCorrections() {
+  const all = allOverrides();
+  const canRemove = (o) => o.session || (state.db && state.canWrite !== false);
+  $("corrLede").textContent = state.db
+    ? "When a flagged part maps wrong, fix it once and every future quote uses the fix. Corrections are shared with everyone who uses this page."
+    : "When a flagged part maps wrong, fix it here. Shared corrections need the page open in claude.ai; these last for this visit.";
+  if (!all.length) {
+    $("corrTable").innerHTML = `<tbody><tr><td class="empty">No corrections yet. Build a quote, then use Fix mapping on any flagged part.</td></tr></tbody>`;
+    return;
+  }
+  $("corrTable").innerHTML = "<thead><tr><th>AIS part</th><th>Devon part</th><th class=n>Qty per AIS</th><th>Note</th><th></th></tr></thead><tbody>" +
+    all.slice().sort((a, b) => a.ais_part.localeCompare(b.ais_part)).map((o) =>
+      `<tr><td class="pn">${esc(o.ais_part)}</td><td class="pn">${o.devon_part ? esc(o.devon_part) : "<span class='meta'>nothing needed</span>"}</td><td class="n">${esc(o.ratio)}</td><td>${esc(o.note)}${o.session ? " <span class='meta'>(this visit only)</span>" : ""}</td>
+       <td class="n">${canRemove(o) ? `<button class="x" type="button" data-del="${esc(o.id)}">Remove</button>` : ""}</td></tr>`).join("") + "</tbody>";
+  $("corrTable").querySelectorAll("[data-del]").forEach((b) => (b.onclick = async () => {
+    const id = b.dataset.del;
+    if (id.startsWith("session-")) {
+      state.sessionOverrides = state.sessionOverrides.filter((x) => x.id !== id);
+      renderCorrections(); if (state.out) build();
+      return;
+    }
+    b.disabled = true;
+    try { await state.db.doc("overrides/" + id).delete(); } catch (e) { b.disabled = false; }
+  }));
+}
+
+function planViews() {
+  const views = [];
+  const fillers = (state.out && state.out.result.heightPoints) || [];
+  state.plans.forEach((p, pi) => {
+    if (p.status !== "done") { if (p.image) views.push({ kind: "img", name: p.file.name, url: p.url }); return; }
+    if (p.image) {
+      const r = p.rasters[0];
+      views.push({ kind: "raster", name: p.file.name, image: r.image, raster: r });
+      return;
+    }
+    (p.pdfPages || []).forEach((page, i) => {
+      const pg = (p.analysis && p.analysis.pages[i]) || { panels: 0 };
+      const raster = (p.rasters || []).find((r) => r.page === i + 1) || null;
+      const rasterMarks = raster ? raster.marks.dashes.length + raster.marks.dots.length : 0;
+      if (!pg.panels && !rasterMarks) return;
+      views.push({ kind: "pdf", name: p.pdfPages.length > 1 ? `${p.file.name} · p${i + 1}` : p.file.name, page, raster,
+        joints: p.analysis.joints.filter((j) => j.page === i + 1),
+        marks: (p.analysis.heightChanges || []).filter((m) => m.page === i + 1),
+        dashes: (p.analysis.pinkDashes || []).filter((m) => m.page === i + 1),
+        fillers: fillers.filter((f) => f.src === pi && f.page === i + 1) });
+    });
+  });
+  return views;
+}
+
+// Numbered markers for the marks read from pixels (matching the numbers in the plan card list).
+function drawRasterMarks(ctx, raster, toScreen, r) {
+  const all = [...raster.marks.dashes, ...raster.marks.dots];
+  ctx.font = `700 ${Math.round(r * 2.4)}px Geist, system-ui, sans-serif`;
+  all.forEach((m, i) => {
+    const [x, y] = toScreen(m.x, m.y);
+    const rad = Math.max(r * 2.2, (m.size * (toScreen(1, 0)[0] - toScreen(0, 0)[0])) * 0.8);
+    ctx.setLineDash(m.use ? [] : [r, r]);
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2);
+    ctx.lineWidth = Math.max(4, r / 1.1); ctx.strokeStyle = m.use ? "#1a1814" : "#9e9e9e"; ctx.stroke();
+    ctx.lineWidth = Math.max(2.5, r / 1.8); ctx.strokeStyle = m.use ? markHex(m) : "#e0e0e0"; ctx.stroke();
+    ctx.setLineDash([]);
+    const label = String(i + 1) + (m.use ? "" : " ✕");
+    ctx.lineWidth = Math.max(3, r / 1.2); ctx.strokeStyle = "#ffffff"; ctx.strokeText(label, x + rad + 2, y - rad);
+    ctx.fillStyle = m.use ? "#1a1814" : "#757575"; ctx.fillText(label, x + rad + 2, y - rad);
+  });
+}
+
+function rasterLegend(raster) {
+  const s = E.summarizeMarks([raster.marks]);
+  const dots = Object.entries(s.dots).map(([c, n]) => `<span><i style="background:transparent;border:3px solid ${DOT_STYLE[c]}"></i>${E.DOT_COLORS[c]} ${n}</span>`).join("");
+  return (s.pink ? `<span><i style="background:#ff66b3;border-radius:2px;height:5px;width:16px"></i>Pink dash ${s.pink}</span>` : "") + dots +
+    (s.offPanel ? `<span class="meta">${s.offPanel} not counted (dashed)</span>` : "");
+}
+
+let renderToken = 0;
+function frameWith(canvas, legend) {
+  const box = document.createElement("div");
+  box.className = "canvasbox"; box.title = "Click to zoom";
+  box.appendChild(canvas);
+  box.onclick = () => box.classList.toggle("zoom");
+  $("planFrame").innerHTML = "";
+  $("planFrame").appendChild(box);
+  $("planFrame").insertAdjacentHTML("beforeend", `<div class="legend">${legend}<span class="meta">Numbers match the list under the plan. Click the plan to zoom.</span></div>`);
+}
+
+async function drawRasterView(v) {
+  ++renderToken;
+  const r = v.raster;
+  const canvas = document.createElement("canvas");
+  canvas.width = r.w; canvas.height = r.h;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, r.w, r.h);
+  ctx.drawImage(v.image, 0, 0, r.w, r.h);
+  frameWith(canvas, rasterLegend(r));
+  drawRasterMarks(ctx, r, (x, y) => [x, y], Math.max(3, r.w / 300));
+}
+
+async function drawPdfView(v) {
+  const token = ++renderToken;
+  // Crop to the part of the page that holds panels and marks, with a margin.
+  const base = v.page.getViewport({ scale: 1 });
+  const rs = v.raster ? v.raster.scale : 1;
+  const rasterPts = v.raster ? [...v.raster.marks.dashes, ...v.raster.marks.dots].map((m) => [m.x / rs, m.y / rs]) : [];
+  const pts = [...[...v.joints, ...v.marks, ...v.dashes].map((j) => base.convertToViewportPoint(j.x, j.y)), ...rasterPts];
+  let [x0, y0, x1, y1] = [0, 0, base.width, base.height];
+  if (pts.length) {
+    x0 = Math.min(...pts.map((p) => p[0])); x1 = Math.max(...pts.map((p) => p[0]));
+    y0 = Math.min(...pts.map((p) => p[1])); y1 = Math.max(...pts.map((p) => p[1]));
+    const m = Math.max(24, 0.08 * Math.max(x1 - x0, y1 - y0));
+    x0 = Math.max(0, x0 - m); y0 = Math.max(0, y0 - m); x1 = Math.min(base.width, x1 + m); y1 = Math.min(base.height, y1 + m);
+  }
+  const scale = Math.min(8, 2400 / Math.max(1, x1 - x0));
+  const viewport = v.page.getViewport({ scale, offsetX: -x0 * scale, offsetY: -y0 * scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round((x1 - x0) * scale); canvas.height = Math.round((y1 - y0) * scale);
+  const counts = {};
+  v.joints.forEach((j) => (counts[j.kind] = (counts[j.kind] || 0) + 1));
+  const legend = Object.entries(JOINT_STYLE).filter(([k]) => counts[k])
+    .map(([k, st]) => `<span><i style="background:${st.color}"></i>${st.label} ${counts[k]}</span>`).join("") +
+    (v.dashes.length ? `<span><i style="background:#ff66b3;border-radius:2px;height:5px;width:16px"></i>Pink dash ${v.dashes.filter((d) => d.joint).length}${v.dashes.some((d) => !d.joint) ? ` (+${v.dashes.filter((d) => !d.joint).length} off a joint)` : ""}</span>` : "") +
+    Object.entries(DOT_STYLE).map(([color, hex]) => {
+      const n = v.marks.filter((m) => m.color === color).length;
+      return n ? `<span><i style="background:transparent;border:3px solid ${hex}"></i>${E.DOT_COLORS[color]} ${n}</span>` : "";
+    }).join("") +
+    (v.fillers.length ? `<span><i style="background:transparent;border:3px solid #1a1814;transform:rotate(45deg);border-radius:1px"></i>Height change (labels) ${v.fillers.length}</span>` : "") +
+    (v.raster ? rasterLegend(v.raster) : "");
+  frameWith(canvas, legend);
+  const ctx = canvas.getContext("2d");
+  await v.page.render({ canvasContext: ctx, viewport }).promise;
+  if (token !== renderToken) return;
+  const r = Math.max(4, canvas.width / 260);
+  ctx.lineWidth = Math.max(1.5, r / 3);
+  for (const j of v.joints) {
+    const [x, y] = viewport.convertToViewportPoint(j.x, j.y);
+    const st = JOINT_STYLE[j.kind] || JOINT_STYLE.other;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    if (j.kind === "ends") { ctx.strokeStyle = st.color; ctx.stroke(); }
+    else { ctx.globalAlpha = 0.8; ctx.fillStyle = st.color; ctx.fill(); ctx.globalAlpha = 1; }
+  }
+  for (const d of v.dashes) {
+    const [x, y] = viewport.convertToViewportPoint(d.x, d.y);
+    ctx.lineWidth = Math.max(2.5, r / 1.8); ctx.strokeStyle = "#1a1814";
+    ctx.strokeRect(x - r * 2, y - r * 2, r * 4, r * 4);
+    if (!d.joint) {
+      ctx.font = `600 ${Math.round(r * 2.2)}px Geist, system-ui, sans-serif`;
+      ctx.lineWidth = Math.max(3, r / 1.2); ctx.strokeStyle = "#ffffff"; ctx.strokeText("not on a joint", x + r * 3, y + r * 3);
+      ctx.fillStyle = "#1a1814"; ctx.fillText("not on a joint", x + r * 3, y + r * 3);
+    }
+  }
+  ctx.font = `600 ${Math.round(r * 2.2)}px Geist, system-ui, sans-serif`;
+  for (const m of v.marks) {
+    const [x, y] = viewport.convertToViewportPoint(m.x, m.y);
+    const hex = DOT_STYLE[m.color] || "#000000";
+    ctx.beginPath(); ctx.arc(x, y, r * 2.4, 0, Math.PI * 2);
+    ctx.lineWidth = Math.max(4, r / 1.1); ctx.strokeStyle = "#1a1814"; ctx.stroke();
+    ctx.lineWidth = Math.max(2.5, r / 1.8); ctx.strokeStyle = hex; ctx.stroke();
+    const text = (E.DOT_COLORS[m.color] || "") + (m.joint ? "" : " (not on a joint)");
+    ctx.lineWidth = Math.max(3, r / 1.2); ctx.strokeStyle = "#ffffff"; ctx.strokeText(text, x + r * 3, y - r * 2);
+    ctx.fillStyle = "#1a1814"; ctx.fillText(text, x + r * 3, y - r * 2);
+  }
+  // height changes found from the panel labels: a diamond on the joint, named by its filler strip
+  const fillerHex = (part) => DOT_STYLE[Object.keys(E.DOT_COLORS).find((c) => E.DOT_COLORS[c] === part)] || "#5f6b7a";
+  const stacked = new Map();
+  for (const f of v.fillers) {
+    const [x, y] = viewport.convertToViewportPoint(f.x, f.y);
+    const key = `${Math.round(x)}|${Math.round(y)}`, k = stacked.get(key) || 0;
+    stacked.set(key, k + 1);
+    const d = r * 4;
+    ctx.beginPath(); ctx.moveTo(x, y - d); ctx.lineTo(x + d, y); ctx.lineTo(x, y + d); ctx.lineTo(x - d, y); ctx.closePath();
+    ctx.lineWidth = Math.max(4, r / 1.1); ctx.strokeStyle = "#1a1814"; ctx.stroke();
+    ctx.lineWidth = Math.max(2.5, r / 1.8); ctx.strokeStyle = fillerHex(f.part); ctx.stroke();
+    const ty = y + d + r * 2.6 * (k + 1);
+    ctx.lineWidth = Math.max(3, r / 1.2); ctx.strokeStyle = "#ffffff"; ctx.strokeText(f.part, x - d, ty);
+    ctx.fillStyle = "#1a1814"; ctx.fillText(f.part, x - d, ty);
+  }
+  if (v.raster) drawRasterMarks(ctx, v.raster, (mx, my) => [(mx / rs - x0) * scale, (my / rs - y0) * scale], r);
+}
+
+function renderPlanView() {
+  const views = planViews();
+  const pv = $("planView");
+  if (!views.length) { pv.hidden = true; $("attn").classList.remove("with-plan"); return; }
+  pv.hidden = false; $("attn").classList.add("with-plan");
+  $("planTabs").innerHTML = views.length > 1 ? views.map((v, i) => `<button type="button" data-i="${i}">${esc(v.name)}</button>`).join("") : "";
+  const show = (i) => {
+    const v = views[i];
+    if (v.kind === "img") { renderToken++; $("planFrame").innerHTML = `<img src="${v.url}" alt="2D plan: ${esc(v.name)}">`; }
+    else if (v.kind === "raster") drawRasterView(v).catch(() => { $("planFrame").innerHTML = `<p class="meta">Couldn't draw this image.</p>`; });
+    else drawPdfView(v).catch(() => { $("planFrame").innerHTML = `<p class="meta">Couldn't draw this page.</p>`; });
+    $("planTabs").querySelectorAll("button").forEach((b) => b.classList.toggle("on", +b.dataset.i === i));
+  };
+  $("planTabs").querySelectorAll("button").forEach((b) => (b.onclick = () => show(+b.dataset.i)));
+  show(0);
+}
+
+// ---------------------------------------------------------------- downloads
+async function offer(kind) {
+  const f = state.out && state.out.files[kind];
+  const msg = $("dlMsg");
+  if (!f) return;
+  if (!state.downloads) { msg.textContent = "Downloads work when this page is open in claude.ai."; msg.className = "msg error"; return; }
+  msg.textContent = ""; msg.className = "msg";
+  try {
+    await state.downloads.save({ filename: f.filename, data: f.data });
+    msg.textContent = `Saved ${f.filename}.`;
+  } catch (e) {
+    const code = e && e.code;
+    if (code === "declined") msg.textContent = "Download cancelled.";
+    else if (code === "rate_limited") msg.textContent = "Finish the open download prompt first.";
+    else { msg.textContent = "Downloads aren't available in this view."; msg.className = "msg error"; }
+  }
+}
+$("dlQuote").onclick = () => offer("quote");
+$("dlReport").onclick = () => offer("report");
+$("dlCross").onclick = () => offer("crosswalk");
+
+// ---------------------------------------------------------------- start
+renderBom();
+renderCalc();
+renderCorrections();
+refresh();
+
+(async () => {
+  const [db, user, downloads] = await Promise.all([cap("db"), cap("user"), cap("downloads")]);
+  state.db = db; state.user = user; state.downloads = downloads;
+  if (user) {
+    try { state.canEdit = !!(await user.canEdit()); } catch (e) { state.canEdit = false; }
+    try { const w = await user.can("data.write"); state.canWrite = w === null || w === undefined ? null : !!w; } catch (e) { state.canWrite = null; }
+  }
+  renderCalc();
+  renderCorrections();
+  if (!db) return;
+
+  db.doc("config/template").onSnapshot(async (snap) => {
+    const d = snap.exists ? snap.data() : null;
+    if (!d || !d.b64) { renderCalc(); return; }
+    if (state.calc && state.calc.source === "team" && state.calc.savedAt === d.savedAt) return;
+    if (state.calc && state.calc.source === "session") return; // keep what this person chose for this visit
+    try { await useCalculator(b64ToBytes(d.b64), String(d.name || "Devon calculator"), "team", d.savedAt || null); }
+    catch (e) { setTplMsg("The stored Devon calculator couldn't be read. Add it again.", true); }
+  }, () => {});
+
+  db.collection("overrides").onSnapshot((snap) => {
+    state.overrides = snap.docs.map((d) => {
+      const v = d.data() || {};
+      return { id: d.id, ais_part: String(v.ais_part || ""), devon_part: String(v.devon_part || ""), ratio: Number(v.ratio) || 1, note: String(v.note || "") };
+    }).filter((o) => o.ais_part);
+    renderCorrections();
+    if (state.out) build();
+  }, () => {});
+})();
+</script>

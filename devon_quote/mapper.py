@@ -1,0 +1,652 @@
+"""Translate an AIS Divi bill of materials (from CET) into Devon part numbers.
+
+Order of precedence for each AIS line:
+  1. mappings/overrides.csv - exact (or wildcard) AIS part -> Devon part(s). Anything you
+     teach the tool goes here, and it always wins over the built-in rules.
+  2. Built-in rules for the Divi panel system (panels, posts, power, worksurfaces,
+     supports, storage).
+  3. Anything left is reported as UNMAPPED so it is never silently dropped.
+
+Every line also gets a status: "ok", "review" (mapped, but a person should confirm) or
+"unmapped". The review report lists the reason for each review item.
+"""
+
+from __future__ import annotations
+
+import csv
+import fnmatch
+import math
+import re
+from collections import Counter, defaultdict
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from .bom import BomLine
+from .catalog import Catalog
+from .marks import MarksSummary
+from .plan import DOT_COLORS, PlanResult
+
+# Devon panel heights, and the size code each connector family uses at that height.
+DEVON_HEIGHTS = (39, 47, 53, 67, 85)
+_CONNECTOR_CODES = {
+    # height: (code A used by HMA130/HMA137/HMA128, code B used by HMP213/HMC132/HMA199)
+    39: ("39", "34"),
+    47: ("47", "42"),
+    53: ("53", "48"),
+    67: ("67", "62"),
+    85: ("85", "80"),
+}
+JOINT_WORDS = {"l": "corner", "tee": "3-way joint", "cross": "4-way joint", "ends": "free end",
+               "angled": "angled joint", "other": "joint of 5+ panels"}
+# Divi heights with a set Devon equivalent (from OF4S); any other height rounds up.
+DIVI_TO_DEVON_HEIGHT = {42: 39, 50: 53, 82: 85}
+DIVI_50_CHOICES = (53, 47)  # a 50" Divi panel can be quoted as either; picked per quote
+# A Divi height more than this many inches below the Devon height it rounds up to is flagged.
+HEIGHT_TOLERANCE = 6
+
+
+def connector(kind: str, height: int) -> str:
+    a, b = _CONNECTOR_CODES[height]
+    return {
+        "2way": f"HMA130.{a}",
+        "3way": f"HMA137.{a}",
+        "4way": f"HMC132.{b}",
+        "inline": f"HMP213.{b}",
+        "finished_end": f"HMA128.{a}",
+        "wall_start": f"HMA199.{b}",
+    }[kind]
+
+
+def devon_height(divi_height: int, divi50: int = 53) -> tuple[int, str]:
+    """The Devon equivalent of a Divi panel height; unknown heights round up (never lose privacy).
+    divi50: the Devon height chosen for 50" Divi panels (53 or 47)."""
+    if divi_height == 50:
+        return divi50, ""
+    if divi_height in DIVI_TO_DEVON_HEIGHT:
+        return DIVI_TO_DEVON_HEIGHT[divi_height], ""
+    for h in DEVON_HEIGHTS:
+        if divi_height <= h:
+            note = ""
+            if h - divi_height > HEIGHT_TOLERANCE:
+                note = f'AIS {divi_height}"H rounds up to Devon {h}"H'
+            return h, note
+    return DEVON_HEIGHTS[-1], f'AIS {divi_height}"H is taller than any Devon panel; used 85"H'
+
+
+@dataclass
+class Mapping:
+    source: BomLine
+    targets: list[tuple[str, float]]  # (Devon part, quantity per AIS unit)
+    status: str  # ok | review | unmapped
+    note: str = ""
+    rule: str = ""
+
+
+@dataclass
+class Override:
+    pattern: str
+    devon_part: str
+    ratio: float
+    note: str
+
+
+@dataclass
+class MapResult:
+    mappings: list[Mapping]
+    quantities: dict[str, int]  # Devon part -> quantity for the calculator
+    sources: dict[str, list[str]]  # Devon part -> AIS parts that produced it
+    auto_added: list[tuple[str, int, str]]
+    warnings: list[str] = field(default_factory=list)
+    plan: PlanResult | None = None
+    plan_parts: list[tuple[str, str, int]] = field(default_factory=list)  # (joint kind, Devon part, qty)
+    marks: MarksSummary | None = None  # marks read from 2D images
+    height_points: list[tuple[int, float, float, str]] = field(default_factory=list)  # (page, x, y, filler) from panel labels
+    divi50: int = 53  # Devon height used for 50" AIS panels
+
+    @property
+    def review(self) -> list[Mapping]:
+        return [m for m in self.mappings if m.status == "review"]
+
+    @property
+    def unmapped(self) -> list[Mapping]:
+        return [m for m in self.mappings if m.status == "unmapped"]
+
+
+def load_overrides(path: str | Path | None) -> list[Override]:
+    if not path or not Path(path).exists():
+        return []
+    out = []
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        for row in csv.DictReader(f):
+            pat = (row.get("ais_part") or "").strip()
+            if not pat or pat.startswith("#"):
+                continue
+            out.append(
+                Override(
+                    pattern=pat.upper(),
+                    devon_part=(row.get("devon_part") or "").strip(),
+                    ratio=float(row.get("ratio") or 1),
+                    note=(row.get("note") or "").strip(),
+                )
+            )
+    return out
+
+
+# --- built-in rules ---------------------------------------------------------------
+
+_PANEL = re.compile(r"^P-DL([A-Z]+?)(\d{2})(\d{2})$")
+_POST = re.compile(r"^P-DLPF(?:PP(?=[23]))?([234])(\d{2})$")  # P-DLPFPP2/PP3 are 2-way/3-way posts too
+_WS = re.compile(r"^W-WS(\d{2})(\d{2})$")
+_CANT = re.compile(r"^WPS-UNCT(\d{2})([LRS])$")
+_CANT_DEPTH = re.compile(r"(\d{2})\s*(?:D\b|\"|in\b)", re.I)
+CANTILEVER_PAIR_NOTE = "Devon sells cantilevers as L/R pairs: pairs = (AIS lefts + rights) / 2, rounded up"
+_WIDTH = re.compile(r"(\d{2})\s*(?:\"|in\b|W\b)", re.I)
+
+
+def _powered(desc: str) -> bool | None:
+    d = desc.upper()
+    if re.search(r"\bNPWR\b|NON-?POWER", d):
+        return False
+    if re.search(r"\bPWR\b|POWERED", d):
+        return True
+    return None
+
+
+class Mapper:
+    def __init__(self, catalog: Catalog, overrides: list[Override] | None = None, divi50: int = 53):
+        if divi50 not in DIVI_50_CHOICES:
+            raise ValueError(f'50" Divi panels can be quoted as 53" or 47" Devon panels, not {divi50}"')
+        self.catalog = catalog
+        self.divi50 = divi50
+        self.overrides = overrides or []
+        self.run_height: int | None = None  # dominant Devon panel height, for height-less parts
+        self.plan: PlanResult | None = None  # joints read from the 2D plan, when one was given
+        self.marks: MarksSummary | None = None  # pink dashes and colored dots read from 2D images
+
+    # Each rule returns a Mapping or None.
+    def _rule_override(self, line: BomLine) -> Mapping | None:
+        pn = line.part.upper()
+        hits = [o for o in self.overrides if fnmatch.fnmatchcase(pn, o.pattern)]
+        if not hits:
+            return None
+        exact = [o for o in hits if o.pattern == pn]
+        hits = exact or hits
+        targets = [(o.devon_part, o.ratio) for o in hits if o.devon_part]
+        notes = "; ".join(o.note for o in hits if o.note)
+        if not targets:
+            return Mapping(line, [], "ok", notes or "no Devon equivalent needed (override)", "override")
+        missing = [t for t, _ in targets if t not in self.catalog]
+        if missing:
+            return Mapping(line, targets, "review", f"override points at {', '.join(missing)}, which is not in the Devon calculator", "override")
+        return Mapping(line, targets, "ok", notes, "override")
+
+    def _rule_panel(self, line: BomLine) -> Mapping | None:
+        m = _PANEL.match(line.part.upper())
+        if not m or line.part.upper().startswith(("P-DLPF", "P-DLSEOR")):
+            return None
+        kind, h, w = m.group(1), int(m.group(2)), int(m.group(3))
+        desc = line.description
+        height, hnote = devon_height(h, self.divi50)
+        notes = [hnote] if hnote else []
+        powered = _powered(desc)
+        if powered is None:
+            powered = False
+            notes.append("could not tell if this panel is powered; quoted non-powered")
+        glass = "GLASS" in desc.upper() or kind.startswith("QG") or kind.startswith("G")
+        if glass:
+            if height == 39 or height == 47:
+                notes.append(f'Devon glass-stacker panels start at 53"H; used 53"H')
+                height = 53
+            family = "HM51"
+            if not kind.startswith("QG"):
+                notes.append("AIS full/partial glass panel quoted as Devon panel + 14\" glass stacker")
+        else:
+            family = "HM01"
+            if "HARD SURF" in desc.upper() or "TILE" in desc.upper():
+                pass  # Devon panels are fabric; AIS hard-surface skins map to the fabric panel
+        part = f"{family}.{height}{w:02d}" + (".P4" if powered else "")
+        if part not in self.catalog:
+            return Mapping(line, [], "unmapped", f'no Devon {height}"H x {w}"W {"powered " if powered else ""}{"glass " if glass else ""}panel ({part})', "panel")
+        return Mapping(line, [(part, 1)], "review" if notes else "ok", "; ".join(notes), "panel")
+
+    def _rule_drawing(self, line: BomLine) -> Mapping | None:
+        """Posts and end-of-run shrouds the 2D plan counts. Runs before saved corrections, so a correction made for a
+        quote without a 2D doesn't add the same connectors a second time."""
+        pn = line.part.upper()
+        m = _POST.match(pn)
+        is_end = pn == "P-DLSEOR" or "END OF RUN" in line.description.upper()
+        if self.plan is not None and (m or is_end):
+            note = "connectors and finished ends are counted from the 2D plan"
+        else:
+            return None
+        saved = self._rule_override(line)
+        if saved is not None and saved.targets:
+            note += f"; the saved correction to {', '.join(p for p, _ in saved.targets)} is used only without a 2D"
+        return Mapping(line, [], "ok", note, "plan")
+
+    def _rule_post(self, line: BomLine) -> Mapping | None:
+        pn = line.part.upper()
+        m = _POST.match(pn)
+        is_end = pn == "P-DLSEOR" or "END OF RUN" in line.description.upper()
+        if m:
+            ways, h = int(m.group(1)), int(m.group(2))
+            height, hnote = devon_height(h, self.divi50)
+            part = connector({2: "2way", 3: "3way"}.get(ways, "4way"), height)  # an AIS 2-way post is a corner
+            return Mapping(line, [(part, 1)], "review" if hnote else "ok", hnote, "post")
+        if is_end:  # a finished end matches the panel it's on; without a 2D only a one-height job is certain
+            height = self.run_height or 53
+            if len(self.bom_heights) <= 1:
+                return Mapping(line, [(connector("finished_end", height), 1)], "ok", "", "post")
+            note = (f'finished end quoted at {height}"H, the main panel height; each end should match the height of '
+                    "its panel, which only the 2D PDF shows")
+            return Mapping(line, [(connector("finished_end", height), 1)], "review", note, "post")
+        if "WALL START" in line.description.upper():
+            height = self.run_height or 53
+            return Mapping(line, [(connector("wall_start", height), 1)], "review", f'wall start quoted at {height}"H', "post")
+        return None
+
+    def _rule_electrical(self, line: BomLine) -> Mapping | None:
+        if not line.part.upper().startswith("E-"):
+            return None
+        d = line.description.upper()
+        if "FEED" in d:
+            if "CEILING" in d:
+                return Mapping(line, [("BE-CELFD", 1)], "ok", "", "electrical")
+            if "POLE" in d:
+                return Mapping(line, [("BE-PP12", 1)], "ok", "", "electrical")
+            if "SIDE" in d:
+                return Mapping(line, [("BE-SDFD1", 1)], "review", "AIS side-mounted base infeed quoted as Devon side feed (BE-SDFD1); use BE-ENDFD if it feeds the end of the run", "electrical")
+            return Mapping(line, [("BE-ENDFD", 1)], "review", "AIS base infeed quoted as Devon end feed", "electrical")
+        if "OUTLET" in d or "RECEPTACLE" in d or "DUPLEX" in d:
+            m = re.search(r"(?:LINE|CIRCUIT|CKT)\s*(\d)", d)
+            n = int(m.group(1)) if m else 1
+            if n > 4:
+                return Mapping(line, [("BE-REC4", 1)], "review", f"AIS circuit {n} has no Devon equivalent (4-circuit system); used circuit 4", "electrical")
+            note = "" if m else "circuit not stated; used circuit 1"
+            return Mapping(line, [(f"BE-REC{n}", 1)], "review" if note else "ok", note, "electrical")
+        if "JUMPER" in d:
+            return Mapping(
+                line, [], "review",
+                "Devon P4 panels connect power panel-to-panel, so AIS jumpers are not quoted; "
+                "add a BE-xxJU pass-thru for each non-powered panel that sits between powered panels",
+                "electrical",
+            )
+        if "DATA" in d:
+            return Mapping(line, [("BE01439-C", 1)], "review", "AIS data plate quoted as Devon data window", "electrical")
+        return None
+
+    def _rule_worksurface(self, line: BomLine) -> Mapping | None:
+        m = _WS.match(line.part.upper())
+        if not m:
+            return None
+        depth, width = int(m.group(1)), int(m.group(2))
+        part = f"WS{depth}{width:02d}"
+        if part in self.catalog:
+            return Mapping(line, [(part, 1)], "ok", "", "worksurface")
+        # Next larger Devon size of the same depth, cut down.
+        sizes = sorted(
+            int(p[4:]) for p in self.catalog.items
+            if re.fullmatch(rf"WS{depth}\d\d", p) and int(p[4:]) >= width
+        )
+        if sizes:
+            bigger = f"WS{depth}{sizes[0]:02d}"
+            return Mapping(line, [(bigger, 1), ("MIS-002", 1)], "review", f'no Devon {depth}x{width}; quoted {bigger} with custom-cut up-charge', "worksurface")
+        return Mapping(line, [], "unmapped", f"no Devon {depth}x{width} worksurface", "worksurface")
+
+    def _rule_support(self, line: BomLine) -> Mapping | None:
+        pn = line.part.upper()
+        d = line.description.upper()
+        m = _CANT.match(pn)
+        depth = hand = None
+        if m:
+            depth, hand = int(m.group(1)), m.group(2)
+        elif "CANTILEVER" in d:
+            hand = "S" if "SHARED" in d else "L" if "LEFT" in d else "R" if "RIGHT" in d else None
+            dm = _CANT_DEPTH.search(line.description)
+            depth = int(dm.group(1)) if dm else 24
+        if hand:
+            size = "22" if depth >= 22 else "16"
+            if hand == "S":
+                return Mapping(line, [(f"HMP226.{size}", 1)], "ok", "", "support")
+            # Each AIS left or right is half a Devon pair; the total is rounded up after adding them all.
+            pair = "HMP225.22" if size == "22" else "HMP165.16"
+            return Mapping(line, [(pair, 0.5)], "ok", CANTILEVER_PAIR_NOTE, "support")
+        if pn == "WPS-FP" or "FLAT PLATE" in line.description.upper():
+            return Mapping(line, [("ACC-105", 1)], "ok", "", "support")
+        if pn.startswith("WPS-VC"):
+            part = pn[4:] if pn[4:] in self.catalog else None
+            part = f"WPS-{pn[4:]}" if f"WPS-{pn[4:]}" in self.catalog else part
+            if part:
+                return Mapping(line, [(part, 1)], "ok", "", "support")
+        if "CORNER BRACKET" in line.description.upper():
+            return Mapping(line, [("HMP455.01-L", 0.5), ("HMP455.01-R", 0.5)], "review", "corner brackets split evenly left/right", "support")
+        return None
+
+    def _rule_storage(self, line: BomLine) -> Mapping | None:
+        d = line.description.upper()
+        pn = line.part.upper()
+        if "PEDESTAL" in d or pn.startswith("S-PED"):
+            if "MOBILE" in d or "MOB" in pn:
+                part = "ECO-MOB BF"
+            elif "F/F" in d or "FF" in pn.replace("BBF", ""):
+                part = "ECO-FF-MT"
+            else:
+                part = "ECO-BBF-MT"
+            return Mapping(line, [(part, 1)], "review", "AIS pedestal quoted as Devon ECO-style pedestal. Confirm size and finish.", "storage")
+        if "LATERAL" in d:
+            return Mapping(line, [("G-LF230", 1)], "review", "AIS lateral quoted as Devon 30\" 2-drawer lateral", "storage")
+        width = _WIDTH.search(line.description)
+        w = width.group(1) if width else None
+        for key, prefix in (("BINDER", "HMU271"), ("OVERHEAD", "HMU271"), ("FULL HEIGHT SHELF", "HMA282"), ("SHELF", "HMA281")):
+            if key in d and w and f"{prefix}.{w}" in self.catalog:
+                return Mapping(line, [(f"{prefix}.{w}", 1)], "review", "", "storage")
+        if "TACK" in d and w and f"TB{w}" in self.catalog:
+            return Mapping(line, [(f"TB{w}", 1)], "ok", "", "storage")
+        return None
+
+    RULES = ("_rule_drawing", "_rule_override", "_rule_panel", "_rule_post", "_rule_electrical", "_rule_worksurface", "_rule_support", "_rule_storage")
+
+    def map_line(self, line: BomLine) -> Mapping:
+        for name in self.RULES:
+            m = getattr(self, name)(line)
+            if m is not None:
+                return m
+        return Mapping(line, [], "unmapped", "no rule or override for this AIS part", "")
+
+    def map(self, lines: list[BomLine], plan: PlanResult | None = None, marks: MarksSummary | None = None) -> MapResult:
+        # Main panel height, used for parts that don't carry a height (end-of-run, wall start).
+        heights = Counter()
+        for ln in lines:
+            m = _PANEL.match(ln.part.upper())
+            if m and not ln.part.upper().startswith(("P-DLPF", "P-DLSEOR")):
+                heights[devon_height(int(m.group(2)), self.divi50)[0]] += ln.qty
+        self.run_height = heights.most_common(1)[0][0] if heights else None
+        self.bom_heights = set(heights)
+        self.plan = plan if plan is not None and plan.panels else None
+        self.marks = marks if marks is not None and marks.any else None
+        # Divi heights the BOM has in each panel width: a plan panel with no label takes the height when there's one
+        self.width_heights: dict[int, set[int]] = defaultdict(set)
+        for ln in lines:
+            m = _PANEL.match(ln.part.upper())
+            if m and not ln.part.upper().startswith(("P-DLPF", "P-DLSEOR")):
+                self.width_heights[int(m.group(3))].add(int(m.group(2)))
+        self.height_points = []
+
+        mappings = [self.map_line(ln) for ln in lines]
+
+        raw: dict[str, float] = defaultdict(float)
+        sources: dict[str, list[str]] = defaultdict(list)
+        for m in mappings:
+            for part, ratio in m.targets:
+                raw[part] += m.source.qty * ratio
+                if m.source.part not in sources[part]:
+                    sources[part].append(m.source.part)
+        warnings = []
+        plan_parts = []
+        if self.plan is not None or self.marks is not None:
+            if self.plan is not None:
+                plan_parts, plan_warnings = self._plan_connectors(lines, list(heights))
+            else:
+                plan_parts, plan_warnings = self._image_connectors(lines, list(heights))
+            warnings += plan_warnings
+            label = "2D plan" if self.plan is not None else "2D marks"
+            for _, part, qty in plan_parts:
+                raw[part] += qty
+                if label not in sources[part]:
+                    sources[part].append(label)
+        elif heights:
+            warnings.append("The AIS SIF doesn't list straight panel-to-panel joints, and Devon quotes a panel-to-panel connector (HMP213) at each one. Add the 2D (a CET PDF) so they're counted; none are quoted now.")
+        if marks is not None and marks.off_panel:
+            one = marks.off_panel == 1
+            warnings.append(f"{marks.off_panel} colored mark{'' if one else 's'} on the 2D {'is' if one else 'are'}n't on "
+                            f"the drawing's panel lines, so {'it was' if one else 'they were'} not quoted.")
+        quantities = {p: math.ceil(q - 1e-9) for p, q in raw.items() if q > 0}
+
+        auto_added = self._auto_add(quantities)
+        return MapResult(mappings, quantities, dict(sources), auto_added, warnings, self.plan, plan_parts, self.marks,
+                         self.height_points, self.divi50)
+
+    def _mark_fillers(self, warnings: list[str]) -> Counter:
+        """High/low filler strips from the colored dots found in 2D images."""
+        fillers = Counter()
+        for color in DOT_COLORS:
+            n = self.marks.dots.get(color, 0)
+            if not n:
+                continue
+            part = DOT_COLORS[color]
+            if part in self.catalog:
+                fillers[part] += n
+            else:
+                warnings.append(f"{part} ({color} dot) isn't in the Devon calculator; add it by hand.")
+        return fillers
+
+    def _image_connectors(self, lines: list[BomLine], bom_heights: list[int]) -> tuple[list[tuple[str, str, int]], list[str]]:
+        """Pink dashes and colored dots read from 2D images, when there's no vector plan to measure.
+
+        The AIS SIF doesn't list straight joints (its 2-way posts are corners), so each pink dash adds a
+        panel-to-panel connector, at the BOM's main panel height.
+        """
+        warnings = []
+        height = self.run_height or 53
+        parts = []
+        if self.marks.pink:
+            parts.append(("pink", connector("inline", height), self.marks.pink))
+        parts += [("filler", p, q) for p, q in self._mark_fillers(warnings).items()]
+        if len(bom_heights) > 1 and not self.marks.dots:
+            warnings.append(f'The BOM has panels at more than one height; panel-to-panel connectors are quoted at {height}"H '
+                            "and the 2D has no colored dots. Mark each height change with a colored dot (red 39/53, "
+                            "blue 39/67, yellow 47/53, green 47/67, purple 53/67) to add its high/low filler strip.")
+        return parts, warnings
+
+    def _height_changes(self, warnings: list[str]) -> Counter:
+        """High/low filler strips from the colored dots on the plan."""
+        fillers = Counter()
+        for ch in self.plan.height_changes:
+            part = DOT_COLORS[ch.color]
+            if ch.joint is None:
+                warnings.append(f"A {ch.color} dot on page {ch.page} isn't on a panel joint, so its filler strip "
+                                f"({part}) was not quoted. Put the dot right on the joint.")
+                continue
+            if part not in self.catalog:
+                warnings.append(f"{part} ({ch.color} dot) isn't in the Devon calculator; add it by hand.")
+                continue
+            fillers[part] += 1
+        return fillers
+
+    def _pink_dash_count(self, warnings: list[str]) -> int:
+        """Panel-to-panel connectors from the pink dashes on the plan, with checks against the measured joints."""
+        plan = self.plan
+        on = [d for d in plan.pink_dashes if d.joint]
+        off = len(plan.pink_dashes) - len(on)
+        n = lambda k, word: f"{k} {word}" + ("" if k == 1 else "s")
+        unmarked = plan.counts["straight"] - sum(1 for d in on if d.joint == "straight")
+        if unmarked > 0:
+            one = unmarked == 1
+            warnings.append(f"{n(unmarked, 'straight joint')} on the plan {'has' if one else 'have'} no pink dash, so "
+                            f"{'it was' if one else 'they were'} not quoted as panel-to-panel connectors. "
+                            "Add a pink dash in CET, or check the plan.")
+        for kind, k in Counter(d.joint for d in on if d.joint != "straight").items():
+            one = k == 1
+            warnings.append(f"{n(k, 'pink dash')} {'is' if one else 'are'} on a {JOINT_WORDS.get(kind, 'joint')}, which "
+                            f"also gets its own connector; check {'it' if one else 'them'}.")
+        if off:
+            one = off == 1
+            warnings.append(f"{n(off, 'pink dash')} {'is' if one else 'are'}n't on a panel joint, so "
+                            f"{'it was' if one else 'they were'} not quoted. Put each dash right on the joint.")
+        return len(on)
+
+    def _panel_height(self, width: int, height: int | None) -> int | None:
+        """Devon height of a plan panel: its label, else the BOM's only height in that width."""
+        if height is None and len(self.width_heights.get(width, ())) == 1:
+            height = next(iter(self.width_heights[width]))
+        return None if height is None else devon_height(height, self.divi50)[0]
+
+    def _joint_heights(self, panels: tuple) -> list[int]:
+        return sorted({h for h in (self._panel_height(w, ht) for w, ht in panels) if h is not None})
+
+    def _label_fillers(self, warnings: list[str]) -> Counter:
+        """High/low filler strips where panels of different labeled heights meet: one from each lower height
+        up to the tallest panel at the joint."""
+        fillers = Counter()
+        for j in self.plan.joints:
+            hs = self._joint_heights(j.panels)
+            if len(hs) < 2:
+                continue
+            if len(hs) > 2:
+                warnings.append(f"A {JOINT_WORDS.get(j.kind, 'joint')} on page {j.page} joins panels at "
+                                f"{', '.join(str(h) for h in hs)}\"H; quoted a filler strip from each lower height to "
+                                f"{hs[-1]}\"H. Check it.")
+            for lo in hs[:-1]:
+                part = f"HMHL{lo}{hs[-1]}"
+                if part in self.catalog:
+                    fillers[part] += 1
+                    self.height_points.append((j.page, j.x, j.y, part))
+                else:
+                    warnings.append(f"Panels at {lo}\" and {hs[-1]}\" meet on page {j.page}, but Devon's calculator has "
+                                    "no filler strip for that change; add it by hand.")
+        return Counter(dict(sorted(fillers.items())))
+
+    def _plan_connectors(self, lines: list[BomLine], bom_heights: list[int]) -> tuple[list[tuple[str, str, int]], list[str]]:
+        """Devon connectors from the joints measured on the 2D plan, plus cross-checks against the BOM.
+
+        With CET panel labels on the plan, each connector is quoted at the tallest panel height at its joint, and
+        joints where heights differ get high/low filler strips. Colored dots, when drawn, set the filler strips.
+        """
+        plan = self.plan
+        default = self.run_height or 53
+        c = plan.counts
+        warnings = []
+        labeled = any(l.matched for l in plan.labels)
+        # each joint at its tallest known panel (labels, else the SIF's only height for that width); a free end is
+        # therefore a finished end at the height of the panel it's on
+        height_at = lambda panels: (self._joint_heights(panels) or [default])[-1]
+
+        dot_fillers = self._height_changes(warnings)
+        if not plan.height_changes and self.marks is not None and self.marks.dots:
+            dot_fillers = self._mark_fillers(warnings)
+        dotted = bool(plan.height_changes or (self.marks is not None and self.marks.dots))
+        fillers = dot_fillers
+        if labeled:
+            label_warnings = []
+            label_fillers = self._label_fillers(label_warnings)
+            if not dotted:
+                fillers = label_fillers
+                warnings += sorted(set(label_warnings))
+            elif label_fillers != dot_fillers:
+                fmt = lambda f: ", ".join(f"{p} x {q}" for p, q in sorted(f.items())) or "none"
+                warnings.append(f"The colored dots give filler strips {fmt(dot_fillers)}, but the panel labels on the "
+                                f"plan give {fmt(label_fillers)}. The dots were quoted; check which is right.")
+                self.height_points = []
+            else:
+                self.height_points = []
+
+        entries = Counter()  # (kind on the plan, Devon connector kind, height) -> qty
+        devon_kinds = {"straight": "inline", "l": "2way", "tee": "3way", "cross": "4way", "ends": "finished_end"}
+        pink_plan = bool(plan.pink_dashes)
+        pink_image = not pink_plan and self.marks is not None and self.marks.pink
+        for j in plan.joints:
+            if j.kind in devon_kinds and not (j.kind == "straight" and (pink_plan or pink_image)):
+                entries[(j.kind, devon_kinds[j.kind], height_at(j.panels))] += 1
+        if pink_plan:  # the designer marked the panel-to-panel joints: their count wins
+            self._pink_dash_count(warnings)
+            for d in plan.pink_dashes:
+                if d.joint:
+                    entries[("pink", "inline", height_at(d.panels))] += 1
+        elif pink_image:
+            if self.marks.pink != c["straight"]:
+                warnings.append(f"The 2D image has {self.marks.pink} pink dashes but the plan measures {c['straight']} "
+                                "straight joints; the pink dashes were quoted.")
+            straight = Counter(height_at(j.panels) for j in plan.joints if j.kind == "straight")
+            entries[("pink", "inline", straight.most_common(1)[0][0] if straight else default)] += self.marks.pink
+        order = {k: i for i, k in enumerate(("straight", "pink", "l", "tee", "cross", "ends"))}
+        parts = [(kind, connector(dk, h), q) for (kind, dk, h), q in
+                 sorted(entries.items(), key=lambda e: (order[e[0][0]], e[0][2]))]
+        parts += [("filler", p, q) for p, q in fillers.items()]
+
+        if labeled:
+            unknown = Counter()
+            for j in plan.joints:
+                for w, h in j.panels:
+                    if self._panel_height(w, h) is None:
+                        unknown[w] += 1
+            # each panel shows up at both of its ends
+            missing = sum(math.ceil(v / 2) for v in unknown.values())
+            if missing:
+                ws = ", ".join(f'{w}"W' for w in sorted(unknown))
+                warnings.append(f"{missing} panel(s) on the plan ({ws}) have no height label, and the BOM has more than "
+                                f"one height in that width; their joints were quoted at {default}\"H with no filler "
+                                "strips. Check them.")
+            stray = [l for l in plan.labels if not l.matched]
+            if stray:
+                warnings.append(f"{len(stray)} panel label(s) on the plan ({', '.join(l.text for l in stray)}) aren't next "
+                                "to a panel of that width, so they were not used. Check the plan.")
+        elif len(bom_heights) > 1 and not dotted:
+            warnings.append("The BOM has panels at more than one height but the plan has no panel labels, so no high/low "
+                            "filler strips are quoted and connectors use each panel's height only where the SIF's widths "
+                            f'tell it (otherwise {default}"H). Export the CET 2D as a PDF with the panel labels showing '
+                            "(letter, height, width, like A6660) "
+                            "so height changes get their high/low filler strips, or mark each height change with a "
+                            "colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, purple 53/67).")
+        if c["angled"]:
+            warnings.append(f"The 2D plan has {c['angled']} joint(s) at an angle other than 90 or 180 degrees. "
+                            "Devon has no angled connector; check those runs.")
+        if c["other"]:
+            warnings.append(f"The 2D plan has {c['other']} joint(s) where more than four panels meet. Check those by hand.")
+
+        # Cross-check the plan against the AIS BOM: they should be the same revision.
+        bom = Counter()
+        bom_widths = Counter()
+        for ln in lines:
+            pn = ln.part.upper()
+            pm = _POST.match(pn)
+            if pm:
+                bom[f"pf{pm.group(1)}"] += ln.qty
+            elif pn == "P-DLSEOR" or "END OF RUN" in ln.description.upper():
+                bom["seor"] += ln.qty
+            else:
+                m = _PANEL.match(pn)
+                if m:
+                    bom["panels"] += ln.qty
+                    bom_widths[int(m.group(3))] += ln.qty
+        n = lambda k, word: f"{k} {word}" + ("" if k == 1 else "s")
+        checks = [
+            ("panels", plan.panels, n(plan.panels, "panel"), "panels"),
+            ("pf2", c["l"], n(c["l"], "corner"), "2-way (corner) posts"),
+            ("pf3", c["tee"], n(c["tee"], "three-way joint"), "3-way posts"),
+            ("pf4", c["cross"], n(c["cross"], "four-way joint"), "4-way posts"),
+            ("seor", c["ends"], n(c["ends"], "free end"), "end-of-run shrouds"),
+        ]
+        for key, plan_n, plan_text, bom_text in checks:
+            if bom[key] and abs(bom[key] - plan_n) > 0:
+                warnings.append(f"The 2D plan shows {plan_text}, but the AIS BOM has {bom[key]:g} {bom_text}. "
+                                "Make sure the plan and the BOM are the same revision.")
+        bom_sizes = Counter()
+        for ln in lines:
+            m = _PANEL.match(ln.part.upper())
+            if m and not ln.part.upper().startswith(("P-DLPF", "P-DLSEOR")):
+                bom_sizes[(int(m.group(2)), int(m.group(3)))] += ln.qty
+        label_sizes = Counter((l.height, l.width) for l in plan.labels if l.matched)
+        if labeled and bom_sizes and len(label_sizes) and sum(label_sizes.values()) == plan.panels and label_sizes != bom_sizes:
+            fmt = lambda z: ", ".join(f'{n:g} x {h}"H {w}"W' for (h, w), n in sorted(z.items()))
+            warnings.append(f"Panel sizes differ: the plan labels show {fmt(label_sizes)}; the BOM has {fmt(bom_sizes)}.")
+        if bom_widths and plan.widths and bom_widths != plan.widths:
+            fmt = lambda w: ", ".join(f'{n:g} x {k}"' for k, n in sorted(w.items()))
+            warnings.append(f"Panel widths differ: the plan has {fmt(plan.widths)}; the BOM has {fmt(bom_widths)}.")
+        return parts, warnings
+
+    def _auto_add(self, q: dict[str, int]) -> list[tuple[str, int, str]]:
+        """No-charge hardware Devon asks to be listed on every order."""
+        added = []
+
+        def add(part: str, qty: int, why: str):
+            if qty > 0 and part in self.catalog and part not in q:
+                q[part] = qty
+                added.append((part, qty, why))
+
+        count = lambda prefix: sum(v for k, v in q.items() if k.startswith(prefix))
+        add("ACC-106", count("ECO-") + count("G-LF"), "fastener kit, one per pedestal/lateral")
+        add("ACC-107", count("HMP165") + count("HMP166") + count("HMP225") + count("HMP226"), "fastener kit, one per cantilever item")
+        add("ACC-108", count("HMP455"), "fastener kit, one per corner bracket")
+        if any(k.startswith(("HM01", "HM51", "HM52", "HM61", "HM62")) for k in q):
+            add("ACC-110", 1, "touch-up paint, one per panel order at no charge")
+        return added

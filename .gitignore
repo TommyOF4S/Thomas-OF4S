@@ -1,0 +1,8 @@
+# Devon's calculator holds dealer pricing; keep it out of this public repo.
+templates/*.xlsm
+templates/*.xlsx
+out/
+__pycache__/
+.pytest_cache/
+build/
+skills/devon-quote/scripts/
