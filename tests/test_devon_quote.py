@@ -204,3 +204,14 @@ def test_divi50_choice(catalog):
     assert m47.map_line(post).targets == [("HMA130.47", 1)]  # connectors follow the panel height
     with pytest.raises(ValueError):
         Mapper(catalog, divi50=50)
+
+
+def test_finished_end_height_without_a_2d(catalog):
+    end = line("P-DLSEOR", "Divi Linear Base - End of Run Shroud", 4)
+    one = Mapper(catalog).map([line("P-DLFRPM6630", "Divi Linear Panel - NPWR - 66H x 30W", 6), end])
+    m = [x for x in one.mappings if x.source.part == "P-DLSEOR"][0]
+    assert m.targets == [("HMA128.67", 1)] and m.status == "ok"  # one height: the ends match it for sure
+    mixed = Mapper(catalog).map([line("P-DLFRPM6630", "Divi Linear Panel - NPWR - 66H x 30W", 6),
+                                 line("P-DLFRPM4230", "Divi Linear Panel - NPWR - 42H x 30W", 2), end])
+    m = [x for x in mixed.mappings if x.source.part == "P-DLSEOR"][0]
+    assert m.targets == [("HMA128.67", 1)] and m.status == "review" and "only the 2D PDF shows" in m.note

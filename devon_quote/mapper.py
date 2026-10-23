@@ -233,9 +233,12 @@ class Mapper:
             height, hnote = devon_height(h, self.divi50)
             part = connector({2: "2way", 3: "3way"}.get(ways, "4way"), height)  # an AIS 2-way post is a corner
             return Mapping(line, [(part, 1)], "review" if hnote else "ok", hnote, "post")
-        if is_end:
+        if is_end:  # a finished end matches the panel it's on; without a 2D only a one-height job is certain
             height = self.run_height or 53
-            note = f'finished end quoted at {height}"H (the main panel height in this BOM)'
+            if len(self.bom_heights) <= 1:
+                return Mapping(line, [(connector("finished_end", height), 1)], "ok", "", "post")
+            note = (f'finished end quoted at {height}"H, the main panel height; each end should match the height of '
+                    "its panel, which only the 2D PDF shows")
             return Mapping(line, [(connector("finished_end", height), 1)], "review", note, "post")
         if "WALL START" in line.description.upper():
             height = self.run_height or 53
@@ -358,6 +361,7 @@ class Mapper:
             if m and not ln.part.upper().startswith(("P-DLPF", "P-DLSEOR")):
                 heights[devon_height(int(m.group(2)), self.divi50)[0]] += ln.qty
         self.run_height = heights.most_common(1)[0][0] if heights else None
+        self.bom_heights = set(heights)
         self.plan = plan if plan is not None and plan.panels else None
         self.marks = marks if marks is not None and marks.any else None
         # Divi heights the BOM has in each panel width: a plan panel with no label takes the height when there's one
@@ -513,7 +517,9 @@ class Mapper:
         c = plan.counts
         warnings = []
         labeled = any(l.matched for l in plan.labels)
-        height_at = (lambda panels: (self._joint_heights(panels) or [default])[-1]) if labeled else (lambda panels: default)
+        # each joint at its tallest known panel (labels, else the SIF's only height for that width); a free end is
+        # therefore a finished end at the height of the panel it's on
+        height_at = lambda panels: (self._joint_heights(panels) or [default])[-1]
 
         dot_fillers = self._height_changes(warnings)
         if not plan.height_changes and self.marks is not None and self.marks.dots:
@@ -575,8 +581,10 @@ class Mapper:
                 warnings.append(f"{len(stray)} panel label(s) on the plan ({', '.join(l.text for l in stray)}) aren't next "
                                 "to a panel of that width, so they were not used. Check the plan.")
         elif len(bom_heights) > 1 and not dotted:
-            warnings.append(f'The BOM has panels at more than one height; plan connectors are all quoted at {default}"H. '
-                            "Export the CET 2D as a PDF with the panel labels showing (letter, height, width, like A6660) "
+            warnings.append("The BOM has panels at more than one height but the plan has no panel labels, so no high/low "
+                            "filler strips are quoted and connectors use each panel's height only where the SIF's widths "
+                            f'tell it (otherwise {default}"H). Export the CET 2D as a PDF with the panel labels showing '
+                            "(letter, height, width, like A6660) "
                             "so height changes get their high/low filler strips, or mark each height change with a "
                             "colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, purple 53/67).")
         if c["angled"]:

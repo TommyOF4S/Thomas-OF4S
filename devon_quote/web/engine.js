@@ -320,6 +320,7 @@
       }));
     ovs.forEach((o) => (o.re = globToRegex(o.pattern)));
     let runHeight = null;
+    let bomHeights = new Set(); // Devon panel heights in the BOM
     let plan = null; // joints read from the 2D plan, when one was given
     let widthHeights = new Map(); // Divi heights the BOM has in each panel width
     let heightPoints = []; // {page, x, y, part, src} where panel labels show a height change
@@ -387,9 +388,10 @@
           return M(line, [[connector(ways === 2 ? "2way" : ways === 3 ? "3way" : "4way", height), 1]], hnote ? "review" : "ok", hnote, "post");
         }
         const d = line.description.toUpperCase();
-        if (isEnd) {
+        if (isEnd) { // a finished end matches the panel it's on; without a 2D only a one-height job is certain
           const height = runHeight || 53;
-          return M(line, [[connector("finished_end", height), 1]], "review", `finished end quoted at ${height}"H (the main panel height in this BOM)`, "post");
+          if (bomHeights.size <= 1) return M(line, [[connector("finished_end", height), 1]], "ok", "", "post");
+          return M(line, [[connector("finished_end", height), 1]], "review", `finished end quoted at ${height}"H, the main panel height; each end should match the height of its panel, which only the 2D PDF shows`, "post");
         }
         if (d.includes("WALL START")) {
           const height = runHeight || 53;
@@ -597,7 +599,9 @@
       const c = plan.counts;
       const warnings = [];
       const labeled = (plan.labels || []).some((l) => l.matched);
-      const heightAt = labeled ? (panels) => { const hs = jointHeights(panels || []); return hs.length ? hs[hs.length - 1] : def; } : () => def;
+      // each joint at its tallest known panel (labels, else the SIF's only height for that width); a free end is
+      // therefore a finished end at the height of the panel it's on
+      const heightAt = (panels) => { const hs = jointHeights(panels || []); return hs.length ? hs[hs.length - 1] : def; };
       let dotFillers = heightChanges(warnings);
       const markDots = marks && Object.keys(marks.dots || {}).length;
       if (!(plan.heightChanges || []).length && markDots) dotFillers = markFillers(warnings);
@@ -648,7 +652,7 @@
         const stray = plan.labels.filter((l) => !l.matched);
         if (stray.length) warnings.push(`${stray.length} panel label(s) on the plan (${stray.map((l) => l.text).join(", ")}) aren't next to a panel of that width, so they were not used. Check the plan.`);
       } else if (bomHeights.length > 1 && !dotted) {
-        warnings.push(`The BOM has panels at more than one height; plan connectors are all quoted at ${def}"H. Export the CET 2D as a PDF with the panel labels showing (letter, height, width, like A6660) so height changes get their high/low filler strips, or mark each height change with a colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, purple 53/67).`);
+        warnings.push(`The BOM has panels at more than one height but the plan has no panel labels, so no high/low filler strips are quoted and connectors use each panel's height only where the SIF's widths tell it (otherwise ${def}"H). Export the CET 2D as a PDF with the panel labels showing (letter, height, width, like A6660) so height changes get their high/low filler strips, or mark each height change with a colored dot (red 39/53, blue 39/67, yellow 47/53, green 47/67, purple 53/67).`);
       }
       if (c.angled) warnings.push(`The 2D plan has ${c.angled} joint(s) at an angle other than 90 or 180 degrees. Devon has no angled connector; check those runs.`);
       if (c.other) warnings.push(`The 2D plan has ${c.other} joint(s) where more than four panels meet. Check those by hand.`);
@@ -707,6 +711,7 @@
         }
       }
       runHeight = null;
+      bomHeights = new Set(heights.keys());
       let bestCount = -1;
       for (const [h, c] of heights) if (c > bestCount) { runHeight = h; bestCount = c; }
       plan = planResult && planResult.panels ? planResult : null;

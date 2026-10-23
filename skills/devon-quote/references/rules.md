@@ -20,7 +20,7 @@ The SIF and the 2D describe the same design, so they are matched up, not summed.
 | Corner (2 panels at 90°); AIS 2-way post `P-DLPF2…` / `P-DLPFPP2…` (always a corner) | `HMA130` 2-way |
 | 3 panels; AIS `P-DLPF3…` / `P-DLPFPP3…` | `HMA137` 3-way |
 | 4 panels; AIS `P-DLPF4…` | `HMC132` 4-way |
-| Free end of a run; AIS `P-DLSEOR` | `HMA128` finished end (swap to `HMA199` wall start where it meets a wall) |
+| Free end of a run; AIS `P-DLSEOR` | `HMA128.XX` finished end, XX = the height of the panel it's attached to (swap to `HMA199` wall start where it meets a wall). Without a 2D, a one-height job is certain; a mixed-height job is flagged |
 
 Devon connector size codes by height: code A (`HMA130`, `HMA137`, `HMA128`) uses 39/47/53/67/85; code B
 (`HMP213`, `HMC132`, `HMA199`) uses 34/42/48/62/80 for the same heights.
