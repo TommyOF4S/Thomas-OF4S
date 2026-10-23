@@ -3,11 +3,13 @@ and package it for sharing.
 
     python skills/build_skill.py        ->  build/devon-quote.skill
 
-The newest templates/DEVON*.xlsm is bundled as the default calculator. When Devon sends a new one (about
-every 6 months), drop it in templates/ and run this again. The calculator stays out of git (.gitignore).
+Devon's calculator at the top of the repo (DEVON*.xlsm, the official copy kept in the private GitHub repo)
+is bundled as the default; templates/ is the fallback. When Devon sends a new one (about every 6 months),
+upload it to the top of the repo on GitHub (delete the old one), pull, and run this again.
 """
 
 import shutil
+import sys
 import zipfile
 from pathlib import Path
 
@@ -26,11 +28,14 @@ def build() -> Path:
         shutil.copy2(ROOT / "devon_quote" / name, SCRIPTS / "devon_quote" / name)
     (SCRIPTS / "mappings").mkdir()
     shutil.copy2(ROOT / "mappings" / "overrides.csv", SCRIPTS / "mappings" / "overrides.csv")
-    calcs = sorted((ROOT / "templates").glob("DEVON*.xlsm"), key=lambda p: p.stat().st_mtime)
-    if not calcs:
-        raise SystemExit("Put Devon's calculator (DEVON*.xlsm) in templates/ first.")
+    sys.path.insert(0, str(ROOT))
+    from devon_quote.service import find_template
+
+    calc = find_template()
+    if calc is None:
+        raise SystemExit("Put Devon's calculator (DEVON*.xlsm) at the top of the repo first.")
     (SCRIPTS / "templates").mkdir()
-    shutil.copy2(calcs[-1], SCRIPTS / "templates" / calcs[-1].name)  # the engine picks it up from here
+    shutil.copy2(calc, SCRIPTS / "templates" / calc.name)  # the engine picks it up from here
     out = ROOT / "build" / "devon-quote.skill"
     out.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:

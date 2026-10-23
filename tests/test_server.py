@@ -13,7 +13,7 @@ from devon_quote.service import find_template
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / "tests" / "fixtures" / "sample_ais_divi.sif"
 
-pytestmark = pytest.mark.skipif(find_template() is None, reason="put the Devon calculator .xlsm in templates/")
+pytestmark = pytest.mark.skipif(find_template() is None, reason="put the Devon calculator .xlsm at the top of the repo")
 
 
 @pytest.fixture

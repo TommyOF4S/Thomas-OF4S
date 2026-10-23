@@ -32,7 +32,7 @@ def _node_has(mod):
 needs_pdfjs = pytest.mark.skipif(not (_node_has("pdfjs-dist/legacy/build/pdf.js") and _node_has("jszip")),
                                  reason="needs node with pdfjs-dist@3 and jszip on NODE_PATH")
 TEMPLATE = find_template()
-needs_template = pytest.mark.skipif(TEMPLATE is None, reason="put the Devon calculator .xlsm in templates/")
+needs_template = pytest.mark.skipif(TEMPLATE is None, reason="put the Devon calculator .xlsm at the top of the repo")
 
 
 def check_expected(counts, widths, panels):

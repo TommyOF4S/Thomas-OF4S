@@ -31,7 +31,7 @@ def _node_ok() -> bool:
 
 
 pytestmark = [
-    pytest.mark.skipif(TEMPLATE is None, reason="put the Devon calculator .xlsm in templates/"),
+    pytest.mark.skipif(TEMPLATE is None, reason="put the Devon calculator .xlsm at the top of the repo"),
     pytest.mark.skipif(not _node_ok(), reason="needs node with jszip on NODE_PATH"),
 ]
 

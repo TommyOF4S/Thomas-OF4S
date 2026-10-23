@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT / "tests" / "fixtures"))
 from make_sample_marks import EXPECTED  # noqa: E402
 
 TEMPLATE = find_template()
-needs_template = pytest.mark.skipif(TEMPLATE is None, reason="put the Devon calculator .xlsm in templates/")
+needs_template = pytest.mark.skipif(TEMPLATE is None, reason="put the Devon calculator .xlsm at the top of the repo")
 
 
 def _node_has(mod):

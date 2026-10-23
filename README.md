@@ -64,10 +64,10 @@ It writes three files to `out/`:
 ### Setup
 
 1. `pip install -r requirements.txt` (Python 3.10+).
-2. Put Devon's calculator in `templates/` (currently `DEVON_OFFICIAL_CALC_10.21.26.xlsm`).
-   **It is git-ignored on purpose**: it holds dealer pricing and this repo is public.
-   When Devon issues a new calculator, drop it in `templates/`. The newest file is used,
-   and the price list is read straight from it.
+2. Devon's calculator is at the top of the repo (currently `DEVON_OFFICIAL_CALC_10.21.26.xlsm`).
+   It holds Devon's dealer pricing, so **keep this repo private**. When Devon issues a new
+   calculator, upload it to the top of the repo and delete the old one; the price list is read
+   straight from it (`templates/` still works as a local fallback).
 
 ### Inputs (command line)
 
@@ -179,7 +179,7 @@ the built-in rules, so every correction you make once is reused on every future 
 python -m pytest -q
 ```
 
-The tests need the Devon calculator in `templates/`. Without it, most of them skip.
+The tests need the Devon calculator at the top of the repo. Without it, most of them skip.
 
 ### Next steps
 
@@ -193,6 +193,10 @@ The tests need the Devon calculator in `templates/`. Without it, most of them sk
 `skills/devon-quote/` is a Claude skill that runs this same engine, so teammates can ask Claude for a
 Devon quote with the SIF, the 2D PDF and Devon's calculator attached. Build the shareable file with
 `python skills/build_skill.py` (writes `build/devon-quote.skill` with the current code, the standing
-corrections in `mappings/overrides.csv`, and the newest `templates/DEVON*.xlsm` as the default calculator).
-When Devon sends a new calculator (about every 6 months), drop it in `templates/`, rebuild, and share the new
-`.skill` file. The calculator is never committed to git.
+corrections in `mappings/overrides.csv`, and Devon's calculator as the default).
+
+**Devon's calculator** lives at the top of this (private) repo, e.g. `DEVON_OFFICIAL_CALC_10.21.26.xlsm`;
+the command line, local page and skill build all use it (`templates/` is a fallback). When Devon sends a new
+one (about every 6 months): upload it to the top of the repo on GitHub, delete the old one, then pull and run
+`python skills/build_skill.py` and share the new `.skill` file. Keep the repo private: the calculator holds
+Devon's dealer pricing.

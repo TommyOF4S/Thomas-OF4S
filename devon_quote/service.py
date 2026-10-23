@@ -23,8 +23,13 @@ DEFAULT_OVERRIDES = ROOT / "mappings" / "overrides.csv"
 
 
 def find_template() -> Path | None:
-    found = sorted(TEMPLATES.glob("DEVON*.xlsm"), key=lambda p: p.stat().st_mtime)
-    return found[-1] if found else None
+    """Devon's calculator: the one kept at the top of the repo (the official copy on GitHub), else the newest
+    in templates/. When several are in one place, the newest file wins."""
+    for folder in (ROOT, TEMPLATES):
+        found = sorted(folder.glob("DEVON*.xlsm"), key=lambda p: p.stat().st_mtime)
+        if found:
+            return found[-1]
+    return None
 
 
 @dataclass

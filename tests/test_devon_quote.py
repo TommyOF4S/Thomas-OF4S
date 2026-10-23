@@ -11,15 +11,16 @@ from devon_quote.pricing import estimate
 from devon_quote.writer import QuoteHeader, write_quote
 
 ROOT = Path(__file__).resolve().parent.parent
-TEMPLATES = sorted((ROOT / "templates").glob("DEVON*.xlsm"))
-TEMPLATE = TEMPLATES[-1] if TEMPLATES else None
+from devon_quote.service import find_template  # noqa: E402
+
+TEMPLATE = find_template()
 SAMPLE = ROOT / "tests" / "fixtures" / "sample_ais_divi.sif"
 
 
 @pytest.fixture(scope="module")
 def catalog():
     if TEMPLATE is None:
-        pytest.skip("put the Devon calculator .xlsm in templates/")
+        pytest.skip("put the Devon calculator .xlsm at the top of the repo")
     return load_catalog(TEMPLATE)
 
 
