@@ -59,7 +59,7 @@ def build_viewer(S):
         for p in g.PARTS)
     m1 = sum(p["sqft_total"] for p in g.PARTS if p["mat"] == "M1")
     m2 = sum(p["sqft_total"] for p in g.PARTS if p["mat"] == "M2")
-    totals = (f'{sum(p["qty"] for p in g.PARTS)} pieces · M1 {m1:.1f} sq ft (about two 49" x 97" sheets) · '
+    totals = (f'{sum(p["qty"] for p in g.PARTS)} pieces · M1 {m1:.1f} sq ft (about three 49" x 97" sheets) · '
               f'M2 {m2:.1f} sq ft · edgeband {g.TOTAL_EB_IN / 12:.0f} LF net')
     hw = "".join(
         f'<tr><td class="m">{h["mark"]}</td><td>{esc(h["item"])}</td>'

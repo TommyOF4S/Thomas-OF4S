@@ -1,9 +1,11 @@
 Mark,Part,Qty,Length_in,Width_in,Thick_in,Material,Edgeband,Notes
-P01,Top,1,49.0,16.0,1.0,"1"" TFM board",All 4 edges,"Sits on top of side panels. Flush front, back and ends. Band all 4 edges."
-P02,"Side panel (left & right, mirror pair)",2,34.0,16.0,1.0,"1"" TFM board","Front, rear, notch","Toe-kick notch 3"" deep x 4"" high at front bottom. 1/2"" x 1/2"" rabbet full height on rear inside edge for back panel. Make one left and one right."
-P03,Bottom deck,1,47.0,15.5,1.0,"1"" TFM board",Front,"Between sides, top surface at 5"" AFF. Band front edge."
-P04,Fixed shelf,2,47.0,15.5,1.0,"1"" TFM board",Front,"Fixed (not adjustable). Supported by dividers below every 12"". Band front edge."
-P05,Vertical divider,9,9.0,15.5,1.0,"1"" TFM board",Front,"Grain/length vertical. 3 per tier, stacked in line. Band front edge."
+P01,Top,1,49.0,18.0,1.0,"1"" TFM board",All 4 edges,"Sits on top of side panels. Flush front, back and ends. Band all 4 edges."
+P02,"Side panel (left & right, mirror pair)",2,34.0,18.0,1.0,"1"" TFM board","Front, rear, notch","Toe-kick notch 3"" deep x 4"" high at front bottom. 1/2"" x 1/2"" rabbet full height on rear inside edge for back panel. Make one left and one right."
+P03,Bottom deck,1,47.0,17.5,1.0,"1"" TFM board",Front,"Between sides, top surface at 5"" AFF. Band front edge."
+P04,Fixed shelf,2,47.0,17.5,1.0,"1"" TFM board",Front,"Fixed (not adjustable). Supported by dividers below every 12"". Band front edge."
+P05,Vertical divider,9,9.0,17.5,1.0,"1"" TFM board",Front,"Grain/length vertical. 3 per tier, stacked in line. Band front edge."
 P06,Toe kick,1,47.0,4.0,1.0,"1"" TFM board",None,"Between sides, front face recessed 3"" (flush with notch)."
 P07,Rear base rail,1,47.0,4.0,1.0,"1"" TFM board",None,"Between sides under rear of bottom deck, back face flush with back of deck."
 P08,Back panel,1,48.0,30.0,0.5,"1/2"" TFM back",None,"Captured in side rabbets, screwed to rear edges of deck, shelves and dividers #6 x 5/8"" pan head at 6"" o.c."
+P09,"Door, end (A and D)",2,29.9375,12.4375,1.0,"1"" TFM board",All 4 edges,"Hinged left. Outer edge flush with side. 2 x 35 mm hinge cups (inside face), 3/4"" lock hole and 2 pull holes at the free edge. See A-303. Band all 4 edges."
+P10,"Door, center (B and C)",2,29.9375,11.875,1.0,"1"" TFM board",All 4 edges,Hinged left on a divider (half overlay). Same drilling as P09. See A-303. Band all 4 edges.

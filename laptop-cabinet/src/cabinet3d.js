@@ -50,7 +50,6 @@
     const root = new THREE.Group(); scene.add(root);
     const parts = [];   // {mesh, base:Vector3 offset 0, explode:Vector3}
     const stacks = new THREE.Group(); root.add(stacks);
-    const doors = new THREE.Group(); root.add(doors);
     const lineMat = new THREE.LineBasicMaterial({ color: pal.line, transparent: true, opacity: 0.85 });
 
     function boxGeom(b) {
@@ -90,17 +89,37 @@
         case 'Toe kick': v.y = -10; v.z = -1; break;
         case 'Rear rail': v.y = 9; v.z = -9; break;
       }
+      if (inst.door) { v.x = 14; v.y = -12; v.z = -40; }
       return v;
     }
 
+    const doorParts = [];
     data.instances.forEach(inst => {
       const geom = inst.profile ? profileGeom(inst) : boxGeom(inst.box);
       let color = pal.board;
       if (inst.mark === 'P08') color = pal.back;
       if (inst.mark === 'P06') color = pal.kick;
-      const g = addMesh(root, geom, color);
       const e = explodeFor(inst);
-      parts.push({ group: g, inst, explode: new THREE.Vector3(e.x, e.z, -e.y) });
+      const part = { inst, explode: new THREE.Vector3(e.x, e.z, -e.y), base: new THREE.Vector3() };
+      if (inst.door) {
+        // pivot on the hinge line (left edge, back face of the door)
+        const hx = inst.door.hinge_x;
+        geom.translate(-hx, 0, 0);
+        const pivot = new THREE.Group(); pivot.position.set(hx, 0, 0); root.add(pivot);
+        const g = addMesh(pivot, geom, color);
+        // hardware: pull and lock on the free edge
+        const b = inst.box, w = b[3] - b[0];
+        const hw = new THREE.MeshLambertMaterial({ color: 0x3a3d42 });
+        const pull = new THREE.Mesh(new THREE.BoxGeometry(0.35, 4.3, 0.35), hw);
+        pull.position.set(w - 1.25, b[5] - 5 - 1.875, 1.0 + 0.45 + 0.18); pivot.add(pull);
+        const lock = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.25, 20), hw);
+        lock.rotation.x = Math.PI / 2; lock.position.set(w - 1.25, b[5] - 2.5, 1.0 + 0.12); pivot.add(lock);
+        part.group = pivot; part.base.set(hx, 0, 0);
+        doorParts.push(pivot);
+      } else {
+        part.group = addMesh(root, geom, color);
+      }
+      parts.push(part);
     });
 
     // laptop stacks
@@ -114,18 +133,13 @@
     });
     stacks.visible = false;
 
-    // ALT-1 doors (phantom)
-    (function () {
-      const d = data.door, n = data.COLS;
-      for (let i = 0; i < n; i++) {
-        const x0 = i * (W / n) + d.gap / 2;
-        addMesh(doors, boxGeom([x0, -d.t, data.BASE_H + d.gap / 2, x0 + d.w, 0, data.BASE_H + d.gap / 2 + d.h]),
-          pal.door, pal.ghost, { transparent: true, opacity: 0.45 });
-      }
-    })();
-    doors.visible = false;
 
     let explodeT = 0, explodeTarget = 0, needs = true;
+    let doorState = 'closed', doorT = 0, doorTarget = 0;
+    const OPEN_ANGLE = -100 * Math.PI / 180;
+    function applyDoors() {
+      doorParts.forEach(p => { p.rotation.y = OPEN_ANGLE * doorT; p.visible = doorState !== 'off'; });
+    }
 
     function setMode(m) {
       stacks.visible = (m === 'loaded');
@@ -133,14 +147,19 @@
       if (opts.instant) { explodeT = explodeTarget; applyExplode(); }
       needs = true;
     }
-    function setDoors(on) { doors.visible = !!on; needs = true; }
+    function setDoors(state) {
+      doorState = state === true ? 'closed' : (state === false ? 'off' : state);
+      doorTarget = doorState === 'open' ? 1 : 0;
+      if (opts.instant || doorState === 'off') doorT = doorTarget;
+      applyDoors(); needs = true;
+    }
     function applyExplode() {
-      parts.forEach(p => p.group.position.copy(p.explode).multiplyScalar(explodeT));
+      parts.forEach(p => p.group.position.copy(p.explode).multiplyScalar(explodeT).add(p.base));
     }
 
     const VIEWS = {
       iso: [-1.05, 0.62, 1.15], front: [0, 0.02, 1], side: [-1, 0.02, 0.0001], rear: [0.9, 0.55, -1.1], top: [0, 1, 0.001],
-      iso_r: [1.05, 0.62, 1.15],
+      iso_r: [1.05, 0.62, 1.15], open: [0.5, 0.5, 1.2],
     };
     function setView(name, dist) {
       const v = new THREE.Vector3(...(VIEWS[name] || VIEWS.iso)).normalize();
@@ -184,12 +203,17 @@
         explodeT += (explodeTarget - explodeT) * 0.14; applyExplode(); needs = true;
         if (Math.abs(explodeT - explodeTarget) <= 1e-3) { explodeT = explodeTarget; applyExplode(); }
       }
+      if (Math.abs(doorT - doorTarget) > 1e-3) {
+        doorT += (doorTarget - doorT) * 0.12; if (Math.abs(doorT - doorTarget) <= 1e-3) doorT = doorTarget;
+        applyDoors(); needs = true;
+      }
       if (controls) controls.update();
       if (needs) { renderer.render(scene, camera); needs = false; }
       if (!opts.instant) requestAnimationFrame(frame);
     }
-    function renderNow() { applyExplode(); renderer.render(scene, camera); }
+    function renderNow() { applyExplode(); applyDoors(); renderer.render(scene, camera); }
 
+    applyDoors();
     resize(); setView(opts.view || 'iso');
     if (window.ResizeObserver) new ResizeObserver(resize).observe(container);
     if (!opts.instant) requestAnimationFrame(frame);

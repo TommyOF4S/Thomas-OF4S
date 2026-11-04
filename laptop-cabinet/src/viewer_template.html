@@ -114,17 +114,17 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
 <div class="wrap">
   <header class="top">
     <div class="mark">OF<b>4</b>S</div>
-    <span>RFQ package · Rev 0 · Nov 4, 2026</span>
+    <span>RFQ package · Rev 1 · Nov 4, 2026</span>
   </header>
 
   <div class="hero">
     <p class="eyebrow">Custom casework · request for quotation</p>
     <h1>LC-60 laptop storage cabinet</h1>
-    <p class="lead">Sixty laptops in twelve open bays, stacked five high. Fixed shelves, 1" panels throughout and a 4" toe-kick base. Drawn and dimensioned for a fabricator to price.</p>
+    <p class="lead">Sixty laptops in twelve bays, stacked five high and pushed to the back, behind four lockable doors. Fixed shelves, 1" panels throughout and a 4" toe-kick base. Drawn and dimensioned for a fabricator to price.</p>
     <dl class="facts">
       <div><dt>Capacity</dt><dd>60 <small>laptops</small></dd></div>
       <div><dt>Bays</dt><dd>12 <small>4 across × 3 high</small></dd></div>
-      <div><dt>Overall W × D × H</dt><dd>49 × 16 × 35 <small>in</small></dd></div>
+      <div><dt>Overall W × D × H</dt><dd>49 × 19 × 35 <small>in, doors closed</small></dd></div>
       <div><dt>Weight, approx.</dt><dd>__EMPTY_LB__ <small>lb empty</small></dd></div>
     </dl>
   </div>
@@ -134,7 +134,7 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
       <div>
         <p class="eyebrow">3D model</p>
         <h2>Turn it, load it, take it apart</h2>
-        <p>Every dimension comes from the same model as the drawing set. Doors are alternate ALT-1, shown as a ghost.</p>
+        <p>Every dimension comes from the same model as the drawing set. Open the doors, or hide them to see the bays.</p>
       </div>
     </div>
     <div class="toolbar">
@@ -144,12 +144,16 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
         <button id="m-exploded" data-mode="exploded" aria-pressed="false">Exploded</button>
       </div>
       <div class="seg" role="group" aria-label="Camera">
-        <button id="v-iso" data-view="iso" aria-pressed="true">Iso</button>
+        <button id="v-iso" data-view="open" aria-pressed="true">Iso</button>
         <button id="v-front" data-view="front" aria-pressed="false">Front</button>
         <button id="v-side" data-view="side" aria-pressed="false">Side</button>
         <button id="v-rear" data-view="rear" aria-pressed="false">Rear</button>
       </div>
-      <label class="check" for="doors"><input type="checkbox" id="doors"> Show ALT-1 doors</label>
+      <div class="seg" role="group" aria-label="Doors">
+        <button id="d-closed" data-doors="closed" aria-pressed="false">Doors closed</button>
+        <button id="d-open" data-doors="open" aria-pressed="true">Open</button>
+        <button id="d-off" data-doors="off" aria-pressed="false">Hidden</button>
+      </div>
     </div>
     <div class="stage">
       <div id="three" role="img" aria-label="Interactive 3D model of the laptop cabinet"></div>
@@ -160,7 +164,7 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
   <section id="drawings">
     <div class="sec-head">
       <div>
-        <p class="eyebrow">Drawing set · 11 sheets · 11 × 17</p>
+        <p class="eyebrow">Drawing set · 13 sheets · 11 × 17</p>
         <h2>Elevations, sections, plans and parts</h2>
         <p>The same sheets as the PDF that goes to the fabricator. Pick a sheet; open it full size for detail.</p>
       </div>
@@ -207,8 +211,8 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
         <h2>To confirm with the client before release</h2>
         <ol class="qs" style="margin-top:18px">
           <li>Exact laptop model and size, with or without a protective case.</li>
-          <li>Will laptops charge inside the cabinet? That changes ventilation and power (ALT-2, ALT-3).</li>
-          <li>Doors and locks, or open bays? (ALT-1)</li>
+          <li>No charging inside the cabinet is assumed. Confirm; if it changes, see ALT-1 and ALT-2.</li>
+          <li>Door pull and lock finish: brushed nickel or black.</li>
           <li>Is 35" a hard maximum, for example under a window? Glides add about 3/8".</li>
           <li>Against a wall, or freestanding with a finished back?</li>
           <li>Laminate color, and how many cabinets.</li>
@@ -224,7 +228,7 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
       <p>Send the PDF and the Excel cut list for pricing. The DXF files are for their CAD or CNC team.</p>
     </div></div>
     <div class="files">
-      <div class="file"><code>LC-60_Drawing_Set.pdf</code><p>11 sheets, 11 × 17, title-blocked.</p></div>
+      <div class="file"><code>LC-60_Drawing_Set.pdf</code><p>13 sheets, 11 × 17, title-blocked. Rev 1.</p></div>
       <div class="file"><code>LC-60_Cut_List.xlsx</code><p>Cut list, hardware, materials, alternates with a price column.</p></div>
       <div class="file"><code>LC-60_Drawings.dxf</code><p>Every view and part detail at 1:1, inches, layered.</p></div>
       <div class="file"><code>LC-60_Parts_CNC.dxf</code><p>Flat outlines of each part at 1:1 for nesting.</p></div>
@@ -254,8 +258,9 @@ const SHEETS = __SHEETS__;
   }
   try {
     if (!window.THREE) throw new Error('3D library did not load');
-    cab = Cabinet3D.create(el, DATA, { distance: 112, palette: { bg: cssColor('--canvas') } });
+    cab = Cabinet3D.create(el, DATA, { distance: 132, view: 'open', palette: { bg: cssColor('--canvas') } });
     cab.setMode('loaded');
+    cab.setDoors('open');
   } catch (e) {
     el.innerHTML = '<p class="err">The 3D view could not start here (' + e.message + '). The drawing set below has the same model as isometric views.</p>';
   }
@@ -266,7 +271,9 @@ const SHEETS = __SHEETS__;
   document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
     press('[data-view]', b); if (cab) cab.setView(b.dataset.view);
   }));
-  document.getElementById('doors').addEventListener('change', e => { if (cab) cab.setDoors(e.target.checked); });
+  document.querySelectorAll('[data-doors]').forEach(b => b.addEventListener('click', () => {
+    press('[data-doors]', b); if (cab) cab.setDoors(b.dataset.doors);
+  }));
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
   const retheme = () => cab && cab.setPalette({ bg: cssColor('--canvas') });
   mq.addEventListener && mq.addEventListener('change', retheme);

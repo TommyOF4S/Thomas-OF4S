@@ -13,7 +13,7 @@ HDR_FILL = PatternFill("solid", fgColor="F3EFE7")
 HDR_FONT = Font(bold=True, color="15273F")
 THIN = Side(style="thin", color="D6CFBE")
 EB_TEXT = {"P01": "All 4 edges", "P02": "Front, rear, notch", "P03": "Front", "P04": "Front",
-           "P05": "Front", "P06": "None", "P07": "None", "P08": "None"}
+           "P05": "Front", "P06": "None", "P07": "None", "P08": "None", "P09": "All 4 edges", "P10": "All 4 edges"}
 
 
 def _sheet(ws, header, rows, widths):

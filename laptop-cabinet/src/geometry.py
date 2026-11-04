@@ -25,13 +25,17 @@ COLS = 4               # stacks side by side
 TIERS = 3              # stacks one above the other
 OPEN_W = 11.0          # clear opening width per bay  (laptop 10" + 1/2" each side)
 OPEN_H = 9.0           # clear opening height per bay (stack 7-1/2" + 1-1/2" lift room)
+D = 18.0               # carcass depth, front of sides to back (rev 1: was 16")
+REAR_GAP = 0.5         # laptops pushed toward the back: 1/2" from back panel
+DOOR_T = 1.0           # doors in the same 1" board as the carcass
+DOOR_GAP = 0.125       # gap between doors (door joints centered on dividers)
 
 # ---------------------------------------------------------------- derived sizes
 W = 2 * T + COLS * OPEN_W + (COLS - 1) * T          # 49
 H = BASE_H + T + TIERS * OPEN_H + (TIERS - 1) * T + T  # 35
-D = 16.0
 INT_W = W - 2 * T                                    # 47  (between sides)
-INT_D = D - BACK_T                                   # 15.5 (front to back panel)
+INT_D = D - BACK_T                                   # 17.5 (front to back panel)
+OVERALL_D = D + DOOR_T                               # 19   (doors closed)
 SIDE_H = H - T                                       # 34  (top sits on the sides)
 STACK_H = STACK * LAPTOP_T                           # 7.5
 BAYS = COLS * TIERS                                  # 12
@@ -98,6 +102,45 @@ MATERIALS = {
 }
 EDGEBAND = "3 mm PVC, color-matched, radiused 1/16\" (≈ 1 mm)"
 
+# ---------------------------------------------------------------- doors (base scope, rev 1)
+# One door per column, all hinged on the LEFT. Door joints are centered on the dividers;
+# outer edges are flush with the sides. Bottom flush with underside of the bottom deck.
+def divider_center(i):
+    return divider_x(i) + T / 2
+
+
+DOOR_Z0 = BASE_H
+DOOR_Z1 = SIDE_H - 1 / 16
+DOOR_H = DOOR_Z1 - DOOR_Z0                            # 29-15/16
+DOORS = []
+for _c in range(COLS):
+    _x0 = 0.0 if _c == 0 else divider_center(_c - 1) + DOOR_GAP / 2
+    _x1 = W if _c == COLS - 1 else divider_center(_c) - DOOR_GAP / 2
+    DOORS.append(dict(col=_c, id="ABCD"[_c], x0=_x0, x1=_x1, w=_x1 - _x0,
+                      mark="P09" if _c in (0, COLS - 1) else "P10"))
+END_DOOR_W = DOORS[0]["w"]                            # 12-7/16
+MID_DOOR_W = DOORS[1]["w"]                            # 11-7/8
+HINGE_CUP_DIA = 35 / 25.4
+HINGE_CUP_X = 7 / 8          # cup center from hinge edge
+HINGE_CUP_Z = 3.0            # cup centers from top and bottom of door
+LOCK_DIA = 3 / 4
+LOCK_FROM_EDGE = 1.25        # lock and pull centerline from free edge
+LOCK_FROM_TOP = 2.5
+PULL_CC = 3.75               # 96 mm wire pull
+PULL_TOP_FROM_TOP = 5.0
+
+
+def door_holes(w, h):
+    """Drilling for a left-hinged door, viewed from the OUTSIDE face. (u, v, dia, kind)."""
+    return [
+        (HINGE_CUP_X, HINGE_CUP_Z, HINGE_CUP_DIA, "cup"),
+        (HINGE_CUP_X, h - HINGE_CUP_Z, HINGE_CUP_DIA, "cup"),
+        (w - LOCK_FROM_EDGE, h - LOCK_FROM_TOP, LOCK_DIA, "lock"),
+        (w - LOCK_FROM_EDGE, h - PULL_TOP_FROM_TOP, 3 / 16, "pull"),
+        (w - LOCK_FROM_EDGE, h - PULL_TOP_FROM_TOP - PULL_CC, 3 / 16, "pull"),
+    ]
+
+
 # ---------------------------------------------------------------- parts
 # eb = list of edges banded, each "L1", "L2" (long edges) or "W1", "W2" (short edges)
 # eb_len = banded length per piece (inches)
@@ -125,11 +168,19 @@ PARTS = [
     dict(mark="P07", name="Rear base rail", qty=1, L=INT_W, Wd=BASE_H, mat="M1",
          eb=[], eb_len=0,
          notes="Between sides under rear of bottom deck, back face flush with back of deck."),
+    dict(mark="P09", name="Door, end (A and D)", qty=2, L=DOOR_H, Wd=END_DOOR_W, mat="M1",
+         eb=["L1", "L2", "W1", "W2"], eb_len=2 * DOOR_H + 2 * END_DOOR_W,
+         notes="Hinged left. Outer edge flush with side. 2 x 35 mm hinge cups (inside face), "
+               "3/4\" lock hole and 2 pull holes at the free edge. See A-303. Band all 4 edges."),
+    dict(mark="P10", name="Door, center (B and C)", qty=2, L=DOOR_H, Wd=MID_DOOR_W, mat="M1",
+         eb=["L1", "L2", "W1", "W2"], eb_len=2 * DOOR_H + 2 * MID_DOOR_W,
+         notes="Hinged left on a divider (half overlay). Same drilling as P09. See A-303. Band all 4 edges."),
     dict(mark="P08", name="Back panel", qty=1, L=INT_W + 2 * BACK_T,
          Wd=H - T - BASE_H, mat="M2", eb=[], eb_len=0,
          notes="Captured in side rabbets, screwed to rear edges of deck, shelves and dividers "
                "#6 x 5/8\" pan head at 6\" o.c."),
 ]
+PARTS.sort(key=lambda p: p["mark"])
 PART_BY_MARK = {p["mark"]: p for p in PARTS}
 
 for p in PARTS:
@@ -166,9 +217,13 @@ for t in range(TIERS):
 _add("P06", (T, KICK_SETBACK, 0, W - T, KICK_SETBACK + T, BASE_H), "Toe kick")
 _add("P07", (T, INT_D - T, 0, W - T, INT_D, BASE_H), "Rear rail")
 _add("P08", (T - BACK_T, INT_D, BASE_H, W - T + BACK_T, D, SIDE_H), "Back")
+for _d in DOORS:
+    _add(_d["mark"], (_d["x0"], -DOOR_T, DOOR_Z0, _d["x1"], 0, DOOR_Z1), f"Door {_d['id']}",
+         door=dict(hinge_x=_d["x0"]))
 
-# laptop stacks: centered side to side, centered front to back in the 15-1/2" depth
-LAPTOP_Y0 = (INT_D - LAPTOP_D) / 2  # 0.75
+# laptop stacks: centered side to side, pushed toward the back (1/2" from back panel)
+LAPTOP_Y0 = INT_D - LAPTOP_D - REAR_GAP  # 3"
+FRONT_GAP = LAPTOP_Y0
 STACKS = []
 for t in range(TIERS):
     for c in range(COLS):
@@ -189,31 +244,34 @@ HARDWARE = [
     dict(mark="H04", item="Confirmat cover cap, color-matched", qty=36, notes="Exposed screw heads on side panels."),
     dict(mark="H05", item="#6 x 5/8\" pan-head screw", qty=40, notes="Back panel to rabbets and rear edges, 6\" o.c."),
     dict(mark="H06", item="Anti-tip wall bracket kit (pair) with fasteners", qty=1,
-         notes="Under top at rear. Required: loaded weight about 475 lb."),
+         notes="Under top at rear. Required: loaded weight over 500 lb and doors swing forward."),
     dict(mark="H07", item=EDGEBAND, qty=None, notes="See cut list for linear feet."),
+    dict(mark="H08", item="Concealed hinge, 35 mm cup, 110° soft-close, clip-on, with mounting plate", qty=2 * COLS,
+         notes="2 per door. Full overlay at the left side (door A), half overlay on dividers (doors B, C, D). "
+               "Fabricator to select crank to suit."),
+    dict(mark="H09", item="Cam lock, 3/4\" body, keyed alike, 2 keys per lock + master", qty=COLS,
+         notes="1 per door at the free edge, 2-1/2\" from top."),
+    dict(mark="H10", item="L-strike for cam lock", qty=COLS,
+         notes="On the divider or side behind each door's free edge."),
+    dict(mark="H11", item="Wire pull, 96 mm (3-3/4\") c.c., brushed nickel or black", qty=COLS,
+         notes="1 per door, vertical, at the free edge."),
+    dict(mark="H12", item="Clear door bumper, 3/8\" dia.", qty=2 * COLS, notes="2 per door, back face, free edge."),
 ]
 
 # ---------------------------------------------------------------- alternates (priced separately)
-DOOR_GAP = 0.125
-DOOR_T = 0.75
-DOOR_W = W / COLS - DOOR_GAP
-DOOR_H = SIDE_H - BASE_H - DOOR_GAP
 ALTERNATES = [
-    dict(mark="ALT-1", title="Lockable doors",
-         desc=f"4 full-overlay doors, one per column, {fmt(DOOR_W)} W x {fmt(DOOR_H)} H x {fmt(DOOR_T)} TFM, "
-              "3 mm PVC all edges. 2 concealed 110° soft-close hinges per door (half-overlay on dividers). "
-              "1 keyed-alike cam lock per door, 1 wire pull per door (4\" c.c.). Adds 3/4\" to depth."),
-    dict(mark="ALT-2", title="Ventilation",
-         desc="One 2\" dia. grommet hole with cap through the back panel at each bay (12), "
-              "or 3 x 1/2\" x 6\" routed vent slots per bay. Needed if laptops go in warm."),
-    dict(mark="ALT-3", title="Charging",
-         desc="Not in base scope. If laptops must charge inside, quote a UL-listed charging "
-              "solution separately (power strips inside casework are not code-compliant)."),
-    dict(mark="ALT-4", title="Mobile base",
-         desc="Replace toe kick and rear rail with a 1\" sub-base on 4 x 3\" locking casters, "
-              "keeping 35\" overall height."),
-    dict(mark="ALT-5", title="Bay labels",
-         desc="Engraved or printed bay ID plates A1 to D3 on shelf fronts, 12 total."),
+    dict(mark="ALT-1", title="Ventilation",
+         desc="One 2\" dia. grommet with cap through the back panel at each bay (12), or routed vent slots "
+              "per bay. Not needed while laptops are stored cold; useful if they go in warm."),
+    dict(mark="ALT-2", title="Charging",
+         desc="Not in scope: the client has not asked for charging. If needed later, quote a UL-listed "
+              "charging solution separately (power strips inside casework are not code-compliant)."),
+    dict(mark="ALT-3", title="Mobile base",
+         desc="Replace toe kick and rear rail with a 1\" sub-base on 4 x 3\" locking casters, keeping 35\" overall height."),
+    dict(mark="ALT-4", title="Bay labels",
+         desc="Engraved or printed ID plates A1 to D3 on shelf fronts (12), plus A to D on door fronts (4)."),
+    dict(mark="ALT-5", title="Master-keyed locks",
+         desc="Locks keyed differently per door with one master key, instead of keyed alike."),
 ]
 
 TOTAL_EB_IN = sum(p["eb_len"] * p["qty"] for p in PARTS)
@@ -229,7 +287,7 @@ def to_json():
         LAPTOP=dict(w=LAPTOP_W, d=LAPTOP_D, t=LAPTOP_T, stack=STACK),
         instances=INSTANCES, stacks=STACKS,
         parts=[{k: p[k] for k in ("mark", "name", "qty", "L", "Wd", "T", "mat")} for p in PARTS],
-        door=dict(w=DOOR_W, h=DOOR_H, t=DOOR_T, gap=DOOR_GAP),
+        OVERALL_D=OVERALL_D,
     )
 
 

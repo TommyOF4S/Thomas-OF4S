@@ -114,18 +114,18 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
 <div class="wrap">
   <header class="top">
     <div class="mark">OF<b>4</b>S</div>
-    <span>RFQ package · Rev 0 · Nov 4, 2026</span>
+    <span>RFQ package · Rev 1 · Nov 4, 2026</span>
   </header>
 
   <div class="hero">
     <p class="eyebrow">Custom casework · request for quotation</p>
     <h1>LC-60 laptop storage cabinet</h1>
-    <p class="lead">Sixty laptops in twelve open bays, stacked five high. Fixed shelves, 1" panels throughout and a 4" toe-kick base. Drawn and dimensioned for a fabricator to price.</p>
+    <p class="lead">Sixty laptops in twelve bays, stacked five high and pushed to the back, behind four lockable doors. Fixed shelves, 1" panels throughout and a 4" toe-kick base. Drawn and dimensioned for a fabricator to price.</p>
     <dl class="facts">
       <div><dt>Capacity</dt><dd>60 <small>laptops</small></dd></div>
       <div><dt>Bays</dt><dd>12 <small>4 across × 3 high</small></dd></div>
-      <div><dt>Overall W × D × H</dt><dd>49 × 16 × 35 <small>in</small></dd></div>
-      <div><dt>Weight, approx.</dt><dd>175 <small>lb empty</small></dd></div>
+      <div><dt>Overall W × D × H</dt><dd>49 × 19 × 35 <small>in, doors closed</small></dd></div>
+      <div><dt>Weight, approx.</dt><dd>233 <small>lb empty</small></dd></div>
     </dl>
   </div>
 
@@ -134,7 +134,7 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
       <div>
         <p class="eyebrow">3D model</p>
         <h2>Turn it, load it, take it apart</h2>
-        <p>Every dimension comes from the same model as the drawing set. Doors are alternate ALT-1, shown as a ghost.</p>
+        <p>Every dimension comes from the same model as the drawing set. Open the doors, or hide them to see the bays.</p>
       </div>
     </div>
     <div class="toolbar">
@@ -144,12 +144,16 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
         <button id="m-exploded" data-mode="exploded" aria-pressed="false">Exploded</button>
       </div>
       <div class="seg" role="group" aria-label="Camera">
-        <button id="v-iso" data-view="iso" aria-pressed="true">Iso</button>
+        <button id="v-iso" data-view="open" aria-pressed="true">Iso</button>
         <button id="v-front" data-view="front" aria-pressed="false">Front</button>
         <button id="v-side" data-view="side" aria-pressed="false">Side</button>
         <button id="v-rear" data-view="rear" aria-pressed="false">Rear</button>
       </div>
-      <label class="check" for="doors"><input type="checkbox" id="doors"> Show ALT-1 doors</label>
+      <div class="seg" role="group" aria-label="Doors">
+        <button id="d-closed" data-doors="closed" aria-pressed="false">Doors closed</button>
+        <button id="d-open" data-doors="open" aria-pressed="true">Open</button>
+        <button id="d-off" data-doors="off" aria-pressed="false">Hidden</button>
+      </div>
     </div>
     <div class="stage">
       <div id="three" role="img" aria-label="Interactive 3D model of the laptop cabinet"></div>
@@ -160,13 +164,13 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
   <section id="drawings">
     <div class="sec-head">
       <div>
-        <p class="eyebrow">Drawing set · 11 sheets · 11 × 17</p>
+        <p class="eyebrow">Drawing set · 13 sheets · 11 × 17</p>
         <h2>Elevations, sections, plans and parts</h2>
         <p>The same sheets as the PDF that goes to the fabricator. Pick a sheet; open it full size for detail.</p>
       </div>
     </div>
     <div class="sheets">
-      <nav class="sheet-list" aria-label="Sheets"><button data-sheet="A-001" aria-current="false"><span>A-001</span><em>Cover, design basis, notes</em></button><button data-sheet="A-101" aria-current="false"><span>A-101</span><em>Front elevation</em></button><button data-sheet="A-102" aria-current="false"><span>A-102</span><em>Section A-A, side elevation, bay</em></button><button data-sheet="A-103" aria-current="false"><span>A-103</span><em>Top plan, plan section B-B</em></button><button data-sheet="A-104" aria-current="false"><span>A-104</span><em>Front elevation, loaded</em></button><button data-sheet="A-201" aria-current="false"><span>A-201</span><em>Isometric views</em></button><button data-sheet="A-202" aria-current="false"><span>A-202</span><em>Exploded isometric</em></button><button data-sheet="A-301" aria-current="false"><span>A-301</span><em>Part details 1</em></button><button data-sheet="A-302" aria-current="false"><span>A-302</span><em>Part details 2</em></button><button data-sheet="A-401" aria-current="false"><span>A-401</span><em>Cut list and hardware</em></button><button data-sheet="A-501" aria-current="false"><span>A-501</span><em>Alternates, quote request</em></button></nav>
+      <nav class="sheet-list" aria-label="Sheets"><button data-sheet="A-001" aria-current="false"><span>A-001</span><em>Cover, design basis, notes</em></button><button data-sheet="A-101" aria-current="false"><span>A-101</span><em>Front elevation, doors closed</em></button><button data-sheet="A-102" aria-current="false"><span>A-102</span><em>Interior elevation, doors removed</em></button><button data-sheet="A-103" aria-current="false"><span>A-103</span><em>Section A-A, side elevation, bay</em></button><button data-sheet="A-104" aria-current="false"><span>A-104</span><em>Top plan, plan section B-B</em></button><button data-sheet="A-105" aria-current="false"><span>A-105</span><em>Interior elevation, loaded</em></button><button data-sheet="A-201" aria-current="false"><span>A-201</span><em>Isometric views</em></button><button data-sheet="A-202" aria-current="false"><span>A-202</span><em>Exploded isometric</em></button><button data-sheet="A-301" aria-current="false"><span>A-301</span><em>Part details 1</em></button><button data-sheet="A-302" aria-current="false"><span>A-302</span><em>Part details 2</em></button><button data-sheet="A-303" aria-current="false"><span>A-303</span><em>Door details</em></button><button data-sheet="A-401" aria-current="false"><span>A-401</span><em>Cut list and hardware</em></button><button data-sheet="A-501" aria-current="false"><span>A-501</span><em>Alternates, quote request</em></button></nav>
       <div>
         <div class="sheet-view"><img id="sheet-img" src="sheets/A-001.png" alt="Sheet A-001" width="2210" height="1430"></div>
         <div class="sheet-meta"><span id="sheet-cap">A-001 · Cover, design basis, notes</span><a id="sheet-link" href="sheets/A-001.png" target="_blank" rel="noopener">Open full size</a></div>
@@ -182,8 +186,8 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
     </div></div>
     <div class="tbl"><table>
       <thead><tr><th>Mark</th><th>Part</th><th>Qty</th><th>Length</th><th>Width</th><th>Thick</th><th>Matl</th><th>Edgeband</th><th>Notes</th></tr></thead>
-      <tbody><tr><td class="m">P01</td><td>Top</td><td class="n">1</td><td class="n">49&quot;</td><td class="n">16&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>All 4 edges</td><td class="note">Sits on top of side panels. Flush front, back and ends. Band all 4 edges.</td></tr><tr><td class="m">P02</td><td>Side panel (left &amp; right, mirror pair)</td><td class="n">2</td><td class="n">34&quot;</td><td class="n">16&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>Front, rear, notch</td><td class="note">Toe-kick notch 3&quot; deep x 4&quot; high at front bottom. 1/2&quot; x 1/2&quot; rabbet full height on rear inside edge for back panel. Make one left and one right.</td></tr><tr><td class="m">P03</td><td>Bottom deck</td><td class="n">1</td><td class="n">47&quot;</td><td class="n">15-1/2&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>Front</td><td class="note">Between sides, top surface at 5&quot; AFF. Band front edge.</td></tr><tr><td class="m">P04</td><td>Fixed shelf</td><td class="n">2</td><td class="n">47&quot;</td><td class="n">15-1/2&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>Front</td><td class="note">Fixed (not adjustable). Supported by dividers below every 12&quot;. Band front edge.</td></tr><tr><td class="m">P05</td><td>Vertical divider</td><td class="n">9</td><td class="n">9&quot;</td><td class="n">15-1/2&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>Front</td><td class="note">Grain/length vertical. 3 per tier, stacked in line. Band front edge.</td></tr><tr><td class="m">P06</td><td>Toe kick</td><td class="n">1</td><td class="n">47&quot;</td><td class="n">4&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>None</td><td class="note">Between sides, front face recessed 3&quot; (flush with notch).</td></tr><tr><td class="m">P07</td><td>Rear base rail</td><td class="n">1</td><td class="n">47&quot;</td><td class="n">4&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>None</td><td class="note">Between sides under rear of bottom deck, back face flush with back of deck.</td></tr><tr><td class="m">P08</td><td>Back panel</td><td class="n">1</td><td class="n">48&quot;</td><td class="n">30&quot;</td><td class="n">1/2&quot;</td><td class="n">M2</td><td>None</td><td class="note">Captured in side rabbets, screwed to rear edges of deck, shelves and dividers #6 x 5/8&quot; pan head at 6&quot; o.c.</td></tr></tbody>
-      <tfoot><tr><td></td><td colspan="8">18 pieces · M1 39.5 sq ft (about two 49&quot; x 97&quot; sheets) · M2 10.0 sq ft · edgeband 41 LF net</td></tr></tfoot>
+      <tbody><tr><td class="m">P01</td><td>Top</td><td class="n">1</td><td class="n">49&quot;</td><td class="n">18&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>All 4 edges</td><td class="note">Sits on top of side panels. Flush front, back and ends. Band all 4 edges.</td></tr><tr><td class="m">P02</td><td>Side panel (left &amp; right, mirror pair)</td><td class="n">2</td><td class="n">34&quot;</td><td class="n">18&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>Front, rear, notch</td><td class="note">Toe-kick notch 3&quot; deep x 4&quot; high at front bottom. 1/2&quot; x 1/2&quot; rabbet full height on rear inside edge for back panel. Make one left and one right.</td></tr><tr><td class="m">P03</td><td>Bottom deck</td><td class="n">1</td><td class="n">47&quot;</td><td class="n">17-1/2&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>Front</td><td class="note">Between sides, top surface at 5&quot; AFF. Band front edge.</td></tr><tr><td class="m">P04</td><td>Fixed shelf</td><td class="n">2</td><td class="n">47&quot;</td><td class="n">17-1/2&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>Front</td><td class="note">Fixed (not adjustable). Supported by dividers below every 12&quot;. Band front edge.</td></tr><tr><td class="m">P05</td><td>Vertical divider</td><td class="n">9</td><td class="n">9&quot;</td><td class="n">17-1/2&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>Front</td><td class="note">Grain/length vertical. 3 per tier, stacked in line. Band front edge.</td></tr><tr><td class="m">P06</td><td>Toe kick</td><td class="n">1</td><td class="n">47&quot;</td><td class="n">4&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>None</td><td class="note">Between sides, front face recessed 3&quot; (flush with notch).</td></tr><tr><td class="m">P07</td><td>Rear base rail</td><td class="n">1</td><td class="n">47&quot;</td><td class="n">4&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>None</td><td class="note">Between sides under rear of bottom deck, back face flush with back of deck.</td></tr><tr><td class="m">P08</td><td>Back panel</td><td class="n">1</td><td class="n">48&quot;</td><td class="n">30&quot;</td><td class="n">1/2&quot;</td><td class="n">M2</td><td>None</td><td class="note">Captured in side rabbets, screwed to rear edges of deck, shelves and dividers #6 x 5/8&quot; pan head at 6&quot; o.c.</td></tr><tr><td class="m">P09</td><td>Door, end (A and D)</td><td class="n">2</td><td class="n">29-15/16&quot;</td><td class="n">12-7/16&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>All 4 edges</td><td class="note">Hinged left. Outer edge flush with side. 2 x 35 mm hinge cups (inside face), 3/4&quot; lock hole and 2 pull holes at the free edge. See A-303. Band all 4 edges.</td></tr><tr><td class="m">P10</td><td>Door, center (B and C)</td><td class="n">2</td><td class="n">29-15/16&quot;</td><td class="n">11-7/8&quot;</td><td class="n">1&quot;</td><td class="n">M1</td><td>All 4 edges</td><td class="note">Hinged left on a divider (half overlay). Same drilling as P09. See A-303. Band all 4 edges.</td></tr></tbody>
+      <tfoot><tr><td></td><td colspan="8">22 pieces · M1 54.3 sq ft (about three 49&quot; x 97&quot; sheets) · M2 10.0 sq ft · edgeband 70 LF net</td></tr></tfoot>
     </table></div>
   </section>
 
@@ -191,7 +195,7 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
     <div class="sec-head"><div><p class="eyebrow">Hardware</p><h2>Fittings per cabinet</h2></div></div>
     <div class="tbl"><table>
       <thead><tr><th>Mark</th><th>Item</th><th>Qty</th><th>Notes</th></tr></thead>
-      <tbody><tr><td class="m">H01</td><td>Leveling glide, 5/16&quot;-18, 1-1/4&quot; dia. nylon base, with threaded insert</td><td class="n">4</td><td class="note">Into bottom edge of each side panel, 2 per side. Adds about 3/8&quot; (see note 6).</td></tr><tr><td class="m">H02</td><td>8 mm x 35 mm fluted hardwood dowel</td><td class="n">60</td><td class="note">Divider ends (2 per end) and carcass joints. Glued.</td></tr><tr><td class="m">H03</td><td>7 x 50 mm confirmat screw (or cam + bolt if shipped knock-down)</td><td class="n">36</td><td class="note">Sides to top, bottom deck, shelves, toe kick and rear rail. Heads capped.</td></tr><tr><td class="m">H04</td><td>Confirmat cover cap, color-matched</td><td class="n">36</td><td class="note">Exposed screw heads on side panels.</td></tr><tr><td class="m">H05</td><td>#6 x 5/8&quot; pan-head screw</td><td class="n">40</td><td class="note">Back panel to rabbets and rear edges, 6&quot; o.c.</td></tr><tr><td class="m">H06</td><td>Anti-tip wall bracket kit (pair) with fasteners</td><td class="n">1</td><td class="note">Under top at rear. Required: loaded weight about 475 lb.</td></tr><tr><td class="m">H07</td><td>3 mm PVC, color-matched, radiused 1/16&quot; (≈ 1 mm)</td><td class="n">45 LF</td><td class="note">See cut list for linear feet.</td></tr></tbody>
+      <tbody><tr><td class="m">H01</td><td>Leveling glide, 5/16&quot;-18, 1-1/4&quot; dia. nylon base, with threaded insert</td><td class="n">4</td><td class="note">Into bottom edge of each side panel, 2 per side. Adds about 3/8&quot; (see note 6).</td></tr><tr><td class="m">H02</td><td>8 mm x 35 mm fluted hardwood dowel</td><td class="n">60</td><td class="note">Divider ends (2 per end) and carcass joints. Glued.</td></tr><tr><td class="m">H03</td><td>7 x 50 mm confirmat screw (or cam + bolt if shipped knock-down)</td><td class="n">36</td><td class="note">Sides to top, bottom deck, shelves, toe kick and rear rail. Heads capped.</td></tr><tr><td class="m">H04</td><td>Confirmat cover cap, color-matched</td><td class="n">36</td><td class="note">Exposed screw heads on side panels.</td></tr><tr><td class="m">H05</td><td>#6 x 5/8&quot; pan-head screw</td><td class="n">40</td><td class="note">Back panel to rabbets and rear edges, 6&quot; o.c.</td></tr><tr><td class="m">H06</td><td>Anti-tip wall bracket kit (pair) with fasteners</td><td class="n">1</td><td class="note">Under top at rear. Required: loaded weight over 500 lb and doors swing forward.</td></tr><tr><td class="m">H07</td><td>3 mm PVC, color-matched, radiused 1/16&quot; (≈ 1 mm)</td><td class="n">77 LF</td><td class="note">See cut list for linear feet.</td></tr><tr><td class="m">H08</td><td>Concealed hinge, 35 mm cup, 110° soft-close, clip-on, with mounting plate</td><td class="n">8</td><td class="note">2 per door. Full overlay at the left side (door A), half overlay on dividers (doors B, C, D). Fabricator to select crank to suit.</td></tr><tr><td class="m">H09</td><td>Cam lock, 3/4&quot; body, keyed alike, 2 keys per lock + master</td><td class="n">4</td><td class="note">1 per door at the free edge, 2-1/2&quot; from top.</td></tr><tr><td class="m">H10</td><td>L-strike for cam lock</td><td class="n">4</td><td class="note">On the divider or side behind each door&#x27;s free edge.</td></tr><tr><td class="m">H11</td><td>Wire pull, 96 mm (3-3/4&quot;) c.c., brushed nickel or black</td><td class="n">4</td><td class="note">1 per door, vertical, at the free edge.</td></tr><tr><td class="m">H12</td><td>Clear door bumper, 3/8&quot; dia.</td><td class="n">8</td><td class="note">2 per door, back face, free edge.</td></tr></tbody>
     </table></div>
   </section>
 
@@ -200,15 +204,15 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
       <div>
         <p class="eyebrow">Alternates · priced separately</p>
         <h2>Options the fabricator quotes as adds</h2>
-        <ul class="alts" style="margin-top:18px"><li><span>ALT-1</span><div><b>Lockable doors</b><p>4 full-overlay doors, one per column, 12-1/8&quot; W x 29-7/8&quot; H x 3/4&quot; TFM, 3 mm PVC all edges. 2 concealed 110° soft-close hinges per door (half-overlay on dividers). 1 keyed-alike cam lock per door, 1 wire pull per door (4&quot; c.c.). Adds 3/4&quot; to depth.</p></div></li><li><span>ALT-2</span><div><b>Ventilation</b><p>One 2&quot; dia. grommet hole with cap through the back panel at each bay (12), or 3 x 1/2&quot; x 6&quot; routed vent slots per bay. Needed if laptops go in warm.</p></div></li><li><span>ALT-3</span><div><b>Charging</b><p>Not in base scope. If laptops must charge inside, quote a UL-listed charging solution separately (power strips inside casework are not code-compliant).</p></div></li><li><span>ALT-4</span><div><b>Mobile base</b><p>Replace toe kick and rear rail with a 1&quot; sub-base on 4 x 3&quot; locking casters, keeping 35&quot; overall height.</p></div></li><li><span>ALT-5</span><div><b>Bay labels</b><p>Engraved or printed bay ID plates A1 to D3 on shelf fronts, 12 total.</p></div></li></ul>
+        <ul class="alts" style="margin-top:18px"><li><span>ALT-1</span><div><b>Ventilation</b><p>One 2&quot; dia. grommet with cap through the back panel at each bay (12), or routed vent slots per bay. Not needed while laptops are stored cold; useful if they go in warm.</p></div></li><li><span>ALT-2</span><div><b>Charging</b><p>Not in scope: the client has not asked for charging. If needed later, quote a UL-listed charging solution separately (power strips inside casework are not code-compliant).</p></div></li><li><span>ALT-3</span><div><b>Mobile base</b><p>Replace toe kick and rear rail with a 1&quot; sub-base on 4 x 3&quot; locking casters, keeping 35&quot; overall height.</p></div></li><li><span>ALT-4</span><div><b>Bay labels</b><p>Engraved or printed ID plates A1 to D3 on shelf fronts (12), plus A to D on door fronts (4).</p></div></li><li><span>ALT-5</span><div><b>Master-keyed locks</b><p>Locks keyed differently per door with one master key, instead of keyed alike.</p></div></li></ul>
       </div>
       <div>
         <p class="eyebrow">Open items</p>
         <h2>To confirm with the client before release</h2>
         <ol class="qs" style="margin-top:18px">
           <li>Exact laptop model and size, with or without a protective case.</li>
-          <li>Will laptops charge inside the cabinet? That changes ventilation and power (ALT-2, ALT-3).</li>
-          <li>Doors and locks, or open bays? (ALT-1)</li>
+          <li>No charging inside the cabinet is assumed. Confirm; if it changes, see ALT-1 and ALT-2.</li>
+          <li>Door pull and lock finish: brushed nickel or black.</li>
           <li>Is 35" a hard maximum, for example under a window? Glides add about 3/8".</li>
           <li>Against a wall, or freestanding with a finished back?</li>
           <li>Laminate color, and how many cabinets.</li>
@@ -224,7 +228,7 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
       <p>Send the PDF and the Excel cut list for pricing. The DXF files are for their CAD or CNC team.</p>
     </div></div>
     <div class="files">
-      <div class="file"><code>LC-60_Drawing_Set.pdf</code><p>11 sheets, 11 × 17, title-blocked.</p></div>
+      <div class="file"><code>LC-60_Drawing_Set.pdf</code><p>13 sheets, 11 × 17, title-blocked. Rev 1.</p></div>
       <div class="file"><code>LC-60_Cut_List.xlsx</code><p>Cut list, hardware, materials, alternates with a price column.</p></div>
       <div class="file"><code>LC-60_Drawings.dxf</code><p>Every view and part detail at 1:1, inches, layered.</p></div>
       <div class="file"><code>LC-60_Parts_CNC.dxf</code><p>Flat outlines of each part at 1:1 for nesting.</p></div>
@@ -293,7 +297,6 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
     const root = new THREE.Group(); scene.add(root);
     const parts = [];   // {mesh, base:Vector3 offset 0, explode:Vector3}
     const stacks = new THREE.Group(); root.add(stacks);
-    const doors = new THREE.Group(); root.add(doors);
     const lineMat = new THREE.LineBasicMaterial({ color: pal.line, transparent: true, opacity: 0.85 });
 
     function boxGeom(b) {
@@ -333,17 +336,37 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
         case 'Toe kick': v.y = -10; v.z = -1; break;
         case 'Rear rail': v.y = 9; v.z = -9; break;
       }
+      if (inst.door) { v.x = 14; v.y = -12; v.z = -40; }
       return v;
     }
 
+    const doorParts = [];
     data.instances.forEach(inst => {
       const geom = inst.profile ? profileGeom(inst) : boxGeom(inst.box);
       let color = pal.board;
       if (inst.mark === 'P08') color = pal.back;
       if (inst.mark === 'P06') color = pal.kick;
-      const g = addMesh(root, geom, color);
       const e = explodeFor(inst);
-      parts.push({ group: g, inst, explode: new THREE.Vector3(e.x, e.z, -e.y) });
+      const part = { inst, explode: new THREE.Vector3(e.x, e.z, -e.y), base: new THREE.Vector3() };
+      if (inst.door) {
+        // pivot on the hinge line (left edge, back face of the door)
+        const hx = inst.door.hinge_x;
+        geom.translate(-hx, 0, 0);
+        const pivot = new THREE.Group(); pivot.position.set(hx, 0, 0); root.add(pivot);
+        const g = addMesh(pivot, geom, color);
+        // hardware: pull and lock on the free edge
+        const b = inst.box, w = b[3] - b[0];
+        const hw = new THREE.MeshLambertMaterial({ color: 0x3a3d42 });
+        const pull = new THREE.Mesh(new THREE.BoxGeometry(0.35, 4.3, 0.35), hw);
+        pull.position.set(w - 1.25, b[5] - 5 - 1.875, 1.0 + 0.45 + 0.18); pivot.add(pull);
+        const lock = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.25, 20), hw);
+        lock.rotation.x = Math.PI / 2; lock.position.set(w - 1.25, b[5] - 2.5, 1.0 + 0.12); pivot.add(lock);
+        part.group = pivot; part.base.set(hx, 0, 0);
+        doorParts.push(pivot);
+      } else {
+        part.group = addMesh(root, geom, color);
+      }
+      parts.push(part);
     });
 
     // laptop stacks
@@ -357,18 +380,13 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
     });
     stacks.visible = false;
 
-    // ALT-1 doors (phantom)
-    (function () {
-      const d = data.door, n = data.COLS;
-      for (let i = 0; i < n; i++) {
-        const x0 = i * (W / n) + d.gap / 2;
-        addMesh(doors, boxGeom([x0, -d.t, data.BASE_H + d.gap / 2, x0 + d.w, 0, data.BASE_H + d.gap / 2 + d.h]),
-          pal.door, pal.ghost, { transparent: true, opacity: 0.45 });
-      }
-    })();
-    doors.visible = false;
 
     let explodeT = 0, explodeTarget = 0, needs = true;
+    let doorState = 'closed', doorT = 0, doorTarget = 0;
+    const OPEN_ANGLE = -100 * Math.PI / 180;
+    function applyDoors() {
+      doorParts.forEach(p => { p.rotation.y = OPEN_ANGLE * doorT; p.visible = doorState !== 'off'; });
+    }
 
     function setMode(m) {
       stacks.visible = (m === 'loaded');
@@ -376,14 +394,19 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
       if (opts.instant) { explodeT = explodeTarget; applyExplode(); }
       needs = true;
     }
-    function setDoors(on) { doors.visible = !!on; needs = true; }
+    function setDoors(state) {
+      doorState = state === true ? 'closed' : (state === false ? 'off' : state);
+      doorTarget = doorState === 'open' ? 1 : 0;
+      if (opts.instant || doorState === 'off') doorT = doorTarget;
+      applyDoors(); needs = true;
+    }
     function applyExplode() {
-      parts.forEach(p => p.group.position.copy(p.explode).multiplyScalar(explodeT));
+      parts.forEach(p => p.group.position.copy(p.explode).multiplyScalar(explodeT).add(p.base));
     }
 
     const VIEWS = {
       iso: [-1.05, 0.62, 1.15], front: [0, 0.02, 1], side: [-1, 0.02, 0.0001], rear: [0.9, 0.55, -1.1], top: [0, 1, 0.001],
-      iso_r: [1.05, 0.62, 1.15],
+      iso_r: [1.05, 0.62, 1.15], open: [0.5, 0.5, 1.2],
     };
     function setView(name, dist) {
       const v = new THREE.Vector3(...(VIEWS[name] || VIEWS.iso)).normalize();
@@ -427,12 +450,17 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
         explodeT += (explodeTarget - explodeT) * 0.14; applyExplode(); needs = true;
         if (Math.abs(explodeT - explodeTarget) <= 1e-3) { explodeT = explodeTarget; applyExplode(); }
       }
+      if (Math.abs(doorT - doorTarget) > 1e-3) {
+        doorT += (doorTarget - doorT) * 0.12; if (Math.abs(doorT - doorTarget) <= 1e-3) doorT = doorTarget;
+        applyDoors(); needs = true;
+      }
       if (controls) controls.update();
       if (needs) { renderer.render(scene, camera); needs = false; }
       if (!opts.instant) requestAnimationFrame(frame);
     }
-    function renderNow() { applyExplode(); renderer.render(scene, camera); }
+    function renderNow() { applyExplode(); applyDoors(); renderer.render(scene, camera); }
 
+    applyDoors();
     resize(); setView(opts.view || 'iso');
     if (window.ResizeObserver) new ResizeObserver(resize).observe(container);
     if (!opts.instant) requestAnimationFrame(frame);
@@ -445,8 +473,8 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--line); color: var
 })();
 </script>
 <script>
-const DATA = {"W": 49.0, "D": 16.0, "H": 35.0, "T": 1.0, "BACK_T": 0.5, "BASE_H": 4.0, "KICK_SETBACK": 3.0, "COLS": 4, "TIERS": 3, "OPEN_W": 11.0, "OPEN_H": 9.0, "INT_D": 15.5, "LAPTOP": {"w": 10.0, "d": 14.0, "t": 1.5, "stack": 5}, "instances": [{"mark": "P01", "box": [0, 0, 34.0, 49.0, 16.0, 35.0], "label": "Top"}, {"mark": "P02", "box": [0, 0, 0, 1.0, 16.0, 34.0], "label": "Side L", "profile": [[3.0, 0], [16.0, 0], [16.0, 34.0], [0, 34.0], [0, 4.0], [3.0, 4.0]]}, {"mark": "P02", "box": [48.0, 0, 0, 49.0, 16.0, 34.0], "label": "Side R", "profile": [[3.0, 0], [16.0, 0], [16.0, 34.0], [0, 34.0], [0, 4.0], [3.0, 4.0]]}, {"mark": "P03", "box": [1.0, 0, 4.0, 48.0, 15.5, 5.0], "label": "Bottom deck"}, {"mark": "P04", "box": [1.0, 0, 14.0, 48.0, 15.5, 15.0], "label": "Shelf 1"}, {"mark": "P04", "box": [1.0, 0, 24.0, 48.0, 15.5, 25.0], "label": "Shelf 2"}, {"mark": "P05", "box": [12.0, 0, 5.0, 13.0, 15.5, 14.0], "label": "Divider t1-1", "tier": 0}, {"mark": "P05", "box": [24.0, 0, 5.0, 25.0, 15.5, 14.0], "label": "Divider t1-2", "tier": 0}, {"mark": "P05", "box": [36.0, 0, 5.0, 37.0, 15.5, 14.0], "label": "Divider t1-3", "tier": 0}, {"mark": "P05", "box": [12.0, 0, 15.0, 13.0, 15.5, 24.0], "label": "Divider t2-1", "tier": 1}, {"mark": "P05", "box": [24.0, 0, 15.0, 25.0, 15.5, 24.0], "label": "Divider t2-2", "tier": 1}, {"mark": "P05", "box": [36.0, 0, 15.0, 37.0, 15.5, 24.0], "label": "Divider t2-3", "tier": 1}, {"mark": "P05", "box": [12.0, 0, 25.0, 13.0, 15.5, 34.0], "label": "Divider t3-1", "tier": 2}, {"mark": "P05", "box": [24.0, 0, 25.0, 25.0, 15.5, 34.0], "label": "Divider t3-2", "tier": 2}, {"mark": "P05", "box": [36.0, 0, 25.0, 37.0, 15.5, 34.0], "label": "Divider t3-3", "tier": 2}, {"mark": "P06", "box": [1.0, 3.0, 0, 48.0, 4.0, 4.0], "label": "Toe kick"}, {"mark": "P07", "box": [1.0, 14.5, 0, 48.0, 15.5, 4.0], "label": "Rear rail"}, {"mark": "P08", "box": [0.5, 15.5, 4.0, 48.5, 16.0, 34.0], "label": "Back"}], "stacks": [{"col": 0, "tier": 0, "id": "A1", "box": [1.5, 0.75, 5.0, 11.5, 14.75, 12.5]}, {"col": 1, "tier": 0, "id": "B1", "box": [13.5, 0.75, 5.0, 23.5, 14.75, 12.5]}, {"col": 2, "tier": 0, "id": "C1", "box": [25.5, 0.75, 5.0, 35.5, 14.75, 12.5]}, {"col": 3, "tier": 0, "id": "D1", "box": [37.5, 0.75, 5.0, 47.5, 14.75, 12.5]}, {"col": 0, "tier": 1, "id": "A2", "box": [1.5, 0.75, 15.0, 11.5, 14.75, 22.5]}, {"col": 1, "tier": 1, "id": "B2", "box": [13.5, 0.75, 15.0, 23.5, 14.75, 22.5]}, {"col": 2, "tier": 1, "id": "C2", "box": [25.5, 0.75, 15.0, 35.5, 14.75, 22.5]}, {"col": 3, "tier": 1, "id": "D2", "box": [37.5, 0.75, 15.0, 47.5, 14.75, 22.5]}, {"col": 0, "tier": 2, "id": "A3", "box": [1.5, 0.75, 25.0, 11.5, 14.75, 32.5]}, {"col": 1, "tier": 2, "id": "B3", "box": [13.5, 0.75, 25.0, 23.5, 14.75, 32.5]}, {"col": 2, "tier": 2, "id": "C3", "box": [25.5, 0.75, 25.0, 35.5, 14.75, 32.5]}, {"col": 3, "tier": 2, "id": "D3", "box": [37.5, 0.75, 25.0, 47.5, 14.75, 32.5]}], "parts": [{"mark": "P01", "name": "Top", "qty": 1, "L": 49.0, "Wd": 16.0, "T": 1.0, "mat": "M1"}, {"mark": "P02", "name": "Side panel (left & right, mirror pair)", "qty": 2, "L": 34.0, "Wd": 16.0, "T": 1.0, "mat": "M1"}, {"mark": "P03", "name": "Bottom deck", "qty": 1, "L": 47.0, "Wd": 15.5, "T": 1.0, "mat": "M1"}, {"mark": "P04", "name": "Fixed shelf", "qty": 2, "L": 47.0, "Wd": 15.5, "T": 1.0, "mat": "M1"}, {"mark": "P05", "name": "Vertical divider", "qty": 9, "L": 9.0, "Wd": 15.5, "T": 1.0, "mat": "M1"}, {"mark": "P06", "name": "Toe kick", "qty": 1, "L": 47.0, "Wd": 4.0, "T": 1.0, "mat": "M1"}, {"mark": "P07", "name": "Rear base rail", "qty": 1, "L": 47.0, "Wd": 4.0, "T": 1.0, "mat": "M1"}, {"mark": "P08", "name": "Back panel", "qty": 1, "L": 48.0, "Wd": 30.0, "T": 0.5, "mat": "M2"}], "door": {"w": 12.125, "h": 29.875, "t": 0.75, "gap": 0.125}};
-const SHEETS = [["A-001", "Cover, design basis, notes"], ["A-101", "Front elevation"], ["A-102", "Section A-A, side elevation, bay"], ["A-103", "Top plan, plan section B-B"], ["A-104", "Front elevation, loaded"], ["A-201", "Isometric views"], ["A-202", "Exploded isometric"], ["A-301", "Part details 1"], ["A-302", "Part details 2"], ["A-401", "Cut list and hardware"], ["A-501", "Alternates, quote request"]];
+const DATA = {"W": 49.0, "D": 18.0, "H": 35.0, "T": 1.0, "BACK_T": 0.5, "BASE_H": 4.0, "KICK_SETBACK": 3.0, "COLS": 4, "TIERS": 3, "OPEN_W": 11.0, "OPEN_H": 9.0, "INT_D": 17.5, "LAPTOP": {"w": 10.0, "d": 14.0, "t": 1.5, "stack": 5}, "instances": [{"mark": "P01", "box": [0, 0, 34.0, 49.0, 18.0, 35.0], "label": "Top"}, {"mark": "P02", "box": [0, 0, 0, 1.0, 18.0, 34.0], "label": "Side L", "profile": [[3.0, 0], [18.0, 0], [18.0, 34.0], [0, 34.0], [0, 4.0], [3.0, 4.0]]}, {"mark": "P02", "box": [48.0, 0, 0, 49.0, 18.0, 34.0], "label": "Side R", "profile": [[3.0, 0], [18.0, 0], [18.0, 34.0], [0, 34.0], [0, 4.0], [3.0, 4.0]]}, {"mark": "P03", "box": [1.0, 0, 4.0, 48.0, 17.5, 5.0], "label": "Bottom deck"}, {"mark": "P04", "box": [1.0, 0, 14.0, 48.0, 17.5, 15.0], "label": "Shelf 1"}, {"mark": "P04", "box": [1.0, 0, 24.0, 48.0, 17.5, 25.0], "label": "Shelf 2"}, {"mark": "P05", "box": [12.0, 0, 5.0, 13.0, 17.5, 14.0], "label": "Divider t1-1", "tier": 0}, {"mark": "P05", "box": [24.0, 0, 5.0, 25.0, 17.5, 14.0], "label": "Divider t1-2", "tier": 0}, {"mark": "P05", "box": [36.0, 0, 5.0, 37.0, 17.5, 14.0], "label": "Divider t1-3", "tier": 0}, {"mark": "P05", "box": [12.0, 0, 15.0, 13.0, 17.5, 24.0], "label": "Divider t2-1", "tier": 1}, {"mark": "P05", "box": [24.0, 0, 15.0, 25.0, 17.5, 24.0], "label": "Divider t2-2", "tier": 1}, {"mark": "P05", "box": [36.0, 0, 15.0, 37.0, 17.5, 24.0], "label": "Divider t2-3", "tier": 1}, {"mark": "P05", "box": [12.0, 0, 25.0, 13.0, 17.5, 34.0], "label": "Divider t3-1", "tier": 2}, {"mark": "P05", "box": [24.0, 0, 25.0, 25.0, 17.5, 34.0], "label": "Divider t3-2", "tier": 2}, {"mark": "P05", "box": [36.0, 0, 25.0, 37.0, 17.5, 34.0], "label": "Divider t3-3", "tier": 2}, {"mark": "P06", "box": [1.0, 3.0, 0, 48.0, 4.0, 4.0], "label": "Toe kick"}, {"mark": "P07", "box": [1.0, 16.5, 0, 48.0, 17.5, 4.0], "label": "Rear rail"}, {"mark": "P08", "box": [0.5, 17.5, 4.0, 48.5, 18.0, 34.0], "label": "Back"}, {"mark": "P09", "box": [0.0, -1.0, 4.0, 12.4375, 0, 33.9375], "label": "Door A", "door": {"hinge_x": 0.0}}, {"mark": "P10", "box": [12.5625, -1.0, 4.0, 24.4375, 0, 33.9375], "label": "Door B", "door": {"hinge_x": 12.5625}}, {"mark": "P10", "box": [24.5625, -1.0, 4.0, 36.4375, 0, 33.9375], "label": "Door C", "door": {"hinge_x": 24.5625}}, {"mark": "P09", "box": [36.5625, -1.0, 4.0, 49.0, 0, 33.9375], "label": "Door D", "door": {"hinge_x": 36.5625}}], "stacks": [{"col": 0, "tier": 0, "id": "A1", "box": [1.5, 3.0, 5.0, 11.5, 17.0, 12.5]}, {"col": 1, "tier": 0, "id": "B1", "box": [13.5, 3.0, 5.0, 23.5, 17.0, 12.5]}, {"col": 2, "tier": 0, "id": "C1", "box": [25.5, 3.0, 5.0, 35.5, 17.0, 12.5]}, {"col": 3, "tier": 0, "id": "D1", "box": [37.5, 3.0, 5.0, 47.5, 17.0, 12.5]}, {"col": 0, "tier": 1, "id": "A2", "box": [1.5, 3.0, 15.0, 11.5, 17.0, 22.5]}, {"col": 1, "tier": 1, "id": "B2", "box": [13.5, 3.0, 15.0, 23.5, 17.0, 22.5]}, {"col": 2, "tier": 1, "id": "C2", "box": [25.5, 3.0, 15.0, 35.5, 17.0, 22.5]}, {"col": 3, "tier": 1, "id": "D2", "box": [37.5, 3.0, 15.0, 47.5, 17.0, 22.5]}, {"col": 0, "tier": 2, "id": "A3", "box": [1.5, 3.0, 25.0, 11.5, 17.0, 32.5]}, {"col": 1, "tier": 2, "id": "B3", "box": [13.5, 3.0, 25.0, 23.5, 17.0, 32.5]}, {"col": 2, "tier": 2, "id": "C3", "box": [25.5, 3.0, 25.0, 35.5, 17.0, 32.5]}, {"col": 3, "tier": 2, "id": "D3", "box": [37.5, 3.0, 25.0, 47.5, 17.0, 32.5]}], "parts": [{"mark": "P01", "name": "Top", "qty": 1, "L": 49.0, "Wd": 18.0, "T": 1.0, "mat": "M1"}, {"mark": "P02", "name": "Side panel (left & right, mirror pair)", "qty": 2, "L": 34.0, "Wd": 18.0, "T": 1.0, "mat": "M1"}, {"mark": "P03", "name": "Bottom deck", "qty": 1, "L": 47.0, "Wd": 17.5, "T": 1.0, "mat": "M1"}, {"mark": "P04", "name": "Fixed shelf", "qty": 2, "L": 47.0, "Wd": 17.5, "T": 1.0, "mat": "M1"}, {"mark": "P05", "name": "Vertical divider", "qty": 9, "L": 9.0, "Wd": 17.5, "T": 1.0, "mat": "M1"}, {"mark": "P06", "name": "Toe kick", "qty": 1, "L": 47.0, "Wd": 4.0, "T": 1.0, "mat": "M1"}, {"mark": "P07", "name": "Rear base rail", "qty": 1, "L": 47.0, "Wd": 4.0, "T": 1.0, "mat": "M1"}, {"mark": "P08", "name": "Back panel", "qty": 1, "L": 48.0, "Wd": 30.0, "T": 0.5, "mat": "M2"}, {"mark": "P09", "name": "Door, end (A and D)", "qty": 2, "L": 29.9375, "Wd": 12.4375, "T": 1.0, "mat": "M1"}, {"mark": "P10", "name": "Door, center (B and C)", "qty": 2, "L": 29.9375, "Wd": 11.875, "T": 1.0, "mat": "M1"}], "OVERALL_D": 19.0};
+const SHEETS = [["A-001", "Cover, design basis, notes"], ["A-101", "Front elevation, doors closed"], ["A-102", "Interior elevation, doors removed"], ["A-103", "Section A-A, side elevation, bay"], ["A-104", "Top plan, plan section B-B"], ["A-105", "Interior elevation, loaded"], ["A-201", "Isometric views"], ["A-202", "Exploded isometric"], ["A-301", "Part details 1"], ["A-302", "Part details 2"], ["A-303", "Door details"], ["A-401", "Cut list and hardware"], ["A-501", "Alternates, quote request"]];
 (function () {
   const el = document.getElementById('three');
   let cab = null;
@@ -456,8 +484,9 @@ const SHEETS = [["A-001", "Cover, design basis, notes"], ["A-101", "Front elevat
   }
   try {
     if (!window.THREE) throw new Error('3D library did not load');
-    cab = Cabinet3D.create(el, DATA, { distance: 112, palette: { bg: cssColor('--canvas') } });
+    cab = Cabinet3D.create(el, DATA, { distance: 132, view: 'open', palette: { bg: cssColor('--canvas') } });
     cab.setMode('loaded');
+    cab.setDoors('open');
   } catch (e) {
     el.innerHTML = '<p class="err">The 3D view could not start here (' + e.message + '). The drawing set below has the same model as isometric views.</p>';
   }
@@ -468,7 +497,9 @@ const SHEETS = [["A-001", "Cover, design basis, notes"], ["A-101", "Front elevat
   document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
     press('[data-view]', b); if (cab) cab.setView(b.dataset.view);
   }));
-  document.getElementById('doors').addEventListener('change', e => { if (cab) cab.setDoors(e.target.checked); });
+  document.querySelectorAll('[data-doors]').forEach(b => b.addEventListener('click', () => {
+    press('[data-doors]', b); if (cab) cab.setDoors(b.dataset.doors);
+  }));
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
   const retheme = () => cab && cab.setPalette({ bg: cssColor('--canvas') });
   mq.addEventListener && mq.addEventListener('change', retheme);

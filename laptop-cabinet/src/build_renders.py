@@ -16,14 +16,16 @@ OUT = os.path.join(HERE, "..", "out", "renders")
 CALLOUTS = [  # label, mark, anchor fractions within the part box (fx, fy, fz), dx, dy (px)
     ("Top", "P01", (0.25, 0.5, 1.0), -130, -30),
     ("Back", "P08", (0.04, 1.0, 0.92), -150, -10),
-    ("Side L", "P02", (0.0, 0.55, 0.45), -120, 20),
+    ("Side L", "P02", (0.0, 0.55, 0.45), -110, 70),
     ("Side R", "P02", (0.0, 0.6, 0.6), 130, 0),
     ("Shelf 2", "P04", (0.12, 0.15, 1.0), -170, 0),
     ("Shelf 1", "P04", (0.12, 0.15, 1.0), -170, 0),
     ("Bottom deck", "P03", (0.12, 0.15, 1.0), -170, 0),
     ("Divider t3-3", "P05", (0.0, 0.4, 0.6), 150, -50),
-    ("Toe kick", "P06", (0.55, 0.0, 0.5), 60, 75),
+    ("Toe kick", "P06", (0.55, 0.0, 0.5), 190, -20),
     ("Rear rail", "P07", (0.92, 0.0, 0.9), 170, -40),
+    ("Door A", "P09", (0.5, 0.0, 0.3), -150, 30),
+    ("Door B", "P10", (0.5, 0.0, 0.25), 60, 90),
 ]
 
 PAGE = """<!doctype html><html><head><meta charset="utf-8">
@@ -46,7 +48,7 @@ const cab = Cabinet3D.create(document.getElementById('v'), DATA,
   {ortho:true, instant:true, interactive:false, preserve:true, pixelRatio:2,
    palette:{bg:0xffffff}});
 window.show = function(o){
-  cab.setDoors(!!o.doors);
+  cab.setDoors(o.doors || 'closed');
   cab.setMode(o.mode);
   cab.setView(o.view);
   cab.camera.zoom = o.zoom || 1.55; cab.camera.updateProjectionMatrix();

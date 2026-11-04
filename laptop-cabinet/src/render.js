@@ -11,12 +11,11 @@ const path = require('path');
   await page.goto('file://' + path.resolve(page_html));
   await page.waitForFunction(() => window.ready === true);
   const shots = [
-    ['iso_empty', { mode: 'empty', view: 'iso' }],
-    ['iso_loaded', { mode: 'loaded', view: 'iso' }],
-    ['exploded', { mode: 'exploded', view: 'iso', callouts: true, zoom: 0.92, lift: 9 }],
-    ['rear_iso', { mode: 'empty', view: 'rear' }],
-    ['iso_doors', { mode: 'empty', view: 'iso', doors: true }],
-    ['front_loaded', { mode: 'loaded', view: 'front' }],
+    ['iso_closed', { mode: 'empty', view: 'iso', doors: 'closed' }],
+    ['iso_open_loaded', { mode: 'loaded', view: 'open', doors: 'open' }],
+    ['iso_nodoors', { mode: 'empty', view: 'iso', doors: 'off' }],
+    ['rear_iso', { mode: 'empty', view: 'rear', doors: 'closed' }],
+    ['exploded', { mode: 'exploded', view: 'iso', doors: 'closed', callouts: true, zoom: 0.7, lift: -6 }],
   ];
   for (const [name, o] of shots) {
     await page.evaluate(o => window.show(o), o);
