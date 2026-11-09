@@ -102,9 +102,10 @@ MATERIALS = {
 }
 EDGEBAND = "3 mm PVC, color-matched, radiused 1/16\" (≈ 1 mm)"
 
-# ---------------------------------------------------------------- doors (base scope, rev 1)
-# One door per column, all hinged on the LEFT. Door joints are centered on the dividers;
-# outer edges are flush with the sides. Bottom flush with underside of the bottom deck.
+# ---------------------------------------------------------------- doors (base scope, rev 2)
+# Two doors, each covering two columns, both hinged on the CENTER divider and swinging outward.
+# The joint is centered on the center divider; outer (free) edges are flush with the sides.
+# Bottom flush with underside of the bottom deck. Rev 1 had four left-hinged doors.
 def divider_center(i):
     return divider_x(i) + T / 2
 
@@ -112,17 +113,23 @@ def divider_center(i):
 DOOR_Z0 = BASE_H
 DOOR_Z1 = SIDE_H - 1 / 16
 DOOR_H = DOOR_Z1 - DOOR_Z0                            # 29-15/16
-DOORS = []
-for _c in range(COLS):
-    _x0 = 0.0 if _c == 0 else divider_center(_c - 1) + DOOR_GAP / 2
-    _x1 = W if _c == COLS - 1 else divider_center(_c) - DOOR_GAP / 2
-    DOORS.append(dict(col=_c, id="ABCD"[_c], x0=_x0, x1=_x1, w=_x1 - _x0,
-                      mark="P09" if _c in (0, COLS - 1) else "P10"))
-END_DOOR_W = DOORS[0]["w"]                            # 12-7/16
-MID_DOOR_W = DOORS[1]["w"]                            # 11-7/8
+CENTER_DIV = (COLS - 1) // 2                          # divider index 1 (x 24..25)
+_JOINT = divider_center(CENTER_DIV)                   # 24-1/2
+DOORS = [
+    dict(id="L", name="Left", x0=0.0, x1=_JOINT - DOOR_GAP / 2, hinge="R", cols="A and B", mark="P09"),
+    dict(id="R", name="Right", x0=_JOINT + DOOR_GAP / 2, x1=W, hinge="L", cols="C and D", mark="P09"),
+]
+for _d in DOORS:
+    _d["w"] = _d["x1"] - _d["x0"]
+    _d["hinge_x"] = _d["x1"] if _d["hinge"] == "R" else _d["x0"]   # hinge line
+    _d["free_x"] = _d["x0"] if _d["hinge"] == "R" else _d["x1"]
+DOOR_W = DOORS[0]["w"]                                # 24-7/16
+DOOR_OPEN_BOTH = 85          # degrees: both doors open together stand back to back
+DOOR_OPEN_ONE = 110          # degrees: one door alone opens fully
 HINGE_CUP_DIA = 35 / 25.4
 HINGE_CUP_X = 7 / 8          # cup center from hinge edge
-HINGE_CUP_Z = 3.0            # cup centers from top and bottom of door
+HINGE_CUP_Z = 3.0            # top and bottom cup centers from door ends; third cup at mid-height
+HINGES_PER_DOOR = 3
 LOCK_DIA = 3 / 4
 LOCK_FROM_EDGE = 1.25        # lock and pull centerline from free edge
 LOCK_FROM_TOP = 2.5
@@ -130,15 +137,17 @@ PULL_CC = 3.75               # 96 mm wire pull
 PULL_TOP_FROM_TOP = 5.0
 
 
-def door_holes(w, h):
-    """Drilling for a left-hinged door, viewed from the OUTSIDE face. (u, v, dia, kind)."""
-    return [
-        (HINGE_CUP_X, HINGE_CUP_Z, HINGE_CUP_DIA, "cup"),
-        (HINGE_CUP_X, h - HINGE_CUP_Z, HINGE_CUP_DIA, "cup"),
+def door_holes(w, h, hinge="L"):
+    """Drilling viewed from the OUTSIDE face, u from the door's left edge. (u, v, dia, kind).
+    hinge = "L" (hinge edge at left: the right door) or "R" (the left door, mirror)."""
+    holes = [(HINGE_CUP_X, z, HINGE_CUP_DIA, "cup") for z in (HINGE_CUP_Z, h / 2, h - HINGE_CUP_Z)] + [
         (w - LOCK_FROM_EDGE, h - LOCK_FROM_TOP, LOCK_DIA, "lock"),
         (w - LOCK_FROM_EDGE, h - PULL_TOP_FROM_TOP, 3 / 16, "pull"),
         (w - LOCK_FROM_EDGE, h - PULL_TOP_FROM_TOP - PULL_CC, 3 / 16, "pull"),
     ]
+    if hinge == "R":
+        holes = [(w - u, v, dia, k) for (u, v, dia, k) in holes]
+    return holes
 
 
 # ---------------------------------------------------------------- parts
@@ -168,13 +177,11 @@ PARTS = [
     dict(mark="P07", name="Rear base rail", qty=1, L=INT_W, Wd=BASE_H, mat="M1",
          eb=[], eb_len=0,
          notes="Between sides under rear of bottom deck, back face flush with back of deck."),
-    dict(mark="P09", name="Door, end (A and D)", qty=2, L=DOOR_H, Wd=END_DOOR_W, mat="M1",
-         eb=["L1", "L2", "W1", "W2"], eb_len=2 * DOOR_H + 2 * END_DOOR_W,
-         notes="Hinged left. Outer edge flush with side. 2 x 35 mm hinge cups (inside face), "
-               "3/4\" lock hole and 2 pull holes at the free edge. See A-303. Band all 4 edges."),
-    dict(mark="P10", name="Door, center (B and C)", qty=2, L=DOOR_H, Wd=MID_DOOR_W, mat="M1",
-         eb=["L1", "L2", "W1", "W2"], eb_len=2 * DOOR_H + 2 * MID_DOOR_W,
-         notes="Hinged left on a divider (half overlay). Same drilling as P09. See A-303. Band all 4 edges."),
+    dict(mark="P09", name="Door (left & right, mirror pair)", qty=2, L=DOOR_H, Wd=DOOR_W, mat="M1",
+         eb=["L1", "L2", "W1", "W2"], eb_len=2 * DOOR_H + 2 * DOOR_W,
+         notes="Both hinged on the center divider (half overlay), swinging outward; free edge flush with "
+               "the side. 3 x 35 mm hinge cups (inside face), 3/4\" lock hole and 2 pull holes at the free "
+               "edge. Make one left and one right. See A-303. Band all 4 edges."),
     dict(mark="P08", name="Back panel", qty=1, L=INT_W + 2 * BACK_T,
          Wd=H - T - BASE_H, mat="M2", eb=[], eb_len=0,
          notes="Captured in side rabbets, screwed to rear edges of deck, shelves and dividers "
@@ -219,7 +226,7 @@ _add("P07", (T, INT_D - T, 0, W - T, INT_D, BASE_H), "Rear rail")
 _add("P08", (T - BACK_T, INT_D, BASE_H, W - T + BACK_T, D, SIDE_H), "Back")
 for _d in DOORS:
     _add(_d["mark"], (_d["x0"], -DOOR_T, DOOR_Z0, _d["x1"], 0, DOOR_Z1), f"Door {_d['id']}",
-         door=dict(hinge_x=_d["x0"]))
+         door=dict(hinge_x=_d["hinge_x"], hinge=_d["hinge"]))
 
 # laptop stacks: centered side to side, pushed toward the back (1/2" from back panel)
 LAPTOP_Y0 = INT_D - LAPTOP_D - REAR_GAP  # 3"
@@ -246,16 +253,17 @@ HARDWARE = [
     dict(mark="H06", item="Anti-tip wall bracket kit (pair) with fasteners", qty=1,
          notes="Under top at rear. Required: loaded weight over 500 lb and doors swing forward."),
     dict(mark="H07", item=EDGEBAND, qty=None, notes="See cut list for linear feet."),
-    dict(mark="H08", item="Concealed hinge, 35 mm cup, 110° soft-close, clip-on, with mounting plate", qty=2 * COLS,
-         notes="2 per door. Full overlay at the left side (door A), half overlay on dividers (doors B, C, D). "
-               "Fabricator to select crank to suit."),
-    dict(mark="H09", item="Cam lock, 3/4\" body, keyed alike, 2 keys per lock + master", qty=COLS,
-         notes="1 per door at the free edge, 2-1/2\" from top."),
-    dict(mark="H10", item="L-strike for cam lock", qty=COLS,
-         notes="On the divider or side behind each door's free edge."),
-    dict(mark="H11", item="Wire pull, 96 mm (3-3/4\") c.c., brushed nickel or black", qty=COLS,
-         notes="1 per door, vertical, at the free edge."),
-    dict(mark="H12", item="Clear door bumper, 3/8\" dia.", qty=2 * COLS, notes="2 per door, back face, free edge."),
+    dict(mark="H08", item="Concealed hinge, 35 mm cup, 110° soft-close, half overlay, clip-on, with mounting plate",
+         qty=HINGES_PER_DOOR * len(DOORS),
+         notes="3 per door, all on the center divider (left door on its left face, right door on its right face). "
+               "Fabricator to select crank for a 7/16\" overlay on the 1\" divider."),
+    dict(mark="H09", item="Cam lock, 3/4\" body, keyed alike, 2 keys per lock + master", qty=len(DOORS),
+         notes="1 per door at the outer (free) edge, 2-1/2\" from top."),
+    dict(mark="H10", item="L-strike for cam lock", qty=len(DOORS),
+         notes="On the inside face of each side panel, behind the door's free edge."),
+    dict(mark="H11", item="Wire pull, 96 mm (3-3/4\") c.c., brushed nickel or black", qty=len(DOORS),
+         notes="1 per door, vertical, at the outer (free) edge."),
+    dict(mark="H12", item="Clear door bumper, 3/8\" dia.", qty=2 * len(DOORS), notes="2 per door, back face, free edge."),
 ]
 
 # ---------------------------------------------------------------- alternates (priced separately)
@@ -269,7 +277,7 @@ ALTERNATES = [
     dict(mark="ALT-3", title="Mobile base",
          desc="Replace toe kick and rear rail with a 1\" sub-base on 4 x 3\" locking casters, keeping 35\" overall height."),
     dict(mark="ALT-4", title="Bay labels",
-         desc="Engraved or printed ID plates A1 to D3 on shelf fronts (12), plus A to D on door fronts (4)."),
+         desc="Engraved or printed ID plates A1 to D3 on shelf fronts (12), plus Left and Right on the door fronts (2)."),
     dict(mark="ALT-5", title="Master-keyed locks",
          desc="Locks keyed differently per door with one master key, instead of keyed alike."),
 ]
@@ -287,7 +295,7 @@ def to_json():
         LAPTOP=dict(w=LAPTOP_W, d=LAPTOP_D, t=LAPTOP_T, stack=STACK),
         instances=INSTANCES, stacks=STACKS,
         parts=[{k: p[k] for k in ("mark", "name", "qty", "L", "Wd", "T", "mat")} for p in PARTS],
-        OVERALL_D=OVERALL_D,
+        OVERALL_D=OVERALL_D, DOOR_OPEN=DOOR_OPEN_BOTH,
     )
 
 

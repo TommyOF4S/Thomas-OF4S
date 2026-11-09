@@ -102,19 +102,22 @@
       const e = explodeFor(inst);
       const part = { inst, explode: new THREE.Vector3(e.x, e.z, -e.y), base: new THREE.Vector3() };
       if (inst.door) {
-        // pivot on the hinge line (left edge, back face of the door)
-        const hx = inst.door.hinge_x;
-        geom.translate(-hx, 0, 0);
-        const pivot = new THREE.Group(); pivot.position.set(hx, 0, 0); root.add(pivot);
+        // pivot on the hinge line (hinge edge, back face of the door)
+        const hx = inst.door.hinge_x, hingeR = inst.door.hinge === 'R';
+        // pivot at the OUTSIDE face of the hinge edge so a door pair on one divider clears itself
+        geom.translate(-hx, 0, -1.0);
+        const pivot = new THREE.Group(); pivot.position.set(hx, 0, 1.0); root.add(pivot);
         const g = addMesh(pivot, geom, color);
         // hardware: pull and lock on the free edge
         const b = inst.box, w = b[3] - b[0];
+        const fx = hingeR ? -w + 1.25 : w - 1.25;   // free-edge hardware line, pivot-local
         const hw = new THREE.MeshLambertMaterial({ color: 0x3a3d42 });
         const pull = new THREE.Mesh(new THREE.BoxGeometry(0.35, 4.3, 0.35), hw);
-        pull.position.set(w - 1.25, b[5] - 5 - 1.875, 1.0 + 0.45 + 0.18); pivot.add(pull);
+        pull.position.set(fx, b[5] - 5 - 1.875, 0.45 + 0.18); pivot.add(pull);
         const lock = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.25, 20), hw);
-        lock.rotation.x = Math.PI / 2; lock.position.set(w - 1.25, b[5] - 2.5, 1.0 + 0.12); pivot.add(lock);
-        part.group = pivot; part.base.set(hx, 0, 0);
+        lock.rotation.x = Math.PI / 2; lock.position.set(fx, b[5] - 2.5, 0.12); pivot.add(lock);
+        pivot.userData.sign = hingeR ? -1 : 1;
+        part.group = pivot; part.base.set(hx, 0, 1.0);
         doorParts.push(pivot);
       } else {
         part.group = addMesh(root, geom, color);
@@ -136,9 +139,9 @@
 
     let explodeT = 0, explodeTarget = 0, needs = true;
     let doorState = 'closed', doorT = 0, doorTarget = 0;
-    const OPEN_ANGLE = -100 * Math.PI / 180;
+    const OPEN_ANGLE = -(data.DOOR_OPEN || 85) * Math.PI / 180;
     function applyDoors() {
-      doorParts.forEach(p => { p.rotation.y = OPEN_ANGLE * doorT; p.visible = doorState !== 'off'; });
+      doorParts.forEach(p => { p.rotation.y = OPEN_ANGLE * doorT * (p.userData.sign || 1); p.visible = doorState !== 'off'; });
     }
 
     function setMode(m) {

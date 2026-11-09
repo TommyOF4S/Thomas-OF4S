@@ -2,7 +2,9 @@
 
 Custom casework package for a client who needs to store 60 laptops (10" x 14" x 1-1/2", stacked no more than 5 high) in one lockable cabinet about 35" tall. Everything a fabricator needs to price it is in `out/`.
 
-**Rev 1 (Nov 4, 2026):** four lockable doors moved into the base scope; carcass depth 16" to 18"; laptop stacks pushed toward the back (3" free in front, 1/2" behind).
+**Rev 1 (Nov 4, 2026):** lockable doors moved into the base scope; carcass depth 16" to 18"; laptop stacks pushed toward the back (3" free in front, 1/2" behind).
+
+**Rev 2 (Nov 9, 2026):** two doors instead of four, each covering two columns, both hinged on the center divider and swinging outward.
 
 ## Design
 
@@ -11,7 +13,7 @@ Custom casework package for a client who needs to store 60 laptops (10" x 14" x 
 | Overall | 49" W x 19" D x 35" H (18" carcass + 1" doors) |
 | Layout | 4 columns x 3 tiers = 12 bays, 5 laptops each = **60 laptops** |
 | Clear bay | 11" W x 9" H x 17-1/2" D (1/2" each side, 1-1/2" lift room above a stack, 3" in front, 1/2" behind) |
-| Doors | 4, one per column, 1" TFM, all hinged left, 110° soft-close concealed hinges, cam locks keyed alike, 96 mm wire pulls |
+| Doors | 2, each 24-7/16" W x 29-15/16" H, 1" TFM, both hinged on the center divider (3 soft-close concealed hinges each), swinging outward. Cam locks keyed alike and 96 mm wire pulls at the outer edges. One door alone opens 110°; both together stand back to back at about 85° |
 | Panels | 1" sides, top, bottom deck, 2 fixed shelves, 9 dividers. 1/2" back in a rabbet |
 | Base | 4" toe kick, recessed 3". First bay floor at 5" |
 | Material | 1" particleboard with thermally fused laminate (TFM), 3 mm PVC edgeband |

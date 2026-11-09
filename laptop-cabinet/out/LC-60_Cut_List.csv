@@ -7,5 +7,4 @@ P05,Vertical divider,9,9.0,17.5,1.0,"1"" TFM board",Front,"Grain/length vertical
 P06,Toe kick,1,47.0,4.0,1.0,"1"" TFM board",None,"Between sides, front face recessed 3"" (flush with notch)."
 P07,Rear base rail,1,47.0,4.0,1.0,"1"" TFM board",None,"Between sides under rear of bottom deck, back face flush with back of deck."
 P08,Back panel,1,48.0,30.0,0.5,"1/2"" TFM back",None,"Captured in side rabbets, screwed to rear edges of deck, shelves and dividers #6 x 5/8"" pan head at 6"" o.c."
-P09,"Door, end (A and D)",2,29.9375,12.4375,1.0,"1"" TFM board",All 4 edges,"Hinged left. Outer edge flush with side. 2 x 35 mm hinge cups (inside face), 3/4"" lock hole and 2 pull holes at the free edge. See A-303. Band all 4 edges."
-P10,"Door, center (B and C)",2,29.9375,11.875,1.0,"1"" TFM board",All 4 edges,Hinged left on a divider (half overlay). Same drilling as P09. See A-303. Band all 4 edges.
+P09,"Door (left & right, mirror pair)",2,29.9375,24.4375,1.0,"1"" TFM board",All 4 edges,"Both hinged on the center divider (half overlay), swinging outward; free edge flush with the side. 3 x 35 mm hinge cups (inside face), 3/4"" lock hole and 2 pull holes at the free edge. Make one left and one right. See A-303. Band all 4 edges."

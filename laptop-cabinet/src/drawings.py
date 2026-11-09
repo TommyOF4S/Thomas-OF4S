@@ -25,8 +25,8 @@ RENDERS = os.path.join(OUT, "renders")
 
 PROJECT = "LC-60 laptop storage cabinet"
 CLIENT = "To be confirmed"
-DATE = "Nov 4, 2026"
-REV = "1 · Doors added, 18\" deep"
+DATE = "Nov 9, 2026"
+REV = "2 · Two doors, center hinged"
 
 # ------------------------------------------------------------------ brand
 INK = HexColor("#1a1814")
@@ -385,6 +385,10 @@ def title_block(c, num, title, scale, idx, total):
     draw_text(c, tx, y, "1 · 11/04/26 · Doors in base scope;", 7, "l", "Mono", INK)
     y -= 9
     draw_text(c, tx, y, "    depth 16\" to 18\"; stacks to rear", 7, "l", "Mono", INK)
+    y -= 10
+    draw_text(c, tx, y, "2 · 11/09/26 · Two doors, both hinged", 7, "l", "Mono", INK)
+    y -= 9
+    draw_text(c, tx, y, "    on center divider, swing outward", 7, "l", "Mono", INK)
     # sheet number block
     c.setFillColor(PAPER1)
     c.rect(x0, M - 12, TB_W, 74, stroke=0, fill=1)
@@ -652,7 +656,8 @@ def plan_section_b():
     v = View(6)
     for d in g.DOORS:
         v.rect(d["x0"], -g.DOOR_T, d["x1"], 0, "cut", hatch=True)
-        v.circle(d["x0"] + 0.45, -0.5, 1.6, "obj", fill=INK)          # hinge side marker
+        dirn = 1 if d["hinge"] == "L" else -1
+        v.circle(d["hinge_x"] + dirn * 0.45, -0.5, 1.6, "obj", fill=INK)   # hinge side marker
     yv = lambda y: y   # model y -> view v (front at bottom)
     v.fill(T, yv(g.INT_D), W - T, yv(0), PAPER1)            # bottom deck below
     v.rect(T, yv(g.KICK_SETBACK + T), W - T, yv(g.KICK_SETBACK), "hidden")   # toe kick below deck
@@ -688,7 +693,7 @@ def plan_section_b():
     v.hdim(0, W, -g.DOOR_T, -30)
     v.vchain([-g.DOOR_T, 0, g.LAPTOP_Y0, g.LAPTOP_Y0 + g.LAPTOP_D, g.INT_D], W, 16)
     v.vdim(-g.DOOR_T, D, W, 40)
-    v.leader(g.DOORS[0]["x0"] + 0.45, -0.5, -30, 26, "Hinge side\n(all doors hinged left)", 6)
+    v.leader(g.DOORS[0]["hinge_x"] - 0.45, -0.5, -40, 22, "Both doors hinge on\nthe center divider", 6)
     c0 = g.col_x(0) + (g.OPEN_W - g.LAPTOP_W) / 2
     v.hchain([T, c0, c0 + g.LAPTOP_W, T + g.OPEN_W], D, 12)
     v.leader(T - g.BACK_T / 2, yv(D - 0.2), -24, 16, "1/2\" x 1/2\" rabbet", 6.3)
@@ -776,18 +781,21 @@ def front_closed():
     v.line(W, g.DOOR_Z1, W, g.SIDE_H, "obj")
     for d in g.DOORS:
         x0, x1, z0, z1 = d["x0"], d["x1"], g.DOOR_Z0, g.DOOR_Z1
+        hx, fx = d["hinge_x"], d["free_x"]
+        dirn = 1 if d["hinge"] == "L" else -1
         v.rect(x0, z0, x1, z1, "obj", fill=PAPER2)
         zm = (z0 + z1) / 2
-        v.line(x1, z0, x0, zm, "hidden")                       # swing: apex on hinge side
-        v.line(x0, zm, x1, z1, "hidden")
-        for zc in (z0 + g.HINGE_CUP_Z, z1 - g.HINGE_CUP_Z):
-            v.circle(x0 + g.HINGE_CUP_X, zc, g.HINGE_CUP_DIA / 2 * v.k, "hidden")
-        lx = x1 - g.LOCK_FROM_EDGE
+        v.line(fx, z0, hx, zm, "hidden")                       # swing: apex on hinge side
+        v.line(hx, zm, fx, z1, "hidden")
+        for zc in (z0 + g.HINGE_CUP_Z, z0 + g.DOOR_H / 2, z1 - g.HINGE_CUP_Z):
+            v.circle(hx + dirn * g.HINGE_CUP_X, zc, g.HINGE_CUP_DIA / 2 * v.k, "hidden")
+        lx = fx - dirn * g.LOCK_FROM_EDGE
         v.circle(lx, z1 - g.LOCK_FROM_TOP, g.LOCK_DIA / 2 * v.k, "obj", fill=WHITE)
         v.circle(lx, z1 - g.LOCK_FROM_TOP, 0.9, "obj", fill=INK)
         pt = z1 - g.PULL_TOP_FROM_TOP
         v.rect(lx - 0.15, pt - g.PULL_CC - 0.2, lx + 0.15, pt + 0.2, "obj", fill=INK)
-        v.text((x0 + x1) / 2, z0 + 1.6, f"DOOR {d['id']}", 7, "m", "MonoM", NAVY, dy=-2.5)
+        v.text((x0 + x1) / 2, z0 + 1.6, f"{d['name'].upper()} DOOR  ·  COLUMNS {d['cols'].replace(' and ', ', ')}",
+               7, "m", "MonoM", NAVY, dy=-2.5)
         v.hdim(x0, x1, 0, -16)
     v.hdim(0, W, 0, -36)
     v.vchain([0, g.DOOR_Z0, g.DOOR_Z1, H], 0, -16)
@@ -795,45 +803,61 @@ def front_closed():
     v.elev(W, H, f'TOP  +{fmt(H)} AFF')
     v.elev(W, g.DOOR_Z0, f'DOOR BOTTOM  +{fmt(g.DOOR_Z0)}')
     v.elev(W, 0, "FIN. FLOOR  0\"")
-    a, dd = g.DOORS[0], g.DOORS[-1]
-    v.leader(a["x0"] + g.HINGE_CUP_X, g.DOOR_Z1 - g.HINGE_CUP_Z, 46, -40,
-             "Concealed hinge H08,\n2 per door (hidden)", 6.3)
-    v.leader(dd["x1"] - g.LOCK_FROM_EDGE, g.DOOR_Z1 - g.LOCK_FROM_TOP, -60, -30,
+    rd = g.DOORS[1]
+    v.leader(rd["hinge_x"] + g.HINGE_CUP_X, g.DOOR_Z1 - g.HINGE_CUP_Z, 46, -36,
+             "Concealed hinge H08, 3 per door,\non the center divider (hidden)", 6.3)
+    v.leader(rd["free_x"] - g.LOCK_FROM_EDGE, g.DOOR_Z1 - g.LOCK_FROM_TOP, -60, -30,
              "Cam lock H09,\nkeyed alike", 6.3)
-    v.leader(dd["x1"] - g.LOCK_FROM_EDGE, g.DOOR_Z1 - g.PULL_TOP_FROM_TOP - 2, -60, -70,
+    v.leader(rd["free_x"] - g.LOCK_FROM_EDGE, g.DOOR_Z1 - g.PULL_TOP_FROM_TOP - 2, -60, -70,
              "Wire pull H11,\n96 mm c.c.", 6.3)
-    gx = g.divider_center(1)
-    v.leader(gx, g.DOOR_Z0 + 12, 36, 40, "1/8\" gap, centered\non divider", 6.3)
+    v.leader(g.divider_center(g.CENTER_DIV), g.DOOR_Z0 + 12, 40, 30,
+             "1/8\" gap centered on the center\ndivider; both doors hinge here", 6.3)
     return v
 
 
 def door_swing_plan():
-    """Plan at 1:8 with doors open 90 degrees. Front at the bottom."""
+    """Plan at 1:10: both doors open together (85°), single-door arc to 110°. Front at the bottom."""
     import math
-    v = View(8)
+    v = View(10)
     v.line(-3, D + 0.25, W + 3, D + 0.25, "hidden")
     v.rect(0, 0, W, D, "obj", fill=PAPER2)
     v.text(W / 2, D / 2, "CABINET (TOP)", 6.5, "m", "MonoM", STONE6, dy=-2)
+
+    def rot(p, ang, pivot):
+        ca, sa = math.cos(ang), math.sin(ang)
+        return (pivot[0] + p[0] * ca - p[1] * sa, pivot[1] + p[0] * sa + p[1] * ca)
+
     for d in g.DOORS:
-        x0, w = d["x0"], d["w"]
-        v.rect(x0, -w, x0 + g.DOOR_T, 0, "obj", fill=NAVY1)
-        pts = [(x0 + w * math.cos(a), -w * math.sin(a)) for a in [i * math.pi / 2 / 16 for i in range(17)]]
-        v.poly(pts, "hidden", closed=False)
-        v.text(x0 + w / 2, -0.2, d["id"], 7, "m", "DispSB", NAVY, dy=-10)
+        w = d["w"]
+        pivot = (d["hinge_x"], -g.DOOR_T)          # outside face at the hinge edge
+        fs = 1 if d["hinge"] == "L" else -1         # free side direction
+        sgn = -1 if d["hinge"] == "L" else 1        # opening rotation direction
+        v.rect(d["x0"], -g.DOOR_T, d["x1"], 0, "thin")               # closed position
+        a = math.radians(g.DOOR_OPEN_BOTH) * sgn
+        corners = [(0, 0), (fs * w, 0), (fs * w, g.DOOR_T), (0, g.DOOR_T)]
+        v.poly([rot(p, a, pivot) for p in corners], "obj", fill=NAVY1)
+        arc = [rot((fs * w, 0), math.radians(g.DOOR_OPEN_ONE) * sgn * i / 24, pivot) for i in range(25)]
+        v.poly(arc, "hidden", closed=False)
+        v.text((d["x0"] + d["x1"]) / 2, -g.DOOR_T, d["name"].upper(), 6.5, "m", "MonoM", NAVY, dy=-10)
+    reach = g.DOOR_T + g.DOOR_W
     v.hdim(0, W, D, 12)
-    v.vdim(-g.DOORS[0]["w"], 0, W, 16)
-    v.vdim(-g.DOORS[0]["w"], D, W, 40, txt=f'{fmt(g.DOORS[0]["w"] + D)} with doors open')
+    v.vdim(-reach, 0, W, 16)
+    v.vdim(-reach, D, W, 40, txt=f'{fmt(reach + D)} with doors open')
+    v.leader(g.divider_center(g.CENTER_DIV) + 1.4, -g.DOOR_W * 0.6, 40, -6,
+             f"Both open: about {g.DOOR_OPEN_BOTH}° each,\nback to back at the center", 6.2)
+    v.text(2.5, -8, f"Dashed arc: one door", 6.2, "l", "Geist", STONE6, dy=-2)
+    v.text(2.5, -9.6, f"alone opens to {g.DOOR_OPEN_ONE}°", 6.2, "l", "Geist", STONE6, dy=-2)
     return v
 
 
 def door_detail(d):
-    """Door P09/P10 viewed from outside, 1:4."""
+    """Door P09 viewed from outside, 1:4 (right door shown: hinge edge at left)."""
     w, h = d["w"], g.DOOR_H
     v = View(4)
     v.rect(0, 0, w, h, "obj", fill=PAPER2)
     e = v.p(1.8)
     v.rect(e, e, w - e, h - e, "eb")
-    for (u, z, dia, kind) in g.door_holes(w, h):
+    for (u, z, dia, kind) in g.door_holes(w, h, d["hinge"]):
         if kind == "cup":
             v.circle(u, z, dia / 2 * v.k, "hidden")
             v.line(u - 1.0, z, u + 1.0, z, "center")
@@ -843,16 +867,17 @@ def door_detail(d):
     lx = w - g.LOCK_FROM_EDGE
     pt = h - g.PULL_TOP_FROM_TOP
     v.rect(lx - 0.2, pt - g.PULL_CC - 0.25, lx + 0.2, pt + 0.25, "phantom")
-    v.vchain([0, g.HINGE_CUP_Z, h - g.HINGE_CUP_Z, h], 0, -14)
+    v.vchain([0, g.HINGE_CUP_Z, h / 2, h - g.HINGE_CUP_Z, h], 0, -14)
     v.vdim(0, h, 0, -34)
     v.vchain([h - g.PULL_TOP_FROM_TOP - g.PULL_CC, h - g.PULL_TOP_FROM_TOP, h - g.LOCK_FROM_TOP, h], w, 14)
     v.hchain([0, g.HINGE_CUP_X, lx, w], h, 14)
     v.hdim(0, w, 0, -14)
-    v.leader(g.HINGE_CUP_X, h - g.HINGE_CUP_Z, 34, -24, "35 mm hinge cup, 1/2\" deep,\ninside face", 6.2)
-    v.leader(lx, h - g.LOCK_FROM_TOP, -50, -80, "3/4\" dia. through,\ncam lock H09", 6.2)
-    v.leader(lx, pt - g.PULL_CC, -30, -26, "3/16\" dia. through (2),\npull H11, 96 mm c.c.", 6.2)
-    v.text(w / 2, h / 2, "OUTSIDE FACE", 6.2, "m", "MonoM", STONE6, dy=-2)
-    v.text(w / 2, h / 2 - 1.2, "hinge edge at left", 6.2, "m", "Geist", STONE6, dy=-2)
+    v.leader(g.HINGE_CUP_X, h - g.HINGE_CUP_Z, 40, -24, "35 mm hinge cup, 1/2\" deep, inside face (3)", 6.2)
+    v.leader(lx, h - g.LOCK_FROM_TOP, -50, -60, "3/4\" dia. through,\ncam lock H09", 6.2)
+    v.leader(lx, pt - g.PULL_CC, -40, -26, "3/16\" dia. through (2),\npull H11, 96 mm c.c.", 6.2)
+    v.text(w / 2, h / 2 + 1.5, "RIGHT DOOR SHOWN  ·  OUTSIDE FACE", 6.5, "m", "MonoM", STONE6, dy=-2)
+    v.text(w / 2, h / 2 - 0.2, "Hinge edge at left, on the center divider.", 6.5, "m", "Geist", STONE6, dy=-2)
+    v.text(w / 2, h / 2 - 1.5, "Left door is the mirror: hinge edge at right.", 6.5, "m", "Geist", STONE6, dy=-2)
     return v
 
 
@@ -885,7 +910,7 @@ class SheetSet:
 def sheet_cover(S, c):
     eyebrow(c, M, PH - M - 6, "Custom casework · request for quotation")
     draw_text(c, M, PH - M - 44, "LC-60 laptop storage cabinet", 34, "l", "Disp", INK)
-    paragraph(c, M, PH - M - 66, f'Sixty laptops in twelve bays of five behind four lockable doors. {fmt(W)} wide, '
+    paragraph(c, M, PH - M - 66, f'Sixty laptops in twelve bays of five behind two lockable doors. {fmt(W)} wide, '
               f'{fmt(g.OVERALL_D)} deep with doors, {fmt(H)} tall. 1" panels throughout, 4" toe-kick base.',
               470, 11, "Geist", STONE6, 15)
     # design basis
@@ -900,7 +925,7 @@ def sheet_cover(S, c):
         ("Clear bay", f'{fmt(g.OPEN_W)} W x {fmt(g.OPEN_H)} H x {fmt(g.INT_D)} D'),
         ("Clearance per stack", f'1/2" each side, 1-1/2" above, {fmt(g.FRONT_GAP)} in front, {fmt(g.REAR_GAP)} behind'),
         ("Overall size", f'{fmt(W)} W x {fmt(g.OVERALL_D)} D x {fmt(H)} H ({fmt(D)} carcass + {fmt(g.DOOR_T)} doors)'),
-        ("Doors", f'{g.COLS}, one per column, hinged left, cam locks keyed alike'),
+        ("Doors", f'{len(g.DOORS)}, each over 2 columns, hinged on the center divider, keyed alike'),
         ("Panels", '1" sides, top, deck, shelves, dividers, doors. 1/2" back'),
         ("Base", f'{fmt(B)} toe kick, recessed {fmt(g.KICK_SETBACK)}; first bay floor at {fmt(g.FLOOR1_Z)}'),
         ("Weight (approx.)", f'{g.TOTAL_LB:.0f} lb empty, {g.LOADED_LB:.0f} lb loaded at 5 lb per laptop'),
@@ -1039,7 +1064,7 @@ def sheet_loaded(S, c):
     draw_text(c, xs[0], y, "Total", 8.5, "l", "GeistSB", INK)
     draw_text(c, xs[2], y, str(g.CAPACITY), 8.5, "l", "MonoM", INK)
     y -= 26
-    paragraph(c, x, y, "Bay IDs run A to D left to right, 1 to 3 bottom to top; door A covers bays A1 to A3. "
+    paragraph(c, x, y, "Bay IDs run A to D left to right, 1 to 3 bottom to top; the left door covers columns A and B, the right door C and D. "
               "Optional ID plates are ALT-4.",
               140, 7.5, "Geist", STONE6, 10.5)
 
@@ -1197,38 +1222,39 @@ def sheet_parts2(S, c):
 def sheet_doors(S, c):
     sheet_heading(c, "Part details", "Doors")
     eb_legend(c, 590, PH - M - 26)
-    xs = [110, 450]
-    views = []
-    for x, d in zip(xs, (g.DOORS[0], g.DOORS[1])):
-        v = door_detail(d)
-        render_view(c, v, x, 90)
-        part_title(c, x - 30, 90 + g.DOOR_H * v.k + 40, d["mark"], "1:4")
-        views.append((v, d))
-    x, y = 760, 650
+    d = g.DOORS[1]
+    v = door_detail(d)
+    render_view(c, v, 110, 90)
+    part_title(c, 80, 90 + g.DOOR_H * v.k + 40, d["mark"], "1:4")
+    x, y = 660, 650
     eyebrow(c, x, y, "Door schedule")
-    sched = [["Door", "Part", "Width", "Hinged on"]]
-    for d in g.DOORS:
-        on = "Left side (full overlay)" if d["col"] == 0 else f"Divider {d['col']} (half overlay)"
-        sched.append([d["id"], d["mark"], fmt(d["w"]), on])
-    y = table(c, x, y - 8, sched, [34, 38, 52, 106])
+    sched = [["Door", "Part", "Width", "Covers", "Hinged on", "Lock at"]]
+    for dd in g.DOORS:
+        face = "left" if dd["hinge"] == "R" else "right"
+        sched.append([dd["name"], dd["mark"], fmt(dd["w"]), dd["cols"], f"Center divider, {face} face",
+                      f'{"Left" if dd["hinge"] == "R" else "Right"} side'])
+    y = table(c, x, y - 8, sched, [34, 32, 48, 52, 104, 60])
     y -= 22
     eyebrow(c, x, y, "Door notes")
     notes = [
-        f"4 doors, one per column, {fmt(g.DOOR_T)} TFM to match carcass, 3 mm PVC on all edges.",
+        f"2 doors, each covering two columns, {fmt(g.DOOR_T)} TFM to match carcass, 3 mm PVC on all edges.",
         f"Height {fmt(g.DOOR_H)}: bottom flush with underside of deck ({fmt(g.DOOR_Z0)} AFF), 1/16\" below the top.",
-        "Joints 1/8\" wide, centered on the dividers. Outer edges flush with the sides.",
-        "All doors hinged on the left, 110° soft-close. Allow 30\" clear in front (A-501).",
-        "Locks keyed alike: 2 keys per lock plus a master. Strike on the divider or side behind each free edge.",
+        "Both doors hinge on the center divider and swing outward. 1/8\" joint centered on the divider; "
+        "free edges flush with the sides.",
+        f"3 hinges per door (doors are {fmt(g.DOOR_W)} wide, about 20 lb each). Middle hinge at mid-height "
+        "lands on the tier-2 divider; top and bottom hinges on tiers 3 and 1.",
+        f"One door alone opens to {g.DOOR_OPEN_ONE}°. With both open they stand back to back at about "
+        f"{g.DOOR_OPEN_BOTH}°, so pulls are on the outer edge only. Allow 26\" clear in front (A-501).",
+        "Locks keyed alike: 2 keys per lock plus a master. Strike on the side panel behind each free edge.",
         "2 clear bumpers per door on the back face at the free edge.",
-        "Doors A and D are the same part (P09); B and C are P10. Drilling is identical.",
+        "Make one left and one right door: same size, mirrored drilling.",
     ]
     for t in notes:
         y -= 14
         draw_text(c, x, y, "·", 9, "l", "MonoM", NAVY)
-        y = paragraph(c, x + 10, y, t, 220, 7.5, "Geist", INK, 10.2) + 10.2 - 4
+        y = paragraph(c, x + 10, y, t, 310, 7.5, "Geist", INK, 10.2) + 10.2 - 4
     S.dxf_y = -350
-    for i, (v, d) in enumerate(views):
-        S.to_dxf(v, f'{d["mark"]} DOOR (OUTSIDE FACE)', i * 30)
+    S.to_dxf(v, f'{d["mark"]} RIGHT DOOR (OUTSIDE FACE); LEFT DOOR IS MIRROR', 0)
 
 
 def table(c, x, y, data, col_w, font_size=7.2, hdr_bg=PAPER1, zebra=False, total_row=False):
@@ -1297,8 +1323,8 @@ def sheet_cutlist(S, c):
 def sheet_rfq(S, c):
     sheet_heading(c, "Quotation", "Alternates and quote request")
     v = door_swing_plan()
-    render_view(c, v, 80, 480)
-    view_label(c, 50, 330, 10, "Door swing plan", "Doors open 90°, scale 1:8")
+    render_view(c, v, 90, 560)
+    view_label(c, 50, 340, 10, "Door swing plan", f"Both doors at {g.DOOR_OPEN_BOTH}°, scale 1:10")
     y = 290
     eyebrow(c, M, y, "Alternates · price each separately, per cabinet")
     y -= 4
@@ -1311,7 +1337,7 @@ def sheet_rfq(S, c):
     y = PH - M - 62
     eyebrow(c, x, y, "Please quote")
     asks = [
-        "Unit price for the base cabinet as drawn, including the 4 lockable doors and door hardware, "
+        "Unit price for the base cabinet as drawn, including the 2 lockable doors and door hardware, "
         "at quantities of 1, 2 and 5.",
         "Each alternate (ALT-1 to ALT-5) as a separate add per cabinet.",
         "Freight to 1790 W 8th Ave, Hialeah, FL 33010, and whether it ships assembled or knock-down.",
@@ -1362,7 +1388,7 @@ def build(pdf_path, dxf_path):
     S.add("A-302", "Part details 2", "1:8 at 11 x 17", sheet_parts2)
     S.add("A-303", "Door details", "1:4 at 11 x 17", sheet_doors)
     S.add("A-401", "Cut list and hardware", "None", sheet_cutlist)
-    S.add("A-501", "Alternates, quote request", "1:8 at 11 x 17", sheet_rfq)
+    S.add("A-501", "Alternates, quote request", "1:10 at 11 x 17", sheet_rfq)
     S.build()
     S.dxf.save(dxf_path)
     return S
@@ -1381,13 +1407,14 @@ def parts_dxf(path):
                 dx.line(x + a, y + b, x + cc, y + d, "OUTLINE")
             dx.line(x + g.D - g.BACK_T, y, x + g.D - g.BACK_T, y + g.SIDE_H, "HIDDEN")
             w_, h_ = g.D, g.SIDE_H
-        elif p["mark"] in ("P09", "P10"):
+        elif p["mark"] == "P09":
             w_, h_ = p["Wd"], p["L"]
             for (a, b), (cc, d) in [((0, 0), (w_, 0)), ((w_, 0), (w_, h_)), ((w_, h_), (0, h_)), ((0, h_), (0, 0))]:
                 dx.line(x + a, y + b, x + cc, y + d, "OUTLINE")
             for (u, z, dia, kind) in g.door_holes(w_, h_):
                 dx.circle(x + u, y + z, dia / 2, "HIDDEN" if kind == "cup" else "OUTLINE")
-            dx.text(x, y + h_ + 0.6, 0.6, "OUTSIDE FACE, HINGE EDGE LEFT. CUPS 35MM X 1/2 DEEP ON INSIDE FACE")
+            dx.text(x, y + h_ + 0.6, 0.6, "RIGHT DOOR, OUTSIDE FACE, HINGE EDGE LEFT. LEFT DOOR IS MIRROR. "
+                    "CUPS 35MM X 1/2 DEEP ON INSIDE FACE")
         else:
             w_, h_ = p["L"], p["Wd"]
             for (a, b), (cc, d) in [((0, 0), (w_, 0)), ((w_, 0), (w_, h_)), ((w_, h_), (0, h_)), ((0, h_), (0, 0))]:

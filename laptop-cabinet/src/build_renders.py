@@ -24,8 +24,7 @@ CALLOUTS = [  # label, mark, anchor fractions within the part box (fx, fy, fz), 
     ("Divider t3-3", "P05", (0.0, 0.4, 0.6), 150, -50),
     ("Toe kick", "P06", (0.55, 0.0, 0.5), 190, -20),
     ("Rear rail", "P07", (0.92, 0.0, 0.9), 170, -40),
-    ("Door A", "P09", (0.5, 0.0, 0.3), -150, 30),
-    ("Door B", "P10", (0.5, 0.0, 0.25), 60, 90),
+    ("Door L", "P09", (0.5, 0.0, 0.3), -150, 30),
 ]
 
 PAGE = """<!doctype html><html><head><meta charset="utf-8">
